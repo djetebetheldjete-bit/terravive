@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terravive — Mon plan de culture durable</title>
+<meta name="description" content="Créez votre plan de culture durable personnalisé, accompagné par l'intelligence agronomique de Terravive.">
+<link rel="canonical" href="https://terravive.onrender.com/app">
+<style>
+  :root{ --leaf:#2E7D46; --deep:#1B5E34; --earth:#7A5230; --sun:#E0A93B; --ink:#14261A; --soft:#5b6b5f; --faint:#8a9a8d; --bg:#eef4ec; --surface:#ffffff; --surface2:#f5f9f3; --line:#dde7dc; --good:#2E8B6F; --bad:#c0392b; --f-display:Georgia,'Times New Roman',serif; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{ font-family:"Segoe UI",system-ui,Arial,sans-serif; color:var(--ink); background:var(--bg); }
+  a{ color:var(--deep); }
+  .top{ position:sticky; top:0; z-index:30; background:var(--surface); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; padding:10px 18px; }
+  .brand{ display:flex; align-items:center; gap:10px; font-family:var(--f-display); font-size:20px; color:var(--deep); font-weight:700; }
+  .leafmark{ width:34px; height:34px; border-radius:50% 50% 50% 0; background:linear-gradient(135deg,var(--leaf),var(--sun)); display:inline-block; transform:rotate(-45deg); box-shadow:inset -3px -3px 0 rgba(0,0,0,.06); }
+  .grow{ flex:1; }
+  .btn{ font-family:inherit; font-weight:600; border-radius:9px; padding:9px 15px; cursor:pointer; font-size:.9rem; border:1px solid var(--line); background:var(--surface2); color:var(--ink); }
+  .btn:hover{ filter:brightness(.98); }
+  .btn.primary{ border:none; background:var(--leaf); color:#fff; }
+  .btn.sun{ border:none; background:var(--sun); color:#3a2a06; }
+  .btn:disabled{ opacity:.55; cursor:default; }
+  .acct{ display:flex; align-items:center; gap:8px; font-size:.85rem; color:var(--soft); }
+  .av{ width:30px; height:30px; border-radius:50%; background:var(--deep); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; }
+  .wrap{ max-width:1180px; margin:0 auto; padding:20px 18px 60px; display:grid; grid-template-columns:390px 1fr; gap:20px; }
+  @media(max-width:860px){ .wrap{ grid-template-columns:1fr; } }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:0 4px 18px rgba(20,38,26,.05); }
+  h2.sec{ font-family:var(--f-display); color:var(--deep); font-size:1.15rem; margin:0 0 4px; }
+  .hint{ color:var(--soft); font-size:.85rem; margin:0 0 14px; }
+  label{ display:block; font-size:.8rem; color:var(--soft); font-weight:600; margin:10px 0 4px; }
+  input,select,textarea{ width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:var(--surface2); color:var(--ink); font-family:inherit; font-size:.95rem; }
+  textarea{ min-height:64px; resize:vertical; }
+  .row2{ display:flex; gap:10px; } .row2>div{ flex:1; }
+  .err{ color:var(--bad); font-size:.82rem; min-height:1em; margin-top:6px; }
+  .plans{ margin-top:16px; }
+  .planrow{ display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-radius:10px; padding:9px 11px; margin-bottom:7px; cursor:pointer; background:var(--surface2); }
+  .planrow:hover{ border-color:var(--leaf); }
+  .planrow b{ font-size:.9rem; } .planrow span{ display:block; font-size:.75rem; color:var(--faint); }
+  .empty{ color:var(--faint); font-size:.9rem; text-align:center; padding:16px; }
+  /* Plan rendu */
+  .planbox{ min-height:220px; }
+  .doc h2{ font-family:var(--f-display); color:var(--deep); font-size:1.15rem; border-bottom:2px solid var(--line); padding-bottom:5px; margin:20px 0 10px; }
+  .doc h2:first-child{ margin-top:2px; }
+  .doc ul{ margin:8px 0 8px 2px; padding-left:20px; } .doc li{ margin:5px 0; line-height:1.5; }
+  .doc p{ line-height:1.6; margin:8px 0; }
+  .doc strong{ color:var(--deep); }
+  .pill{ display:inline-flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--line); border-radius:999px; padding:4px 11px; font-size:.78rem; color:var(--soft); margin:0 6px 6px 0; }
+  .pill b{ color:var(--ink); }
+  .placeholder{ text-align:center; color:var(--faint); padding:40px 16px; }
+  .placeholder .big{ font-size:42px; }
+  .toolbar{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  /* Conseiller */
+  .chat{ margin-top:20px; }
+  .thread{ display:flex; flex-direction:column; gap:10px; max-height:420px; overflow:auto; padding:4px; }
+  .msg{ padding:10px 13px; border-radius:12px; font-size:.92rem; line-height:1.5; max-width:85%; white-space:pre-wrap; }
+  .msg.me{ align-self:flex-end; background:var(--leaf); color:#fff; border-bottom-right-radius:3px; }
+  .msg.ai{ align-self:flex-start; background:var(--surface2); border:1px solid var(--line); border-bottom-left-radius:3px; }
+  .msg.ai .doc h2{ font-size:1rem; margin:10px 0 6px; }
+  .composer{ display:flex; gap:8px; margin-top:12px; }
+  .composer input{ flex:1; }
+  /* Modale */
+  .modal-bg{ position:fixed; inset:0; background:rgba(20,38,26,.5); display:none; align-items:center; justify-content:center; z-index:50; padding:16px; }
+  .modal-bg.show{ display:flex; }
+  .modal{ background:var(--surface); border-radius:14px; padding:22px; width:100%; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .modal h3{ font-family:var(--f-display); color:var(--deep); margin:0 0 4px; }
+  .modal p{ color:var(--soft); font-size:.86rem; margin:0 0 12px; }
+  .modal .switch{ text-align:center; font-size:.82rem; color:var(--soft); margin-top:12px; }
+  .modal .link{ background:none; border:none; color:var(--leaf); font-weight:600; cursor:pointer; }
+  .spin{ display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.5); border-top-color:#fff; border-radius:50%; animation:sp .7s linear infinite; vertical-align:-3px; }
+  @keyframes sp{ to{ transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+  <div class="top">
+    <a href="/" class="brand" style="text-decoration:none;"><span class="leafmark"></span> Terravive</a>
+    <span class="grow"></span>
+    <button class="btn primary" id="loginBtn" type="button" style="display:none;">Se connecter</button>
+    <span class="acct" id="acct" style="display:none;"><span class="av" id="av">?</span><span id="acctName"></span></span>
+    <button class="btn" id="logoutBtn" type="button" style="display:none;">Se déconnecter</button>
+  </div>
+
+  <div class="wrap">
+    <!-- Colonne gauche : formulaire + mes plans -->
+    <div>
+      <div class="card">
+        <h2 class="sec">Créer mon plan de culture durable</h2>
+        <p class="hint">Décrivez votre parcelle. L'IA agronome bâtit un plan adapté, tourné vers l'agroécologie.</p>
+        <label>Que voulez-vous cultiver ? *</label>
+        <input id="crop" placeholder="ex. tomate, maïs, cacao, gombo…" maxlength="120">
+        <div class="row2">
+          <div><label>Région / localité</label><input id="region" placeholder="ex. Yamoussoukro" maxlength="120"></div>
+          <div><label>Surface</label><input id="area" placeholder="ex. 500 m², 1 ha" maxlength="80"></div>
+        </div>
+        <div class="row2">
+          <div><label>Type de sol</label>
+            <select id="soil">
+              <option value="">— je ne sais pas —</option>
+              <option>Sableux</option><option>Argileux</option><option>Limoneux</option><option>Latéritique</option><option>Riche / humifère</option><option>Pauvre / dégradé</option>
+            </select>
+          </div>
+          <div><label>Saison / démarrage</label>
+            <select id="season">
+              <option value="">— à préciser —</option>
+              <option>Début de saison des pluies</option><option>Pleine saison des pluies</option><option>Saison sèche (avec irrigation)</option><option>Maintenant</option>
+            </select>
+          </div>
+        </div>
+        <label>Objectif principal</label>
+        <select id="goal">
+          <option value="Produire durablement pour ma famille et vendre le surplus">Autoconsommation + vente du surplus</option>
+          <option value="Produire pour vendre au marché (revenu)">Vente au marché (revenu)</option>
+          <option value="Agriculture 100% biologique, sans produits chimiques">100% biologique</option>
+          <option value="Restaurer et enrichir un sol fatigué">Restaurer un sol fatigué</option>
+        </select>
+        <label>Moyens / contraintes (facultatif)</label>
+        <textarea id="notes" placeholder="ex. peu d'eau disponible, pas de tracteur, budget limité, présence de fourmis…" maxlength="500"></textarea>
+        <div class="err" id="formErr"></div>
+        <button class="btn primary" id="genBtn" type="button" style="width:100%;margin-top:6px;">🌱 Générer mon plan durable</button>
+      </div>
+
+      <div class="card plans">
+        <h2 class="sec">Mes plans</h2>
+        <div id="plansList"><div class="empty">Vos plans apparaîtront ici.</div></div>
+      </div>
+    </div>
+
+    <!-- Colonne droite : plan + conseiller -->
+    <div>
+      <div class="card planbox" id="planCard">
+        <div class="placeholder" id="planPlaceholder">
+          <div class="big">🌿</div>
+          <p>Remplissez le formulaire à gauche et cliquez sur <b>« Générer mon plan durable »</b>.<br>Votre plan personnalisé s'affichera ici.</p>
+        </div>
+        <div id="planContent" style="display:none;">
+          <div id="planPills"></div>
+          <div class="doc" id="planDoc"></div>
+          <div class="toolbar">
+            <button class="btn" id="printBtn" type="button">Imprimer / PDF</button>
+            <button class="btn" id="newBtn" type="button">Nouveau plan</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card chat" id="chatCard" style="display:none;">
+        <h2 class="sec">Conseiller Terravive</h2>
+        <p class="hint" id="chatHint">Une question sur votre culture ? Un problème (feuilles jaunes, insectes) ? Demandez ici — réponses tournées vers l'agriculture durable.</p>
+        <div class="thread" id="thread"></div>
+        <div class="composer">
+          <input id="chatInput" placeholder="ex. Mes feuilles de tomate jaunissent, que faire ?" maxlength="500">
+          <button class="btn sun" id="sendBtn" type="button">Envoyer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale connexion / inscription -->
+  <div class="modal-bg" id="authModal">
+    <div class="modal">
+      <h3 id="authTitle">Créer mon compte</h3>
+      <p id="authIntro">Gratuit — pour sauvegarder vos plans et suivre vos cultures.</p>
+      <div id="nameWrap"><label style="font-size:.8rem;color:var(--soft);font-weight:600;">Nom</label><input id="auName" placeholder="Votre nom" maxlength="80"></div>
+      <div id="regionWrap"><label style="font-size:.8rem;color:var(--soft);font-weight:600;">Région (facultatif)</label><input id="auRegion" placeholder="ex. Bouaké" maxlength="80"></div>
+      <label style="font-size:.8rem;color:var(--soft);font-weight:600;">E-mail</label><input id="auEmail" type="email" placeholder="vous@exemple.com" autocomplete="username">
+      <label style="font-size:.8rem;color:var(--soft);font-weight:600;">Mot de passe</label><input id="auPass" type="password" placeholder="au moins 6 caractères" autocomplete="current-password">
+      <div class="err" id="authErr"></div>
+      <button class="btn primary" id="authGo" type="button" style="width:100%;">Créer mon compte</button>
+      <div class="switch" id="authSwitch">Déjà un compte ? <button class="link" id="switchLink" type="button">Se connecter</button></div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let me = null, authMode = "register", currentPlan = null, chatHistory = [];
+
+  // ---- Rendu Markdown minimal (##, listes -, **gras**, paragraphes) ----
+  function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+  function inline(s){ return esc(s).replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>").replace(/\*([^*]+)\*/g,"<em>$1</em>"); }
+  function renderMd(md){
+    const lines = String(md||"").replace(/\r/g,"").split("\n"); let html="", inList=false;
+    const closeList=()=>{ if(inList){ html+="</ul>"; inList=false; } };
+    for(let raw of lines){
+      const l = raw.trimEnd();
+      if(/^##\s+/.test(l)){ closeList(); html+="<h2>"+inline(l.replace(/^##\s+/,""))+"</h2>"; continue; }
+      if(/^#\s+/.test(l)){ closeList(); html+="<h2>"+inline(l.replace(/^#\s+/,""))+"</h2>"; continue; }
+      if(/^\s*[-*]\s+/.test(l)){ if(!inList){ html+="<ul>"; inList=true; } html+="<li>"+inline(l.replace(/^\s*[-*]\s+/,""))+"</li>"; continue; }
+      if(/^\s*\d+\.\s+/.test(l)){ if(!inList){ html+="<ul>"; inList=true; } html+="<li>"+inline(l.replace(/^\s*\d+\.\s+/,""))+"</li>"; continue; }
+      if(l.trim()===""){ closeList(); continue; }
+      closeList(); html+="<p>"+inline(l)+"</p>";
+    }
+    closeList(); return html;
+  }
+
+  // ---- Comptes ----
+  async function loadMe(){
+    try{ const r = await fetch("/api/auth/me"); me = (await r.json()).user || null; }catch(e){ me=null; }
+    render();
+  }
+  function render(){
+    if(me){
+      $("loginBtn").style.display="none"; $("logoutBtn").style.display="inline-block";
+      $("acct").style.display="flex"; $("acctName").textContent = me.name; $("av").textContent=(me.name||"?").charAt(0).toUpperCase();
+      loadPlans();
+    } else {
+      $("loginBtn").style.display="inline-block"; $("logoutBtn").style.display="none"; $("acct").style.display="none";
+      $("plansList").innerHTML='<div class="empty">Connectez-vous pour retrouver vos plans.</div>';
+    }
+  }
+  function openAuth(mode){
+    authMode = mode || "register";
+    $("authModal").classList.add("show");
+    const reg = authMode==="register";
+    $("authTitle").textContent = reg? "Créer mon compte":"Se connecter";
+    $("authIntro").textContent = reg? "Gratuit — pour sauvegarder vos plans et suivre vos cultures." : "Content de vous revoir.";
+    $("nameWrap").style.display = reg? "block":"none"; $("regionWrap").style.display = reg? "block":"none";
+    $("authGo").textContent = reg? "Créer mon compte":"Se connecter";
+    $("authSwitch").innerHTML = reg? 'Déjà un compte ? <button class="link" id="switchLink" type="button">Se connecter</button>' : 'Pas encore de compte ? <button class="link" id="switchLink" type="button">Créer un compte</button>';
+    $("switchLink").addEventListener("click", ()=>openAuth(reg?"login":"register"));
+    $("authErr").textContent=""; $("auPass").value="";
+  }
+  function closeAuth(){ $("authModal").classList.remove("show"); }
+  async function doAuth(){
+    const err=$("authErr"); err.textContent="";
+    const email=$("auEmail").value.trim(), pass=$("auPass").value;
+    if(!email||!pass){ err.textContent="Renseignez l'e-mail et le mot de passe."; return; }
+    const url = authMode==="register" ? "/api/auth/register" : "/api/auth/login";
+    const body = authMode==="register" ? { name:$("auName").value, region:$("auRegion").value, email, password:pass } : { email, password:pass };
+    $("authGo").disabled=true;
+    try{
+      const r = await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+      const d = await r.json(); if(!r.ok){ err.textContent=d.error||"Erreur"; $("authGo").disabled=false; return; }
+      me = d.user; closeAuth(); render();
+    }catch(e){ err.textContent="Serveur injoignable."; }
+    $("authGo").disabled=false;
+  }
+
+  // ---- Plans ----
+  async function loadPlans(){
+    try{
+      const r = await fetch("/api/plans"); const d = await r.json();
+      const box=$("plansList");
+      if(!r.ok || !d.plans || !d.plans.length){ box.innerHTML='<div class="empty">Aucun plan pour l\'instant.</div>'; return; }
+      box.innerHTML="";
+      d.plans.forEach(p=>{
+        const row=document.createElement("div"); row.className="planrow";
+        row.innerHTML='<div style="flex:1"><b>'+esc(p.title||p.crop)+'</b><span>'+new Date(p.created_at).toLocaleDateString('fr-FR')+'</span></div><span>➜</span>';
+        row.addEventListener("click", ()=>openPlan(p.id));
+        box.appendChild(row);
+      });
+    }catch(e){}
+  }
+  function showPlan(plan){
+    currentPlan = plan; chatHistory=[];
+    $("planPlaceholder").style.display="none"; $("planContent").style.display="block";
+    const pills=[["Culture",plan.crop],["Région",plan.region],["Surface",plan.area],["Sol",plan.soil],["Saison",plan.season]].filter(x=>x[1]);
+    $("planPills").innerHTML = pills.map(x=>'<span class="pill">'+x[0]+' : <b>'+esc(x[1])+'</b></span>').join("");
+    $("planDoc").innerHTML = renderMd(plan.content);
+    $("chatCard").style.display="block"; $("thread").innerHTML="";
+    $("chatHint").innerHTML='Une question sur votre culture de <b>'+esc(plan.crop)+'</b> ? Un problème observé ? Demandez ici.';
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+  async function openPlan(id){
+    try{ const r=await fetch("/api/plan?id="+encodeURIComponent(id)); const d=await r.json(); if(r.ok) showPlan(d.plan); }catch(e){}
+  }
+  async function generate(){
+    if(!me){ openAuth("register"); return; }
+    const crop=$("crop").value.trim(), err=$("formErr"); err.textContent="";
+    if(!crop){ err.textContent="Indiquez au moins ce que vous voulez cultiver."; return; }
+    const btn=$("genBtn"); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Génération du plan…';
+    try{
+      const body={ crop, region:$("region").value, area:$("area").value, soil:$("soil").value, season:$("season").value, goal:$("goal").value, notes:$("notes").value };
+      const r=await fetch("/api/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+      const d=await r.json();
+      if(!r.ok){ err.textContent=d.error||"La génération a échoué."; }
+      else { showPlan(d.plan); loadPlans(); }
+    }catch(e){ err.textContent="Serveur injoignable."; }
+    btn.disabled=false; btn.innerHTML="🌱 Générer mon plan durable";
+  }
+
+  // ---- Conseiller ----
+  function bubble(text, who, asMd){
+    const d=document.createElement("div"); d.className="msg "+(who==="me"?"me":"ai");
+    if(asMd){ d.innerHTML='<div class="doc">'+renderMd(text)+'</div>'; } else { d.textContent=text; }
+    $("thread").appendChild(d); $("thread").scrollTop=$("thread").scrollHeight; return d;
+  }
+  async function sendChat(){
+    const inp=$("chatInput"); const q=inp.value.trim(); if(!q) return;
+    inp.value=""; bubble(q,"me"); chatHistory.push({role:"user",content:q});
+    const wait=bubble("…","ai"); $("sendBtn").disabled=true;
+    try{
+      const r=await fetch("/api/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ message:q, planId: currentPlan?currentPlan.id:null, history: chatHistory.slice(0,-1) })});
+      const d=await r.json();
+      wait.remove();
+      if(!r.ok){ bubble(d.error||"La réponse a échoué.","ai"); }
+      else { bubble(d.reply,"ai",true); chatHistory.push({role:"assistant",content:d.reply}); }
+    }catch(e){ wait.remove(); bubble("Serveur injoignable.","ai"); }
+    $("sendBtn").disabled=false;
+  }
+
+  // ---- Événements ----
+  $("loginBtn").addEventListener("click", ()=>openAuth("login"));
+  $("logoutBtn").addEventListener("click", async ()=>{ try{ await fetch("/api/auth/logout",{method:"POST"}); }catch(e){} me=null; render(); });
+  $("authGo").addEventListener("click", doAuth);
+  $("auPass").addEventListener("keydown",e=>{ if(e.key==="Enter") doAuth(); });
+  $("authModal").addEventListener("click",e=>{ if(e.target.id==="authModal") closeAuth(); });
+  $("genBtn").addEventListener("click", generate);
+  $("sendBtn").addEventListener("click", sendChat);
+  $("chatInput").addEventListener("keydown",e=>{ if(e.key==="Enter") sendChat(); });
+  $("printBtn").addEventListener("click", ()=>window.print());
+  $("newBtn").addEventListener("click", ()=>{ $("planContent").style.display="none"; $("planPlaceholder").style.display="block"; $("chatCard").style.display="none"; window.scrollTo({top:0,behavior:"smooth"}); });
+
+  loadMe();
+</script>
+</body>
+</html>

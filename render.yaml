@@ -1,0 +1,21 @@
+# Configuration de déploiement pour Render (https://render.com)
+# Render lit ce fichier et configure le service. Renseignez les clés
+# marquées « sync: false » dans le tableau de bord (jamais dans le code).
+services:
+  - type: web
+    name: terravive
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false            # votre clé Claude
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-5
+      - key: ADMIN_EMAILS
+        sync: false            # e-mail(s) administrateur
+      - key: SUPABASE_URL
+        sync: false            # facultatif
+      - key: SUPABASE_KEY
+        sync: false            # facultatif

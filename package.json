@@ -1,0 +1,12 @@
+{
+  "name": "terravive",
+  "version": "1.0.0",
+  "description": "Terravive — l'agriculture durable accompagnée par l'intelligence artificielle.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
