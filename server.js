@@ -137,6 +137,35 @@ async function listPlansForUser(userId) {
   return Object.values(loadStore().plans).filter((p) => p.user_id === userId).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
 }
 
+// ---------- Bibliothèque partagée : réutilisation par CULTURE + SECTEUR ----------
+// Si un itinéraire a déjà été établi pour la même culture dans la même région, on le
+// ressert (instantané et gratuit) au lieu de rappeler l'IA. Base COMMUNE à tous les
+// utilisateurs : ce qu'une personne crée pour un secteur profite aux suivantes.
+function normKey(s) {
+  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "") // enlève les accents
+    .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+function sectorKey(crop, region) {
+  const c = normKey(crop), r = normKey(region);
+  if (!c || !r) return null; // pas de « secteur » tant qu'il manque la culture OU la région
+  return c + "|" + r;
+}
+async function findSharedPlan(crop, region) {
+  const key = sectorKey(crop, region);
+  if (!key) return null;
+  let rows = [];
+  if (USE_DB) {
+    try { rows = (await sb(`/trv_plans?select=id,crop,region,created_at&order=created_at.desc&limit=500`)) || []; }
+    catch (e) { return null; }
+  } else {
+    rows = Object.values(loadStore().plans)
+      .map((p) => ({ id: p.id, crop: p.crop, region: p.region, created_at: p.created_at }))
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  }
+  const hit = rows.find((p) => sectorKey(p.crop, p.region) === key);
+  return hit ? await getPlan(hit.id) : null;
+}
+
 // ---------- Appel IA (bascule de clés) ----------
 const RETRYABLE = [408, 409, 429, 500, 502, 503, 504, 529];
 let KEY_CURSOR = 0;
@@ -291,16 +320,29 @@ async function handlePlan(req, res) {
   if (!API_KEY) return sendJson(res, 500, { error: "Clé IA manquante (ANTHROPIC_API_KEY)." });
   const user = await currentUser(req);
   if (!user) return sendJson(res, 401, { error: "Connectez-vous pour créer votre plan." });
-  if (!rateOk("plan:" + user.id, 20, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Vous avez généré beaucoup de plans aujourd'hui. Reprenez plus tard." });
   let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
   const crop = String(p.crop || "").trim().slice(0, 120);
   if (!crop) return sendJson(res, 400, { error: "Indiquez au moins la culture souhaitée." });
   const clean = { crop, region: String(p.region || "").slice(0, 120), area: String(p.area || "").slice(0, 80), soil: String(p.soil || "").slice(0, 80), ph: String(p.ph || "").slice(0, 40), season: String(p.season || "").slice(0, 80), goal: String(p.goal || "").slice(0, 120), notes: String(p.notes || "").slice(0, 500) };
+  const fresh = p.fresh === true || p.fresh === "1" || p.fresh === 1;
+
+  // 1) RÉUTILISATION : un itinéraire existe-t-il déjà pour cette culture dans ce secteur ?
+  //    Si oui (et que la personne n'a pas demandé expressément un nouveau), on le ressert
+  //    immédiatement — gratuit, instantané, sans toucher la limite ni le coût IA.
+  if (!fresh) {
+    try {
+      const existing = await findSharedPlan(crop, clean.region);
+      if (existing && existing.content) return sendJson(res, 200, { plan: existing, reused: true, sector: clean.region || null });
+    } catch (e) { /* en cas de souci de lecture, on bascule simplement sur la génération */ }
+  }
+
+  // 2) GÉNÉRATION par l'IA (compte dans la limite journalière et dans le coût).
+  if (!rateOk("plan:" + user.id, 20, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Vous avez généré beaucoup de plans aujourd'hui. Reprenez plus tard." });
   try {
     const content = await callClaude(planSystem(), [{ role: "user", content: planUserMessage(clean) }], null, PLAN_MAX_TOKENS);
     const rec = { id: newId(), user_id: user.id, title: crop + (clean.region ? " — " + clean.region : ""), crop, region: clean.region || null, area: clean.area || null, soil: clean.soil || null, season: clean.season || null, goal: clean.goal || null, notes: clean.notes || null, content, created_at: new Date().toISOString() };
     await savePlan(rec);
-    sendJson(res, 200, { plan: rec });
+    sendJson(res, 200, { plan: rec, reused: false });
   } catch (e) { sendJson(res, e.status || 500, { error: e.message || "La génération a échoué." }); }
 }
 async function handlePlansList(req, res) { const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." }); sendJson(res, 200, { plans: await listPlansForUser(user.id) }); }

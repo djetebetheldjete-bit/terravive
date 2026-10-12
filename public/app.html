@@ -140,6 +140,7 @@
           <p>Remplissez le formulaire à gauche et cliquez sur <b>« Générer mon itinéraire »</b>.<br>Votre itinéraire technique personnalisé s'affichera ici.</p>
         </div>
         <div id="planContent" style="display:none;">
+          <div id="reuseNote" style="display:none;"></div>
           <div id="planPills"></div>
           <div class="doc" id="planDoc"></div>
           <div class="toolbar">
@@ -267,9 +268,19 @@
       });
     }catch(e){}
   }
-  function showPlan(plan){
+  function showPlan(plan, reuse){
     currentPlan = plan; chatHistory=[];
     $("planPlaceholder").style.display="none"; $("planContent").style.display="block";
+    const rn=$("reuseNote");
+    if(reuse && reuse.reused){
+      rn.style.display="block";
+      rn.innerHTML='<div style="background:#f5f9f3;border:1px solid #dde7dc;border-left:4px solid #E0A93B;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:.92rem;color:#14261A;">'
+        +'<b>Itinéraire déjà établi pour ce secteur.</b> Un plan existe déjà pour <b>'+esc(plan.crop)+'</b>'
+        +(reuse.sector?' dans le secteur de <b>'+esc(reuse.sector)+'</b>':'')
+        +'. Le voici — vous pouvez le garder tel quel, ou en générer un nouveau adapté à vos informations.'
+        +'<div style="margin-top:10px;"><button class="btn primary" id="regenBtn" type="button">Générer un nouveau</button></div></div>';
+      var rb=document.getElementById("regenBtn"); if(rb) rb.onclick=function(){ generate(true); };
+    } else { rn.style.display="none"; rn.innerHTML=""; }
     const pills=[["Culture",plan.crop],["Région",plan.region],["Surface",plan.area],["Sol",plan.soil],["Saison",plan.season]].filter(x=>x[1]);
     $("planPills").innerHTML = pills.map(x=>'<span class="pill">'+x[0]+' : <b>'+esc(x[1])+'</b></span>').join("");
     $("planDoc").innerHTML = renderMd(plan.content);
@@ -280,17 +291,19 @@
   async function openPlan(id){
     try{ const r=await fetch("/api/plan?id="+encodeURIComponent(id)); const d=await r.json(); if(r.ok) showPlan(d.plan); }catch(e){}
   }
-  async function generate(){
+  async function generate(fresh){
+    fresh = (fresh===true);
     if(!me){ openAuth("register"); return; }
     const crop=$("crop").value.trim(), err=$("formErr"); err.textContent="";
     if(!crop){ err.textContent="Indiquez au moins ce que vous voulez cultiver."; return; }
     const btn=$("genBtn"); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Génération de l\'itinéraire…';
+    var rb=document.getElementById("regenBtn"); if(rb){ rb.disabled=true; rb.innerHTML='<span class="spin"></span> Génération…'; }
     try{
-      const body={ crop, region:$("region").value, area:$("area").value, soil:$("soil").value, ph:$("ph").value, season:$("season").value, goal:$("goal").value, notes:$("notes").value };
+      const body={ crop, region:$("region").value, area:$("area").value, soil:$("soil").value, ph:$("ph").value, season:$("season").value, goal:$("goal").value, notes:$("notes").value, fresh:fresh };
       const r=await fetch("/api/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
       const d=await r.json();
       if(!r.ok){ err.textContent=d.error||"La génération a échoué."; }
-      else { showPlan(d.plan); loadPlans(); }
+      else { showPlan(d.plan, { reused: d.reused===true, sector: d.sector }); if(d.reused!==true) loadPlans(); }
     }catch(e){ err.textContent="Serveur injoignable."; }
     btn.disabled=false; btn.innerHTML="Générer mon itinéraire";
   }
@@ -355,7 +368,7 @@
   $("authGo").addEventListener("click", doAuth);
   $("auPass").addEventListener("keydown",e=>{ if(e.key==="Enter") doAuth(); });
   $("authModal").addEventListener("click",e=>{ if(e.target.id==="authModal") closeAuth(); });
-  $("genBtn").addEventListener("click", generate);
+  $("genBtn").addEventListener("click", ()=>generate(false));
   $("sendBtn").addEventListener("click", sendChat);
   $("chatInput").addEventListener("keydown",e=>{ if(e.key==="Enter") sendChat(); });
   $("pdfBtn").addEventListener("click", exportPlanPDF);
