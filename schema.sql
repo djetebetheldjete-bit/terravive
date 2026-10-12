@@ -37,3 +37,16 @@ create table if not exists trv_plans (
   created_at timestamptz default now()
 );
 create index if not exists trv_plans_user_idx on trv_plans (user_id, created_at desc);
+
+-- Projets d'automatisation agricole (Arduino) générés
+create table if not exists trv_devices (
+  id text primary key,
+  user_id text,
+  title text,
+  kind text,                  -- type de projet (ex. « arrosage automatique »)
+  sector text,                -- région / secteur (pour la mémoire partagée)
+  need text,                  -- le besoin décrit par la personne
+  content text,               -- le projet complet (Markdown : matériel, câblage, sketch…)
+  created_at timestamptz default now()
+);
+create index if not exists trv_devices_user_idx on trv_devices (user_id, created_at desc);

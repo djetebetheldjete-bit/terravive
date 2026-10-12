@@ -36,6 +36,8 @@ const API_KEY = API_KEYS[0];
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 // Longueur max (tokens) pour la génération du plan — l'itinéraire complet est long.
 const PLAN_MAX_TOKENS = parseInt(process.env.PLAN_MAX_TOKENS, 10) || 8000;
+// Longueur max pour un projet Arduino (le sketch commenté + le guide peuvent être longs).
+const ARDUINO_MAX_TOKENS = parseInt(process.env.ARDUINO_MAX_TOKENS, 10) || 9000;
 const PORT = process.env.PORT || 3000;
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -71,7 +73,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { return JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {} }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {} }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -164,6 +166,42 @@ async function findSharedPlan(crop, region) {
   }
   const hit = rows.find((p) => sectorKey(p.crop, p.region) === key);
   return hit ? await getPlan(hit.id) : null;
+}
+
+// ---------- Projets d'automatisation agricole (Arduino) ----------
+async function saveDevice(rec) {
+  if (USE_DB) { try { await sb(`/trv_devices?on_conflict=id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("saveDevice:", e.message); } return; }
+  const s = loadStore(); s.devices[rec.id] = rec; saveStore(s);
+}
+async function getDevice(id) {
+  if (USE_DB) { try { const r = await sb(`/trv_devices?id=eq.${encodeURIComponent(id)}&select=*`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return loadStore().devices[id] || null;
+}
+async function listDevicesForUser(userId) {
+  if (USE_DB) { try { return (await sb(`/trv_devices?user_id=eq.${encodeURIComponent(userId)}&select=id,title,kind,sector,created_at&order=created_at.desc`)) || []; } catch (e) { return []; } }
+  return Object.values(loadStore().devices).filter((d) => d.user_id === userId).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+}
+// Mémoire partagée : un projet déjà créé pour le même TYPE dans le même SECTEUR est resservi.
+function deviceKey(kind, sector) {
+  const k = normKey(kind);
+  if (!k) return null;
+  const s = normKey(sector);
+  return k + "|" + (s || "*"); // sans secteur renseigné, on partage par type seul
+}
+async function findSharedDevice(kind, sector) {
+  const key = deviceKey(kind, sector);
+  if (!key) return null;
+  let rows = [];
+  if (USE_DB) {
+    try { rows = (await sb(`/trv_devices?select=id,kind,sector,created_at&order=created_at.desc&limit=500`)) || []; }
+    catch (e) { return null; }
+  } else {
+    rows = Object.values(loadStore().devices)
+      .map((d) => ({ id: d.id, kind: d.kind, sector: d.sector, created_at: d.created_at }))
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  }
+  const hit = rows.find((d) => deviceKey(d.kind, d.sector) === key);
+  return hit ? await getDevice(hit.id) : null;
 }
 
 // ---------- Appel IA (bascule de clés) ----------
@@ -291,6 +329,59 @@ Tu réponds aux questions de l'agriculteur au fil de sa saison : diagnostic de p
   return s;
 }
 
+// ---------- Automatisation agricole (Arduino) ----------
+function arduinoSystem() {
+  return `Tu es un FORMATEUR en électronique pratique et en automatisation pour l'AGRICULTURE DURABLE, à l'aise avec Arduino, au service d'agriculteurs d'Afrique de l'Ouest (notamment la Côte d'Ivoire). Tu t'adresses à des personnes qui débutent en électronique : sois clair, concret, bienveillant, en français simple, et explique chaque terme technique en quelques mots.
+
+TÂCHE : à partir du BESOIN d'automatisation décrit par la personne (ex. arroser automatiquement quand la terre est sèche, surveiller une serre, alerter en cas de gel, surveiller le niveau d'une cuve d'eau…), produis un PROJET ARDUINO COMPLET et prêt à réaliser, en français, au format Markdown.
+
+Respecte EXACTEMENT ces sections (titres en ##), dans cet ordre :
+
+## 1. Ce que fait ce montage
+En quelques phrases simples : le principe, ce que la personne va obtenir, et en quoi c'est utile et durable (ex. économie d'eau, intervention au bon moment).
+
+## 2. Matériel nécessaire
+Une LISTE à puces : chaque composant, son rôle en une phrase, et une précision utile (ex. capteur d'humidité CAPACITIF de préférence, car il ne rouille pas). Rappelle les précautions : un actionneur de puissance (pompe, électrovanne, ventilateur) a TOUJOURS sa PROPRE alimentation et passe PAR UN RELAIS — jamais directement sur une broche de l'Arduino (trop de courant). Reste sur du matériel courant et peu coûteux, disponible localement.
+
+## 3. Le câblage (où brancher chaque fil)
+Explique broche par broche, en texte clair, où va chaque fil (ex. « le fil de signal du capteur → broche A0 »). Donne des repères simples (VCC = +, GND = masse/−). Mentionne une LED témoin + sa résistance 220 Ω si c'est utile.
+
+## 4. Le programme Arduino (sketch)
+Donne le sketch COMPLET dans UN SEUL bloc de code délimité par trois accents graves et le mot cpp (\`\`\`cpp … \`\`\`). Le code doit être ABONDAMMENT COMMENTÉ en français (comme un cours), avec :
+- un en-tête qui rappelle le but, le matériel et la sécurité ;
+- des constantes de RÉGLAGE clairement regroupées et expliquées (seuils, durées, pauses…), faciles à calibrer ;
+- setup() et loop() expliqués ;
+- l'affichage de mesures sur le moniteur série (Serial) pour que la personne comprenne ce qui se passe ;
+- des sécurités (ex. ne pas faire tourner la pompe à vide, respecter une pause mini entre deux actions).
+Le code doit compiler tel quel pour une carte Arduino Uno et rester simple à lire.
+
+## 5. Tester puis installer
+Explique comment TESTER d'abord en simulation sur Wokwi (créer un nouveau projet Arduino Uno, coller le sketch, lancer la simulation) AVANT de câbler le vrai matériel ; puis comment téléverser le sketch sur la vraie carte avec le logiciel Arduino, et où placer capteurs et actionneurs au champ.
+
+## 6. Réglages à calibrer et sécurité
+Comment calibrer les seuils sur SA terre / SA situation (ex. lire la valeur du capteur quand c'est sec puis humide et choisir un seuil entre les deux). Rappelle les précautions d'eau + électricité (protéger les connexions de la pluie, alimentation adaptée, pompe via relais).
+
+## 7. Aller plus loin
+2 ou 3 améliorations concrètes et utiles (ex. ajouter un capteur de pluie, un capteur de niveau de cuve, une plage horaire d'arrosage, l'envoi d'une alerte), en une ligne chacune.
+
+RÈGLE SPÉCIALE — ARROSAGE : si le besoin concerne l'arrosage automatique, fais un montage ENRICHI (pas seulement l'humidité du sol). Intègre, quand c'est pertinent, PLUSIEURS paramètres et explique chacun : humidité du sol (capteur capacitif), détection de PLUIE (ne pas arroser s'il pleut), température et humidité de l'air (capteur DHT — arroser de préférence aux heures fraîches pour limiter l'évaporation), NIVEAU de la cuve d'eau (sécurité : ne pas faire tourner la pompe à vide), PLAGE HORAIRE d'arrosage (éviter midi), durée d'arrosage et pause minimale entre deux arrosages, LED témoin et journal série. Garde le code lisible et bien commenté malgré ces ajouts.
+
+RÈGLES GÉNÉRALES :
+- Reste réaliste et prudent ; ne propose jamais de montage dangereux (eau + secteur 220 V sans précautions, etc.).
+- Adapte aux moyens locaux (composants courants, petit budget).
+- Langage simple, pédagogique.
+- Ne mets aucune introduction avant la première section ## 1.`;
+}
+function arduinoUserMessage(d) {
+  return `Voici le projet d'automatisation que je veux réaliser :
+- Type de projet : ${d.kind || "non précisé"}
+- Région / secteur : ${d.sector || "non précisé"}
+- Ce que je veux automatiser (en détail) : ${d.need || "non précisé"}
+- Mon matériel ou mes contraintes : ${d.gear || "non précisé"}
+
+Rédige le projet Arduino complet, avec le sketch commenté.`;
+}
+
 // ---------- Points d'entrée API ----------
 async function handleRegister(req, res) {
   try {
@@ -376,12 +467,50 @@ async function handleAdminUsers(req, res) {
   sendJson(res, 200, { users: users.map((x) => ({ id: x.id, email: x.email, name: x.name, region: x.region || null, created_at: x.created_at, plans: count[x.id] || 0 })), totalPlans: plans.length });
 }
 
+async function handleArduino(req, res) {
+  if (!API_KEY) return sendJson(res, 500, { error: "Clé IA manquante (ANTHROPIC_API_KEY)." });
+  const user = await currentUser(req);
+  if (!user) return sendJson(res, 401, { error: "Connectez-vous pour créer votre projet." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const kind = String(p.kind || "").trim().slice(0, 120);
+  const need = String(p.need || "").trim().slice(0, 800);
+  if (!kind && !need) return sendJson(res, 400, { error: "Indiquez au moins ce que vous voulez automatiser." });
+  const clean = { kind: kind || "Projet Arduino", sector: String(p.sector || "").slice(0, 120), need, gear: String(p.gear || "").slice(0, 400) };
+  const fresh = p.fresh === true || p.fresh === "1" || p.fresh === 1;
+
+  // 1) RÉUTILISATION : un projet existe-t-il déjà pour ce type dans ce secteur ?
+  if (!fresh) {
+    try {
+      const existing = await findSharedDevice(clean.kind, clean.sector);
+      if (existing && existing.content) return sendJson(res, 200, { device: existing, reused: true, sector: clean.sector || null });
+    } catch (e) { /* on bascule sur la génération */ }
+  }
+
+  // 2) GÉNÉRATION par l'IA (compte dans la limite et le coût).
+  if (!rateOk("arduino:" + user.id, 20, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Vous avez généré beaucoup de projets aujourd'hui. Reprenez plus tard." });
+  try {
+    const content = await callClaude(arduinoSystem(), [{ role: "user", content: arduinoUserMessage(clean) }], null, ARDUINO_MAX_TOKENS);
+    const rec = { id: newId(), user_id: user.id, title: clean.kind + (clean.sector ? " — " + clean.sector : ""), kind: clean.kind, sector: clean.sector || null, need: clean.need || null, content, created_at: new Date().toISOString() };
+    await saveDevice(rec);
+    sendJson(res, 200, { device: rec, reused: false });
+  } catch (e) { sendJson(res, e.status || 500, { error: e.message || "La génération a échoué." }); }
+}
+async function handleDevicesList(req, res) { const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." }); sendJson(res, 200, { devices: await listDevicesForUser(user.id) }); }
+async function handleDeviceGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const id = new URL(req.url, "http://x").searchParams.get("id");
+  const device = id ? await getDevice(id) : null;
+  if (!device || device.user_id !== user.id) return sendJson(res, 404, { error: "Projet introuvable." });
+  sendJson(res, 200, { device });
+}
+
 // ---------- Fichiers statiques ----------
 function serveStatic(req, res) {
   let urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
   if (urlPath === "/") urlPath = "/accueil.html";
   if (urlPath === "/app") urlPath = "/app.html";
   if (urlPath === "/accueil") urlPath = "/accueil.html";
+  if (urlPath === "/arduino") urlPath = "/arduino.html";
   const safe = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(PUBLIC_DIR, safe);
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end("Accès interdit"); }
@@ -402,6 +531,9 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && url === "/api/plan") return handlePlan(req, res);
   if (req.method === "GET" && url === "/api/plans") return handlePlansList(req, res);
   if (req.method === "GET" && url === "/api/plan") return handlePlanGet(req, res);
+  if (req.method === "POST" && url === "/api/arduino") return handleArduino(req, res);
+  if (req.method === "GET" && url === "/api/devices") return handleDevicesList(req, res);
+  if (req.method === "GET" && url === "/api/device") return handleDeviceGet(req, res);
   if (req.method === "POST" && url === "/api/chat") return handleChat(req, res);
   if (req.method === "GET" && url === "/api/admin/users") return handleAdminUsers(req, res);
   if (req.method === "GET") return serveStatic(req, res);

@@ -1,0 +1,24 @@
+# ============================================================
+# Terravive — variables d'environnement (exemple)
+# Copiez ce fichier en « .env » et renseignez vos valeurs.
+# Sur Render : renseignez ces variables dans le tableau de bord (jamais dans le code).
+# ============================================================
+
+# Clé de l'API Claude (obligatoire pour générer les plans et le conseiller)
+ANTHROPIC_API_KEY=
+
+# Facultatif : plusieurs clés séparées par des virgules (bascule automatique si l'une sature)
+# ANTHROPIC_API_KEYS=cle1,cle2
+
+# Modèle (par défaut : claude-sonnet-5)
+ANTHROPIC_MODEL=claude-sonnet-5
+
+# Adresse(s) e-mail administrateur (accès à l'espace admin), séparées par des virgules
+ADMIN_EMAILS=
+
+# Base de données Supabase (facultatif). Sans elle, les données sont stockées en fichiers locaux.
+SUPABASE_URL=
+SUPABASE_KEY=
+
+# Port (Render le définit automatiquement)
+# PORT=3000
