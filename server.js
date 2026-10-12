@@ -73,7 +73,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {} }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {} }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -202,6 +202,66 @@ async function findSharedDevice(kind, sector) {
   }
   const hit = rows.find((d) => deviceKey(d.kind, d.sector) === key);
   return hit ? await getDevice(hit.id) : null;
+}
+
+// ---------- Station connectée + mesures des capteurs ----------
+async function getOrCreateStation(userId) {
+  if (USE_DB) {
+    try {
+      const r = await sb(`/trv_stations?user_id=eq.${encodeURIComponent(userId)}&select=*&limit=1`);
+      if (r && r[0]) return r[0];
+      const rec = { id: newId(), user_id: userId, name: "Ma parcelle", device_key: "trv_" + crypto.randomBytes(16).toString("hex"), created_at: new Date().toISOString() };
+      await sb(`/trv_stations`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) });
+      return rec;
+    } catch (e) { return null; }
+  }
+  const s = loadStore();
+  let st = Object.values(s.stations).find((x) => x.user_id === userId);
+  if (!st) { st = { id: newId(), user_id: userId, name: "Ma parcelle", device_key: "trv_" + crypto.randomBytes(16).toString("hex"), created_at: new Date().toISOString() }; s.stations[st.id] = st; saveStore(s); }
+  return st;
+}
+async function getStationByKey(key) {
+  if (!key) return null;
+  if (USE_DB) { try { const r = await sb(`/trv_stations?device_key=eq.${encodeURIComponent(key)}&select=*&limit=1`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return Object.values(loadStore().stations).find((x) => x.device_key === key) || null;
+}
+async function saveReading(rec) {
+  if (USE_DB) { try { await sb(`/trv_readings`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("saveReading:", e.message); } return; }
+  const s = loadStore(); s.readings[rec.id] = rec;
+  // on garde au plus 500 mesures par utilisateur en local (évite de gonfler le fichier)
+  const mine = Object.values(s.readings).filter((x) => x.user_id === rec.user_id).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  if (mine.length > 500) mine.slice(500).forEach((x) => { delete s.readings[x.id]; });
+  saveStore(s);
+}
+async function recentReadings(userId, limit) {
+  const n = limit || 48;
+  if (USE_DB) { try { return (await sb(`/trv_readings?user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc&limit=${n}`)) || []; } catch (e) { return []; } }
+  return Object.values(loadStore().readings).filter((x) => x.user_id === userId).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, n);
+}
+
+// ---------- Météo (Open-Meteo, gratuit, sans clé) ----------
+const WEATHER_CACHE = new Map(); // region -> { at, data }
+const WEATHER_TTL = 30 * 60 * 1000;
+async function fetchWeather(region) {
+  const key = normKey(region) || "_";
+  const hit = WEATHER_CACHE.get(key);
+  if (hit && Date.now() - hit.at < WEATHER_TTL) return hit.data;
+  let data = null;
+  try {
+    const q = encodeURIComponent((region && String(region).trim()) || "Yamoussoukro");
+    const geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=1&language=fr&format=json`).then((r) => r.json());
+    const g = geo && geo.results && geo.results[0];
+    const lat = g ? g.latitude : 6.82, lon = g ? g.longitude : -5.28; // défaut : Yamoussoukro
+    const place = g ? (g.name + (g.admin1 ? ", " + g.admin1 : "")) : "Yamoussoukro";
+    const f = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=4&timezone=auto`).then((r) => r.json());
+    data = {
+      place,
+      current: f.current ? { temp: Math.round(f.current.temperature_2m), hum: f.current.relative_humidity_2m, rain: f.current.precipitation, code: f.current.weather_code } : null,
+      daily: f.daily ? f.daily.time.map((t, i) => ({ date: t, code: f.daily.weather_code[i], tmax: Math.round(f.daily.temperature_2m_max[i]), tmin: Math.round(f.daily.temperature_2m_min[i]), rainP: f.daily.precipitation_probability_max ? f.daily.precipitation_probability_max[i] : null })) : []
+    };
+  } catch (e) { data = null; }
+  WEATHER_CACHE.set(key, { at: Date.now(), data });
+  return data;
 }
 
 // ---------- Appel IA (bascule de clés) ----------
@@ -504,6 +564,49 @@ async function handleDeviceGet(req, res) {
   sendJson(res, 200, { device });
 }
 
+// Réception des mesures envoyées par une carte (ESP32). Pas de cookie : la carte
+// s'authentifie avec sa CLÉ D'APPAREIL (device_key). Entrée simple et robuste.
+async function handleIngest(req, res) {
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const key = String(p.key || req.headers["x-device-key"] || "").trim();
+  const station = await getStationByKey(key);
+  if (!station) return sendJson(res, 401, { error: "Clé d'appareil inconnue." });
+  if (!rateOk("ingest:" + station.id, 300, 60 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de mesures. Ralentissez l'envoi." });
+  const num = (v, min, max) => { const n = Number(v); return (isFinite(n)) ? Math.max(min, Math.min(max, n)) : null; };
+  const rec = {
+    id: newId(), user_id: station.user_id, station_id: station.id,
+    soil: (p.soil != null) ? Math.round(num(p.soil, 0, 100)) : null,
+    temp: (p.temp != null) ? Math.round(num(p.temp, -20, 80) * 10) / 10 : null,
+    hum: (p.hum != null) ? Math.round(num(p.hum, 0, 100)) : null,
+    level: (p.level != null) ? Math.round(num(p.level, 0, 100)) : null,
+    created_at: new Date().toISOString()
+  };
+  await saveReading(rec);
+  sendJson(res, 200, { ok: true });
+}
+async function handleStation(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const st = await getOrCreateStation(user.id);
+  if (!st) return sendJson(res, 500, { error: "Impossible de préparer la station." });
+  sendJson(res, 200, { station: { id: st.id, name: st.name, device_key: st.device_key } });
+}
+async function handleDashboard(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const [plans, devices, readings] = await Promise.all([listPlansForUser(user.id), listDevicesForUser(user.id), recentReadings(user.id, 48)]);
+  const region = (user.region) || (plans[0] && plans[0].region) || "";
+  const weather = await fetchWeather(region);
+  const latest = readings[0] || null;
+  sendJson(res, 200, {
+    user: { name: user.name, region: user.region || null },
+    counts: { plans: plans.length, devices: devices.length, readings: readings.length },
+    latest,
+    readings: readings.slice().reverse(), // du plus ancien au plus récent (pour le graphique)
+    recentPlans: plans.slice(0, 4),
+    recentDevices: devices.slice(0, 4),
+    weather
+  });
+}
+
 // ---------- Fichiers statiques ----------
 function serveStatic(req, res) {
   let urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
@@ -511,6 +614,7 @@ function serveStatic(req, res) {
   if (urlPath === "/app") urlPath = "/app.html";
   if (urlPath === "/accueil") urlPath = "/accueil.html";
   if (urlPath === "/arduino") urlPath = "/arduino.html";
+  if (urlPath === "/tableau" || urlPath === "/dashboard") urlPath = "/tableau.html";
   const safe = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(PUBLIC_DIR, safe);
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end("Accès interdit"); }
@@ -531,6 +635,9 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && url === "/api/plan") return handlePlan(req, res);
   if (req.method === "GET" && url === "/api/plans") return handlePlansList(req, res);
   if (req.method === "GET" && url === "/api/plan") return handlePlanGet(req, res);
+  if (req.method === "POST" && url === "/api/ingest") return handleIngest(req, res);
+  if (req.method === "GET" && url === "/api/station") return handleStation(req, res);
+  if (req.method === "GET" && url === "/api/dashboard") return handleDashboard(req, res);
   if (req.method === "POST" && url === "/api/arduino") return handleArduino(req, res);
   if (req.method === "GET" && url === "/api/devices") return handleDevicesList(req, res);
   if (req.method === "GET" && url === "/api/device") return handleDeviceGet(req, res);
