@@ -7,7 +7,9 @@
 <meta name="description" content="Tableau de bord Terravive : météo, humidité du sol, capteurs de votre parcelle, plans et projets — en un coup d'œil.">
 <link rel="canonical" href="https://terravive.onrender.com/tableau">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <style>
   /* ===== Thèmes (modes modifiables) ===== */
   :root{
@@ -115,9 +117,24 @@
   .tipbar{ background:linear-gradient(120deg,var(--surface2),var(--surface)); border:1px solid var(--line); border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:12px; margin-top:16px; }
   .tipbar .ti{ color:var(--leaf); } .tipbar .ti svg{ width:24px; height:24px; }
   .section-gap{ margin-top:16px; }
-  #map{ height:320px; border-radius:12px; margin-top:12px; border:1px solid var(--line); z-index:1; }
+  #map{ height:340px; border-radius:12px; margin-top:12px; border:1px solid var(--line); z-index:1; }
   .leaflet-container{ background:var(--surface2); font:inherit; }
-  .maprow{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px; }
+  .maprow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .maprow select.sel{ font-family:inherit; font-size:.88rem; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); cursor:pointer; }
+  .vchips{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .vchip{ background:var(--surface2); border:1px solid var(--line); border-radius:11px; padding:10px 12px; min-width:92px; }
+  .vchip .l{ font-size:.72rem; color:var(--soft); } .vchip .v{ font-family:var(--f-display); font-size:1.25rem; color:var(--ink); }
+  .valert{ border-radius:11px; padding:11px 13px; margin-top:12px; font-size:.9rem; border:1px solid var(--line); }
+  .valert.ok{ background:color-mix(in srgb,var(--good) 12%,transparent); border-color:color-mix(in srgb,var(--good) 35%,transparent); }
+  .valert.warn{ background:color-mix(in srgb,var(--sun) 14%,transparent); border-color:color-mix(in srgb,var(--sun) 40%,transparent); }
+  .valert.bad{ background:color-mix(in srgb,var(--bad) 12%,transparent); border-color:color-mix(in srgb,var(--bad) 35%,transparent); }
+  .vverdict{ background:var(--surface2); border:1px solid var(--line); border-left:5px solid var(--line); border-radius:10px; padding:11px 13px; margin-top:8px; }
+  .vverdict.fav{ border-left-color:var(--good); } .vverdict.prec{ border-left-color:var(--sun); } .vverdict.dec{ border-left-color:var(--bad); }
+  .vverdict .tete{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .vverdict .nom{ font-weight:700; text-transform:capitalize; }
+  .vbadge{ font-size:.72rem; font-weight:700; padding:3px 9px; border-radius:20px; color:#fff; }
+  .vbadge.fav{ background:var(--good); } .vbadge.prec{ background:var(--sun); color:#2a1d04; } .vbadge.dec{ background:var(--bad); }
+  .vverdict ul{ margin:7px 0 0 18px; font-size:.84rem; color:var(--soft); } .vverdict .note{ font-size:.8rem; color:var(--faint); font-style:italic; margin-top:5px; }
 </style>
 </head>
 <body>
@@ -173,13 +190,19 @@
           </div>
 
           <div class="card section-gap">
-            <h2 class="ct">Ma parcelle</h2>
-            <div class="muted" id="mapSub">Vue satellite centrée sur votre secteur. Déplacez le repère sur votre parcelle, puis enregistrez.</div>
+            <h2 class="ct">Ma parcelle — surveillance satellite</h2>
+            <div class="muted" id="mapSub">Dessinez votre parcelle sur la carte (outil rectangle ou polygone, en haut à gauche de la carte), puis lancez une analyse satellite via Vertea.</div>
             <div id="map"></div>
-            <div class="maprow">
-              <button class="btn primary" id="saveLoc" type="button" style="display:none;">Enregistrer l'emplacement</button>
-              <span class="muted" id="locInfo"></span>
+            <div class="maprow" id="verteaControls" style="display:none;">
+              <select class="sel" id="vCulture" title="Culture (pour le besoin en eau)">
+                <option value="tomate">Tomate</option><option value="concombre">Concombre</option><option value="piment">Piment</option><option value="laitue">Laitue</option>
+              </select>
+              <button class="btn primary" id="btnNdvi" type="button">Santé (NDVI)</button>
+              <button class="btn" id="btnEau" type="button">Besoin en eau</button>
+              <button class="btn" id="btnPlant" type="button">Quoi planter&nbsp;?</button>
             </div>
+            <div class="muted section-gap" id="vStatus" style="min-height:1em;"></div>
+            <div id="vOut"></div>
           </div>
 
           <div class="card section-gap">
@@ -330,19 +353,113 @@
     initParcelMap(d);
   }
 
-  // ===== Carte de la parcelle (vue satellite) =====
-  let MAP=null, MARKER=null, pendingLoc=null;
-  function savedParcelle(){ try{ const s=localStorage.getItem("trv-parcelle"); return s?JSON.parse(s):null; }catch(e){ return null; } }
+  // ===== Carte de la parcelle (vue satellite) + appels à Vertea =====
+  const VERTEA_BASE = "https://agriscan-z7dc.onrender.com";
+  let MAP=null, drawGroup=null, zoneActive=null, ndviLayer=null;
+  function savedParcelle(){ try{ const s=localStorage.getItem("trv-parcelle"); const o=s?JSON.parse(s):null; return (o&&(o.bbox||o.polygon))?o:null; }catch(e){ return null; } }
+  function ymd(dt){ return dt.toISOString().slice(0,10); }
+  function daysAgo(n){ const dt=new Date(); dt.setDate(dt.getDate()-n); return dt; }
+
+  function showControls(){ $("verteaControls").style.display="flex"; $("mapSub").textContent="Parcelle enregistrée. Lancez une analyse satellite ci-dessous (15–40 s)."; }
+  function setZoneFromLayer(layer){
+    if(layer instanceof L.Rectangle){ const b=layer.getBounds(); zoneActive={ bbox:[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()] }; }
+    else if(layer.getLatLngs){ zoneActive={ polygon: layer.getLatLngs()[0].map(p=>[p.lng,p.lat]) }; }
+    try{ localStorage.setItem("trv-parcelle", JSON.stringify(zoneActive)); }catch(e){}
+    try{ MAP.fitBounds(layer.getBounds()); }catch(e){}
+    showControls();
+  }
+  function restoreZone(sv){
+    let layer=null;
+    if(sv.bbox){ layer=L.rectangle([[sv.bbox[1],sv.bbox[0]],[sv.bbox[3],sv.bbox[2]]], {color:'#C58A2A',weight:2,fill:false}); }
+    else if(sv.polygon){ layer=L.polygon(sv.polygon.map(p=>[p[1],p[0]]), {color:'#C58A2A',weight:2,fill:false}); }
+    if(layer){ drawGroup.addLayer(layer); zoneActive=sv; try{MAP.fitBounds(layer.getBounds());}catch(e){} showControls(); }
+  }
   function initParcelMap(d){
     if(MAP || !window.L){ return; }
     const sv=savedParcelle();
-    const center = sv ? [sv.lat, sv.lon] : (d.weather && d.weather.lat!=null ? [d.weather.lat, d.weather.lon] : [6.82,-5.28]);
-    MAP = L.map('map', { zoomControl:true }).setView(center, sv?16:13);
+    const center = (d.weather && d.weather.lat!=null) ? [d.weather.lat, d.weather.lon] : [6.82,-5.28];
+    MAP = L.map('map', { zoomControl:true }).setView(center, 13);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'Imagerie © Esri, Maxar, Earthstar Geographics' }).addTo(MAP);
-    MARKER = L.marker(center, { draggable:true }).addTo(MAP);
-    MARKER.on('dragend', ()=>{ const ll=MARKER.getLatLng(); pendingLoc={ lat:+ll.lat.toFixed(6), lon:+ll.lng.toFixed(6) }; $("saveLoc").style.display="inline-flex"; $("locInfo").textContent="Nouvel emplacement : "+pendingLoc.lat+", "+pendingLoc.lon; });
-    if(sv){ $("locInfo").textContent="Parcelle enregistrée ("+sv.lat+", "+sv.lon+")."; $("mapSub").textContent="Vue satellite de votre parcelle. Déplacez le repère si besoin, puis enregistrez."; }
-    setTimeout(()=>{ try{ MAP.invalidateSize(); }catch(e){} }, 250);
+    drawGroup = new L.FeatureGroup(); MAP.addLayer(drawGroup);
+    if(L.Control && L.Control.Draw){
+      const dc = new L.Control.Draw({
+        draw:{ rectangle:{shapeOptions:{color:'#C58A2A',weight:2,fill:false}}, polygon:{shapeOptions:{color:'#C58A2A',weight:2,fill:false},allowIntersection:false,showArea:true}, polyline:false, circle:false, marker:false, circlemarker:false },
+        edit:{ featureGroup:drawGroup, remove:true }
+      });
+      MAP.addControl(dc);
+      MAP.on(L.Draw.Event.CREATED, (e)=>{ drawGroup.clearLayers(); if(ndviLayer){MAP.removeLayer(ndviLayer);ndviLayer=null;} drawGroup.addLayer(e.layer); setZoneFromLayer(e.layer); });
+      MAP.on(L.Draw.Event.DELETED, ()=>{ zoneActive=null; try{localStorage.removeItem("trv-parcelle");}catch(e){} $("verteaControls").style.display="none"; $("vOut").innerHTML=""; $("mapSub").textContent="Dessinez votre parcelle sur la carte, puis lancez une analyse satellite."; });
+    }
+    if(sv){ restoreZone(sv); }
+    setTimeout(()=>{ try{ MAP.invalidateSize(); }catch(e){} }, 300);
+  }
+
+  // --- Appels au moteur satellite Vertea ---
+  function vSetBusy(on, msg){ $("vStatus").textContent=msg||""; ["btnNdvi","btnEau","btnPlant"].forEach(id=>{ const b=$(id); if(b) b.disabled=!!on; }); }
+  async function vFetch(path, body){
+    const r = await fetch(VERTEA_BASE+path, { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(body) });
+    return r.json();
+  }
+  function alertClass(f, m){ if((f||0)>=25) return "bad"; if((f||0)+(m||0)>=50) return "warn"; return "ok"; }
+  async function runNdvi(){
+    if(!zoneActive){ $("vStatus").textContent="Dessinez d'abord votre parcelle."; return; }
+    vSetBusy(true, "Analyse de la santé des cultures (NDVI)… cela peut prendre 15–40 s.");
+    try{
+      const d = await vFetch("/ndvi", Object.assign({}, zoneActive, { date_debut: ymd(daysAgo(180)), date_fin: ymd(new Date()) }));
+      if(d.erreur){ vSetBusy(false, "Erreur : "+d.erreur); return; }
+      if(ndviLayer) MAP.removeLayer(ndviLayer);
+      if(d.tile_url){ ndviLayer=L.tileLayer(d.tile_url,{opacity:0.85}); ndviLayer.addTo(MAP); }
+      const ac=alertClass(d.pct_faible,d.pct_moyen);
+      const txt = ac==="bad" ? ("Alerte : "+d.pct_faible+"% de la parcelle montre une végétation faible — vérifiez le sol ou l'irrigation sur ces zones.")
+                : ac==="warn" ? "À surveiller : une partie de la parcelle n'est pas en pleine vigueur."
+                : "Parcelle en bonne santé : la végétation est majoritairement vigoureuse.";
+      $("vOut").innerHTML =
+        '<div class="vchips">'
+        +'<div class="vchip"><div class="l">NDVI moyen</div><div class="v">'+(d.ndvi_moyen??"—")+'</div></div>'
+        +'<div class="vchip"><div class="l">Surface</div><div class="v">'+(d.surface_ha??"—")+' ha</div></div>'
+        +'<div class="vchip"><div class="l">Saine</div><div class="v">'+(d.pct_sain??"—")+'%</div></div>'
+        +'<div class="vchip"><div class="l">À surveiller</div><div class="v">'+(d.pct_moyen??"—")+'%</div></div>'
+        +'<div class="vchip"><div class="l">Faible</div><div class="v">'+(d.pct_faible??"—")+'%</div></div>'
+        +'</div><div class="valert '+ac+'">'+txt+'</div>';
+      vSetBusy(false, "Analyse de santé terminée. La carte NDVI est affichée sur la parcelle.");
+    }catch(e){ vSetBusy(false, "Impossible de joindre Vertea. Le service se réveille peut-être (réessayez dans ~30 s)."); }
+  }
+  async function runIrrigation(){
+    if(!zoneActive){ $("vStatus").textContent="Dessinez d'abord votre parcelle."; return; }
+    const culture=$("vCulture").value;
+    vSetBusy(true, "Calcul du besoin en eau (FAO-56, ERA5 + CHIRPS)… 15–40 s.");
+    try{
+      const body = Object.assign({}, zoneActive, { culture, date_semis: ymd(daysAgo(110)), date_fin: ymd(daysAgo(50)) });
+      const d = await vFetch("/irrigation", body);
+      if(d.erreur){ vSetBusy(false, "Erreur : "+d.erreur); return; }
+      const litres = Math.round((d.besoin_irrigation_mm_j||0)*10000);
+      const ac = (d.besoin_irrigation_mm_j<=0) ? "ok" : "warn";
+      const msg = (d.besoin_irrigation_mm_j<=0)
+        ? "La pluie couvre les besoins actuels : aucune irrigation nécessaire sur cette période."
+        : "Apport conseillé : environ "+d.besoin_irrigation_mm_j+" mm/jour, soit ~"+litres.toLocaleString("fr-FR")+" litres par hectare et par jour.";
+      $("vOut").innerHTML =
+        '<div class="vchips">'
+        +'<div class="vchip"><div class="l">Besoin</div><div class="v">'+d.besoin_irrigation_mm_j+' mm/j</div></div>'
+        +'<div class="vchip"><div class="l">ET₀</div><div class="v">'+d.et0_mm_j+'</div></div>'
+        +'<div class="vchip"><div class="l">ETc</div><div class="v">'+d.etc_mm_j+'</div></div>'
+        +'<div class="vchip"><div class="l">Kc ('+esc(d.stade||"")+')</div><div class="v">'+d.kc+'</div></div>'
+        +'<div class="vchip"><div class="l">Pluie efficace</div><div class="v">'+d.pluie_efficace_mm_j+'</div></div>'
+        +'</div><div class="valert '+ac+'">'+msg+'</div>';
+      vSetBusy(false, "Besoin en eau calculé pour « "+esc(d.culture)+" ».");
+    }catch(e){ vSetBusy(false, "Impossible de joindre Vertea. Le service se réveille peut-être (réessayez dans ~30 s)."); }
+  }
+  async function runPlantation(){
+    if(!zoneActive){ $("vStatus").textContent="Dessinez d'abord votre parcelle."; return; }
+    vSetBusy(true, "Analyse des cultures adaptées (ERA5 + CHIRPS)… 15–40 s.");
+    try{
+      const d = await vFetch("/plantation", Object.assign({}, zoneActive, { date_ref: ymd(daysAgo(50)) }));
+      if(d.erreur){ vSetBusy(false, "Erreur : "+d.erreur); return; }
+      const cls=v=> v==="Favorable"?"fav":(v==="Deconseille"?"dec":"prec");
+      let html='<div class="valert ok">Mois : '+esc(d.mois||"")+' · Température ~'+(d.temperature_moy??"?")+'°C · Pluie sur ~90 j : '+(d.pluie_cycle_mm??"?")+' mm</div>';
+      (d.cultures||[]).forEach(c=>{ const k=cls(c.verdict); html+='<div class="vverdict '+k+'"><div class="tete"><span class="nom">'+esc(c.culture)+'</span><span class="vbadge '+k+'">'+esc(c.verdict)+'</span></div><ul>'+(c.raisons||[]).map(r=>'<li>'+esc(r)+'</li>').join("")+'</ul><div class="note">'+esc(c.note||"")+'</div></div>'; });
+      $("vOut").innerHTML=html;
+      vSetBusy(false, "Conseil de plantation calculé.");
+    }catch(e){ vSetBusy(false, "Impossible de joindre Vertea. Le service se réveille peut-être (réessayez dans ~30 s)."); }
   }
 
   // ===== Station : clé + programme ESP32 =====
@@ -434,7 +551,9 @@ void loop() {
 
   $("themeSel").addEventListener("change", (e)=>applyTheme(e.target.value));
   (function syncThemeSel(){ let t="nature"; try{ t=localStorage.getItem("trv-theme")||"nature"; }catch(e){} $("themeSel").value=t; })();
-  $("saveLoc").addEventListener("click", ()=>{ if(!pendingLoc) return; try{ localStorage.setItem("trv-parcelle", JSON.stringify(pendingLoc)); }catch(e){} $("saveLoc").style.display="none"; $("locInfo").textContent="Parcelle enregistrée ("+pendingLoc.lat+", "+pendingLoc.lon+")."; });
+  $("btnNdvi").addEventListener("click", runNdvi);
+  $("btnEau").addEventListener("click", runIrrigation);
+  $("btnPlant").addEventListener("click", runPlantation);
   $("revealBtn").addEventListener("click", ()=>{ keyShown=!keyShown; $("revealBtn").textContent=keyShown?"Masquer":"Afficher"; renderKey(); });
   $("copyKeyBtn").addEventListener("click", copyKey);
   $("sketchBtn").addEventListener("click", downloadSketch);
