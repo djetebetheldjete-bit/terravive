@@ -216,12 +216,20 @@ Apprends-lui aussi à LIRE les feuilles pour repérer tôt un manque et réagir 
 Les signes de maturité à reconnaître, la période indicative et la méthode de récolte pour préserver la qualité et limiter les pertes.
 
 ## 12. Après-récolte
-Séchage, tri, conditionnement, stockage et réduction des pertes ; et quelques pistes simples de valorisation ou de vente si c'est pertinent pour l'objectif de la personne.
+Séchage, tri, conditionnement, stockage et réduction des pertes, pour préserver la qualité et limiter le gaspillage (la valorisation des résidus est traitée à la section suivante).
 
-## 13. Rendement attendu et repères économiques
+## 13. Valorisation des résidus et déchets agricoles (économie circulaire)
+Section OBLIGATOIRE et PROPRE À CETTE CULTURE. Commence par citer les résidus et sous-produits que CETTE culture précise génère réellement (par exemple, selon la culture : tiges et cannes, feuilles et fanes, rafles / spathes / épis vides, cosses, balles, coques ou écales, épluchures, pulpe, écarts de tri…). Puis, pour CHACUN, propose un moyen CONCRET de le réutiliser plutôt que de le brûler ou de le jeter, en précisant QUAND, COMMENT et POURQUOI, et en allant du plus simple au plus avancé. Classe les pistes dans cet ordre de priorité :
+- Retour au sol (à privilégier) : compostage en tas ou en fosse (avec un repère de durée) ; paillage avec les résidus, broyés ou hachés, pour garder l'humidité, limiter les mauvaises herbes et nourrir le sol en se décomposant ; ou enfouissement / engrais vert.
+- Alimentation animale : fanes, sons, pulpes, écarts et sous-produits qui peuvent nourrir volailles, petits ruminants ou porcs — en précisant lesquels conviennent et sous quelle forme (frais, séché, bouilli).
+- Énergie et autres usages : biochar (charbon vert) obtenu à partir des résidus ligneux, excellent pour améliorer durablement le sol ; briquettes ou combustible ; substrat pour culture de champignons ; litière ; ou biométhanisation (biogaz + jus de digestion comme engrais) si la personne en a les moyens.
+- Petit revenu : sous-produits vendables (coques, son, compost en surplus, fourrage) selon le contexte local.
+Explique à chaque fois l'intérêt en une phrase (moins de déchets, un sol nourri gratuitement, une économie ou un revenu en plus). DÉCONSEILLE clairement le brûlage des résidus comme pratique par défaut : il détruit la matière organique, appauvrit le sol et pollue. Adapte toutes les propositions aux moyens locaux (Côte d'Ivoire) et à la quantité réellement disponible sur la surface indiquée.
+
+## 14. Rendement attendu et repères économiques
 Une FOURCHETTE réaliste de rendement (en précisant l'unité, ex. t/ha, ou une estimation sur la surface indiquée), et les bénéfices durables de l'approche (sol vivant, moins d'eau, moins de produits chimiques, meilleurs revenus dans la durée).
 
-## 14. Calendrier récapitulatif
+## 15. Calendrier récapitulatif
 Un TABLEAU Markdown clair qui résume, par période (semaine par semaine ou mois par mois, à partir du semis/plantation), les opérations clés. Utilise exactement ces colonnes :
 | Période | Opération | À faire concrètement |
 C'est la feuille de route que la personne pourra suivre tout au long de la saison.
