@@ -270,12 +270,12 @@ async function fetchWeather(region) {
     if (f && f.current) {
       ok = true;
       data = {
-        place,
+        place, lat, lon,
         current: { temp: Math.round(f.current.temperature_2m), hum: f.current.relative_humidity_2m, rain: f.current.precipitation, code: f.current.weather_code },
         daily: f.daily ? f.daily.time.map((t, i) => ({ date: t, code: f.daily.weather_code[i], tmax: Math.round(f.daily.temperature_2m_max[i]), tmin: Math.round(f.daily.temperature_2m_min[i]), rainP: f.daily.precipitation_probability_max ? f.daily.precipitation_probability_max[i] : null })) : []
       };
     } else {
-      data = { place, current: null, daily: [] };
+      data = { place, lat, lon, current: null, daily: [] };
     }
   } catch (e) { data = null; }
   // On ne fige PAS un échec pendant 30 min : en cas de problème, on retente au bout de 90 s.

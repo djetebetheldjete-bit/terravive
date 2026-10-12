@@ -6,6 +6,8 @@
 <title>Terravive — Tableau de bord</title>
 <meta name="description" content="Tableau de bord Terravive : météo, humidité du sol, capteurs de votre parcelle, plans et projets — en un coup d'œil.">
 <link rel="canonical" href="https://terravive.onrender.com/tableau">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   /* ===== Thèmes (modes modifiables) ===== */
   :root{
@@ -113,6 +115,9 @@
   .tipbar{ background:linear-gradient(120deg,var(--surface2),var(--surface)); border:1px solid var(--line); border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:12px; margin-top:16px; }
   .tipbar .ti{ color:var(--leaf); } .tipbar .ti svg{ width:24px; height:24px; }
   .section-gap{ margin-top:16px; }
+  #map{ height:320px; border-radius:12px; margin-top:12px; border:1px solid var(--line); z-index:1; }
+  .leaflet-container{ background:var(--surface2); font:inherit; }
+  .maprow{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px; }
 </style>
 </head>
 <body>
@@ -165,6 +170,16 @@
             <h2 class="ct">Humidité du sol — tendance</h2>
             <div class="muted" id="chartSub">En attente des premières mesures de votre capteur.</div>
             <div class="chartwrap section-gap" id="chartWrap"><div class="muted" style="padding:30px 0;text-align:center;" id="chartEmpty">Aucune mesure pour l'instant. Branchez votre station (voir « Ma station » à droite).</div></div>
+          </div>
+
+          <div class="card section-gap">
+            <h2 class="ct">Ma parcelle</h2>
+            <div class="muted" id="mapSub">Vue satellite centrée sur votre secteur. Déplacez le repère sur votre parcelle, puis enregistrez.</div>
+            <div id="map"></div>
+            <div class="maprow">
+              <button class="btn primary" id="saveLoc" type="button" style="display:none;">Enregistrer l'emplacement</button>
+              <span class="muted" id="locInfo"></span>
+            </div>
           </div>
 
           <div class="card section-gap">
@@ -311,6 +326,23 @@
     // plans récents
     const rp=(d.recentPlans||[]);
     $("recentPlans").innerHTML = rp.length ? rp.map(p=>'<a href="/app"><span>'+esc(p.title||p.crop)+'</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>').join("") : "";
+    // carte de la parcelle
+    initParcelMap(d);
+  }
+
+  // ===== Carte de la parcelle (vue satellite) =====
+  let MAP=null, MARKER=null, pendingLoc=null;
+  function savedParcelle(){ try{ const s=localStorage.getItem("trv-parcelle"); return s?JSON.parse(s):null; }catch(e){ return null; } }
+  function initParcelMap(d){
+    if(MAP || !window.L){ return; }
+    const sv=savedParcelle();
+    const center = sv ? [sv.lat, sv.lon] : (d.weather && d.weather.lat!=null ? [d.weather.lat, d.weather.lon] : [6.82,-5.28]);
+    MAP = L.map('map', { zoomControl:true }).setView(center, sv?16:13);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'Imagerie © Esri, Maxar, Earthstar Geographics' }).addTo(MAP);
+    MARKER = L.marker(center, { draggable:true }).addTo(MAP);
+    MARKER.on('dragend', ()=>{ const ll=MARKER.getLatLng(); pendingLoc={ lat:+ll.lat.toFixed(6), lon:+ll.lng.toFixed(6) }; $("saveLoc").style.display="inline-flex"; $("locInfo").textContent="Nouvel emplacement : "+pendingLoc.lat+", "+pendingLoc.lon; });
+    if(sv){ $("locInfo").textContent="Parcelle enregistrée ("+sv.lat+", "+sv.lon+")."; $("mapSub").textContent="Vue satellite de votre parcelle. Déplacez le repère si besoin, puis enregistrez."; }
+    setTimeout(()=>{ try{ MAP.invalidateSize(); }catch(e){} }, 250);
   }
 
   // ===== Station : clé + programme ESP32 =====
@@ -402,6 +434,7 @@ void loop() {
 
   $("themeSel").addEventListener("change", (e)=>applyTheme(e.target.value));
   (function syncThemeSel(){ let t="nature"; try{ t=localStorage.getItem("trv-theme")||"nature"; }catch(e){} $("themeSel").value=t; })();
+  $("saveLoc").addEventListener("click", ()=>{ if(!pendingLoc) return; try{ localStorage.setItem("trv-parcelle", JSON.stringify(pendingLoc)); }catch(e){} $("saveLoc").style.display="none"; $("locInfo").textContent="Parcelle enregistrée ("+pendingLoc.lat+", "+pendingLoc.lon+")."; });
   $("revealBtn").addEventListener("click", ()=>{ keyShown=!keyShown; $("revealBtn").textContent=keyShown?"Masquer":"Afficher"; renderKey(); });
   $("copyKeyBtn").addEventListener("click", copyKey);
   $("sketchBtn").addEventListener("click", downloadSketch);
