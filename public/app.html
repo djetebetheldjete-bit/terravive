@@ -45,6 +45,9 @@
   .doc ul{ margin:8px 0 8px 2px; padding-left:20px; } .doc li{ margin:5px 0; line-height:1.5; }
   .doc p{ line-height:1.6; margin:8px 0; }
   .doc strong{ color:var(--deep); }
+  .doc table{ border-collapse:collapse; width:100%; margin:10px 0; font-size:.88rem; }
+  .doc th,.doc td{ border:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
+  .doc th{ background:var(--surface2); color:var(--deep); }
   .pill{ display:inline-flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--line); border-radius:999px; padding:4px 11px; font-size:.78rem; color:var(--soft); margin:0 6px 6px 0; }
   .pill b{ color:var(--ink); }
   .placeholder{ text-align:center; color:var(--faint); padding:40px 16px; }
@@ -84,8 +87,8 @@
     <!-- Colonne gauche : formulaire + mes plans -->
     <div>
       <div class="card">
-        <h2 class="sec">Créer mon plan de culture durable</h2>
-        <p class="hint">Décrivez votre parcelle. L'IA agronome bâtit un plan adapté, tourné vers l'agroécologie.</p>
+        <h2 class="sec">Créer mon itinéraire technique</h2>
+        <p class="hint">Décrivez votre parcelle. L'IA agronome bâtit un itinéraire technique complet, tourné vers l'agroécologie.</p>
         <label>Que voulez-vous cultiver ? *</label>
         <input id="crop" placeholder="ex. tomate, maïs, cacao, gombo…" maxlength="120">
         <div class="row2">
@@ -106,6 +109,8 @@
             </select>
           </div>
         </div>
+        <label>pH du sol <span style="color:var(--faint);font-weight:400;">(facultatif — laissez vide si vous ne le connaissez pas)</span></label>
+        <input id="ph" placeholder="ex. 6,5" maxlength="40">
         <label>Objectif principal</label>
         <select id="goal">
           <option value="Produire durablement pour ma famille et vendre le surplus">Autoconsommation + vente du surplus</option>
@@ -116,7 +121,7 @@
         <label>Moyens / contraintes (facultatif)</label>
         <textarea id="notes" placeholder="ex. peu d'eau disponible, pas de tracteur, budget limité, présence de fourmis…" maxlength="500"></textarea>
         <div class="err" id="formErr"></div>
-        <button class="btn primary" id="genBtn" type="button" style="width:100%;margin-top:6px;">🌱 Générer mon plan durable</button>
+        <button class="btn primary" id="genBtn" type="button" style="width:100%;margin-top:6px;">🌱 Générer mon itinéraire</button>
       </div>
 
       <div class="card plans">
@@ -130,13 +135,13 @@
       <div class="card planbox" id="planCard">
         <div class="placeholder" id="planPlaceholder">
           <div class="big">🌿</div>
-          <p>Remplissez le formulaire à gauche et cliquez sur <b>« Générer mon plan durable »</b>.<br>Votre plan personnalisé s'affichera ici.</p>
+          <p>Remplissez le formulaire à gauche et cliquez sur <b>« Générer mon itinéraire »</b>.<br>Votre itinéraire technique personnalisé s'affichera ici.</p>
         </div>
         <div id="planContent" style="display:none;">
           <div id="planPills"></div>
           <div class="doc" id="planDoc"></div>
           <div class="toolbar">
-            <button class="btn" id="printBtn" type="button">Imprimer / PDF</button>
+            <button class="btn sun" id="pdfBtn" type="button">📄 Télécharger en PDF</button>
             <button class="btn" id="newBtn" type="button">Nouveau plan</button>
           </div>
         </div>
@@ -173,20 +178,31 @@
   const $ = (id) => document.getElementById(id);
   let me = null, authMode = "register", currentPlan = null, chatHistory = [];
 
-  // ---- Rendu Markdown minimal (##, listes -, **gras**, paragraphes) ----
+  // ---- Rendu Markdown minimal (##, listes -, **gras**, TABLEAUX, paragraphes) ----
   function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
   function inline(s){ return esc(s).replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>").replace(/\*([^*]+)\*/g,"<em>$1</em>"); }
+  function mdTableSep(s){ return /^\s*\|?\s*:?-{2,}\s*(\|\s*:?-{2,}\s*)+\|?\s*$/.test(s); }
+  function mdCells(s){ let t=s.trim(); if(t.startsWith("|")) t=t.slice(1); if(t.endsWith("|")) t=t.slice(0,-1); return t.split("|").map(c=>c.trim()); }
   function renderMd(md){
-    const lines = String(md||"").replace(/\r/g,"").split("\n"); let html="", inList=false;
+    const lines = String(md||"").replace(/\r/g,"").split("\n");
+    let html="", inList=false, i=0;
     const closeList=()=>{ if(inList){ html+="</ul>"; inList=false; } };
-    for(let raw of lines){
-      const l = raw.trimEnd();
-      if(/^##\s+/.test(l)){ closeList(); html+="<h2>"+inline(l.replace(/^##\s+/,""))+"</h2>"; continue; }
-      if(/^#\s+/.test(l)){ closeList(); html+="<h2>"+inline(l.replace(/^#\s+/,""))+"</h2>"; continue; }
-      if(/^\s*[-*]\s+/.test(l)){ if(!inList){ html+="<ul>"; inList=true; } html+="<li>"+inline(l.replace(/^\s*[-*]\s+/,""))+"</li>"; continue; }
-      if(/^\s*\d+\.\s+/.test(l)){ if(!inList){ html+="<ul>"; inList=true; } html+="<li>"+inline(l.replace(/^\s*\d+\.\s+/,""))+"</li>"; continue; }
-      if(l.trim()===""){ closeList(); continue; }
-      closeList(); html+="<p>"+inline(l)+"</p>";
+    while(i<lines.length){
+      const l = lines[i].replace(/\s+$/,"");
+      // Tableau Markdown : une ligne « | … | » suivie d'une ligne séparatrice « |---|---| »
+      if(/^\s*\|.*\|\s*$/.test(l) && i+1<lines.length && mdTableSep(lines[i+1])){
+        closeList();
+        const header = mdCells(l); const rows=[]; i+=2;
+        while(i<lines.length && /^\s*\|.*\|\s*$/.test(lines[i])){ rows.push(mdCells(lines[i])); i++; }
+        html+='<table><thead><tr>'+header.map(c=>'<th>'+inline(c)+'</th>').join("")+'</tr></thead><tbody>';
+        html+=rows.map(r=>'<tr>'+r.map(c=>'<td>'+inline(c)+'</td>').join("")+'</tr>').join("");
+        html+='</tbody></table>'; continue;
+      }
+      if(/^#{1,6}\s+/.test(l)){ closeList(); html+="<h2>"+inline(l.replace(/^#+\s+/,""))+"</h2>"; i++; continue; }
+      if(/^\s*[-*]\s+/.test(l)){ if(!inList){ html+="<ul>"; inList=true; } html+="<li>"+inline(l.replace(/^\s*[-*]\s+/,""))+"</li>"; i++; continue; }
+      if(/^\s*\d+\.\s+/.test(l)){ if(!inList){ html+="<ul>"; inList=true; } html+="<li>"+inline(l.replace(/^\s*\d+\.\s+/,""))+"</li>"; i++; continue; }
+      if(l.trim()===""){ closeList(); i++; continue; }
+      closeList(); html+="<p>"+inline(l)+"</p>"; i++;
     }
     closeList(); return html;
   }
@@ -266,15 +282,49 @@
     if(!me){ openAuth("register"); return; }
     const crop=$("crop").value.trim(), err=$("formErr"); err.textContent="";
     if(!crop){ err.textContent="Indiquez au moins ce que vous voulez cultiver."; return; }
-    const btn=$("genBtn"); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Génération du plan…';
+    const btn=$("genBtn"); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Génération de l\'itinéraire…';
     try{
-      const body={ crop, region:$("region").value, area:$("area").value, soil:$("soil").value, season:$("season").value, goal:$("goal").value, notes:$("notes").value };
+      const body={ crop, region:$("region").value, area:$("area").value, soil:$("soil").value, ph:$("ph").value, season:$("season").value, goal:$("goal").value, notes:$("notes").value };
       const r=await fetch("/api/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
       const d=await r.json();
       if(!r.ok){ err.textContent=d.error||"La génération a échoué."; }
       else { showPlan(d.plan); loadPlans(); }
     }catch(e){ err.textContent="Serveur injoignable."; }
-    btn.disabled=false; btn.innerHTML="🌱 Générer mon plan durable";
+    btn.disabled=false; btn.innerHTML="🌱 Générer mon itinéraire";
+  }
+
+  // ---- Export PDF propre (page Terravive + plan + tableau) ----
+  function exportPlanPDF(){
+    if(!currentPlan){ return; }
+    const pills = $("planPills").innerHTML;
+    const doc = $("planDoc").innerHTML;
+    const date = new Date().toLocaleDateString("fr-FR");
+    const html =
+      '<!doctype html><html lang="fr"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<title>Terravive — Itinéraire technique de culture</title><style>' +
+      '@page{margin:16mm 14mm}*{box-sizing:border-box}' +
+      'body{font-family:Georgia,"Times New Roman",serif;color:#14261A;line-height:1.5;margin:0}' +
+      '.h{border-bottom:3px solid #2E7D46;padding-bottom:10px;margin-bottom:12px}' +
+      '.b{font-size:22px;font-weight:bold;color:#1B5E34}.s{color:#5b6b5f;font-size:12px;margin-top:2px}' +
+      '.pills{margin:10px 0 2px}' +
+      '.pill{display:inline-block;border:1px solid #dde7dc;border-radius:999px;padding:3px 10px;font-size:11px;color:#5b6b5f;margin:0 5px 5px 0}.pill b{color:#14261A}' +
+      'h2{color:#1B5E34;font-size:15.5px;border-bottom:1px solid #e3ece4;padding-bottom:3px;margin:15px 0 7px;page-break-after:avoid}' +
+      'p,li{font-size:12.5px}ul{margin:5px 0 8px 18px}strong{color:#1B5E34}' +
+      'table{border-collapse:collapse;width:100%;margin:8px 0;font-size:11.5px;page-break-inside:avoid}' +
+      'th,td{border:1px solid #cfe0d4;padding:6px 8px;text-align:left;vertical-align:top}th{background:#eef5ef;color:#14261A}' +
+      '.f{margin-top:18px;border-top:1px solid #e3ece4;padding-top:8px;color:#8a9a8d;font-size:10.5px}' +
+      '</style></head><body>' +
+      '<div class="h"><div class="b">\u{1F331} Terravive</div><div class="s">Itinéraire technique de culture · généré le ' + date + '</div></div>' +
+      '<div class="pills">' + pills + '</div>' +
+      '<div>' + doc + '</div>' +
+      '<div class="f">Conseils indicatifs, à adapter à votre terrain. En cas de doute important ' +
+      '(maladie grave, usage de produits), consultez un agronome local. — Terravive</div>' +
+      '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.focus();window.print();},300);};</scr' + 'ipt>' +
+      '</body></html>';
+    const w = window.open("", "_blank");
+    if(!w){ alert("Autorisez les fenêtres pop-up de ce site pour générer le PDF."); return; }
+    w.document.open(); w.document.write(html); w.document.close();
   }
 
   // ---- Conseiller ----
@@ -306,7 +356,7 @@
   $("genBtn").addEventListener("click", generate);
   $("sendBtn").addEventListener("click", sendChat);
   $("chatInput").addEventListener("keydown",e=>{ if(e.key==="Enter") sendChat(); });
-  $("printBtn").addEventListener("click", ()=>window.print());
+  $("pdfBtn").addEventListener("click", exportPlanPDF);
   $("newBtn").addEventListener("click", ()=>{ $("planContent").style.display="none"; $("planPlaceholder").style.display="block"; $("chatCard").style.display="none"; window.scrollTo({top:0,behavior:"smooth"}); });
 
   loadMe();
