@@ -191,7 +191,12 @@
 
           <div class="card section-gap">
             <h2 class="ct">Ma parcelle — surveillance satellite</h2>
-            <div class="muted" id="mapSub">Dessinez votre parcelle sur la carte (outil rectangle ou polygone, en haut à gauche de la carte), puis lancez une analyse satellite via Vertea.</div>
+            <div class="muted" id="mapSub">Repérez votre champ (recherche ou GPS), puis dessinez votre parcelle (outil rectangle ou polygone, en haut à gauche de la carte) et lancez une analyse satellite via Vertea.</div>
+            <div class="maprow" style="margin-top:10px;">
+              <input id="placeSearch" class="sel" style="flex:1;min-width:150px;" placeholder="Rechercher un lieu (village, ville…)">
+              <button class="btn" id="btnSearch" type="button">Aller</button>
+              <button class="btn" id="btnLocate" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> Me localiser</button>
+            </div>
             <div id="map"></div>
             <div class="maprow" id="verteaControls" style="display:none;">
               <select class="sel" id="vCulture" title="Culture (pour le besoin en eau)">
@@ -213,7 +218,10 @@
               <div class="tile" style="box-shadow:none;"><div class="lab">Air (humid.)</div><div class="val" id="lHum" style="font-size:1.4rem;">—</div></div>
               <div class="tile" style="box-shadow:none;"><div class="lab">Cuve</div><div class="val" id="lLevel" style="font-size:1.4rem;">—</div></div>
             </div>
-            <div class="muted section-gap" id="liveWhen"></div>
+            <div class="maprow" style="justify-content:space-between;">
+              <span class="muted" id="liveWhen"></span>
+              <button class="btn" id="clearMeas" type="button" style="display:none;">Effacer mes mesures</button>
+            </div>
           </div>
 
           <div class="tipbar">
@@ -339,6 +347,7 @@
     $("lHum").textContent  = L&&L.hum!=null ? L.hum+"%" : "—";
     $("lLevel").textContent= L&&L.level!=null ? L.level+"%" : "—";
     $("liveWhen").textContent = L ? "Dernière mesure : "+new Date(L.created_at).toLocaleString("fr-FR") : "Aucune mesure reçue pour l'instant.";
+    $("clearMeas").style.display = (d.readings && d.readings.length) ? "inline-flex" : "none";
     // graphique
     if(d.readings&&d.readings.length){ $("chartSub").textContent="Chaque point est une mesure envoyée par votre capteur (humidité du sol en %)."; drawChart(d.readings); }
     // météo
@@ -462,6 +471,38 @@
     }catch(e){ vSetBusy(false, "Impossible de joindre Vertea. Le service se réveille peut-être (réessayez dans ~30 s)."); }
   }
 
+  // --- Repérage du champ : recherche de lieu + GPS ---
+  async function searchPlace(){
+    if(!MAP){ return; }
+    const q=$("placeSearch").value.trim(); if(!q){ return; }
+    $("vStatus").textContent="Recherche du lieu…";
+    try{
+      const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q="+encodeURIComponent(q),{headers:{"Accept-Language":"fr"}});
+      const a=await r.json();
+      if(!a||!a.length){ $("vStatus").textContent="Lieu introuvable. Essayez un nom plus précis."; return; }
+      const l=a[0];
+      if(l.boundingbox){ const b=l.boundingbox.map(parseFloat); MAP.fitBounds([[b[0],b[2]],[b[1],b[3]]]); }
+      else { MAP.setView([+l.lat,+l.lon],15); }
+      $("vStatus").textContent="Lieu trouvé. Zoomez puis dessinez votre parcelle.";
+    }catch(e){ $("vStatus").textContent="Recherche impossible (connexion ?)."; }
+  }
+  function locateMe(){
+    if(!MAP){ return; }
+    if(!navigator.geolocation){ $("vStatus").textContent="Le GPS n'est pas disponible sur cet appareil."; return; }
+    $("vStatus").textContent="Localisation en cours… (autorisez l'accès à votre position)";
+    navigator.geolocation.getCurrentPosition(
+      (p)=>{ const c=[p.coords.latitude,p.coords.longitude]; MAP.setView(c,17); L.circleMarker(c,{radius:7,color:"#C58A2A",weight:3,fillColor:"#C58A2A",fillOpacity:.5}).addTo(MAP); $("vStatus").textContent="Vous êtes ici. Dessinez votre parcelle autour de ce point."; },
+      ()=>{ $("vStatus").textContent="Localisation refusée ou indisponible."; },
+      { enableHighAccuracy:true, timeout:10000 }
+    );
+  }
+  // --- Effacer les mesures (ex. données de test) ---
+  async function clearMeasures(){
+    if(!confirm("Effacer toutes vos mesures enregistrées ? (utile pour repartir d'un historique vide avant d'utiliser une vraie carte)")) return;
+    try{ await fetch("/api/readings/clear",{method:"POST"}); }catch(e){}
+    refresh();
+  }
+
   // ===== Station : clé + programme ESP32 =====
   function maskKey(k){ return k ? (k.slice(0,7)+"••••••••••••••••••••") : "••••••••••••"; }
   let keyShown=false;
@@ -547,6 +588,13 @@ void loop() {
     if(!me){ $("authNote").style.display="block"; $("board").style.display="none"; return; }
     try{ const r=await fetch("/api/dashboard"); const d=await r.json(); if(r.ok) fillDashboard(d); }catch(e){}
     try{ const r=await fetch("/api/station"); const d=await r.json(); if(r.ok){ station=d.station; renderKey(); } }catch(e){}
+    // Actualisation automatique des mesures du capteur (toutes les 60 s) :
+    // dès qu'une vraie carte envoie des données, elles apparaissent sans recharger la page.
+    setInterval(refresh, 60000);
+  }
+  async function refresh(){
+    if(!me){ return; }
+    try{ const r=await fetch("/api/dashboard"); const d=await r.json(); if(r.ok) fillDashboard(d); }catch(e){}
   }
 
   $("themeSel").addEventListener("change", (e)=>applyTheme(e.target.value));
@@ -554,6 +602,10 @@ void loop() {
   $("btnNdvi").addEventListener("click", runNdvi);
   $("btnEau").addEventListener("click", runIrrigation);
   $("btnPlant").addEventListener("click", runPlantation);
+  $("btnSearch").addEventListener("click", searchPlace);
+  $("placeSearch").addEventListener("keydown", (e)=>{ if(e.key==="Enter") searchPlace(); });
+  $("btnLocate").addEventListener("click", locateMe);
+  $("clearMeas").addEventListener("click", clearMeasures);
   $("revealBtn").addEventListener("click", ()=>{ keyShown=!keyShown; $("revealBtn").textContent=keyShown?"Masquer":"Afficher"; renderKey(); });
   $("copyKeyBtn").addEventListener("click", copyKey);
   $("sketchBtn").addEventListener("click", downloadSketch);

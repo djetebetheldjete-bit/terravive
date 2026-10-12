@@ -238,6 +238,10 @@ async function recentReadings(userId, limit) {
   if (USE_DB) { try { return (await sb(`/trv_readings?user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc&limit=${n}`)) || []; } catch (e) { return []; } }
   return Object.values(loadStore().readings).filter((x) => x.user_id === userId).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, n);
 }
+async function clearReadings(userId) {
+  if (USE_DB) { try { await sb(`/trv_readings?user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); } catch (e) { console.error("clearReadings:", e.message); } return; }
+  const s = loadStore(); Object.values(s.readings).forEach((r) => { if (r.user_id === userId) delete s.readings[r.id]; }); saveStore(s);
+}
 
 // ---------- Météo (Open-Meteo, gratuit, sans clé) ----------
 const WEATHER_CACHE = new Map(); // region -> { at, ttl, data }
@@ -609,6 +613,11 @@ async function handleStation(req, res) {
   if (!st) return sendJson(res, 500, { error: "Impossible de préparer la station." });
   sendJson(res, 200, { station: { id: st.id, name: st.name, device_key: st.device_key } });
 }
+async function handleReadingsClear(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  await clearReadings(user.id);
+  sendJson(res, 200, { ok: true });
+}
 async function handleDashboard(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
   const [plans, devices, readings] = await Promise.all([listPlansForUser(user.id), listDevicesForUser(user.id), recentReadings(user.id, 48)]);
@@ -655,6 +664,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && url === "/api/plans") return handlePlansList(req, res);
   if (req.method === "GET" && url === "/api/plan") return handlePlanGet(req, res);
   if (req.method === "POST" && url === "/api/ingest") return handleIngest(req, res);
+  if (req.method === "POST" && url === "/api/readings/clear") return handleReadingsClear(req, res);
   if (req.method === "GET" && url === "/api/station") return handleStation(req, res);
   if (req.method === "GET" && url === "/api/dashboard") return handleDashboard(req, res);
   if (req.method === "POST" && url === "/api/arduino") return handleArduino(req, res);
