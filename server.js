@@ -2,8 +2,7 @@
  * Terravive — l'agriculture durable accompagnée par l'intelligence artificielle.
  *
  * Principe (même modèle que Bâtisseur) : l'agriculteur décrit sa parcelle, et l'IA
- * bâtit avec lui un PLAN DE CULTURE DURABLE personnalisé (calendrier des tâches,
- * fertilisation naturelle, gestion de l'eau, protection biologique, biodiversité),
+ * bâtit avec lui un ITINÉRAIRE TECHNIQUE DE CULTURE complet et personnalisé,
  * puis reste disponible comme CONSEILLER (diagnostic, questions au fil de la saison).
  *
  * Zéro dépendance : Node.js 18+ (http, fs, crypto). Stockage : Supabase (si configuré)
@@ -35,6 +34,8 @@ const API_KEYS = (function () {
 })();
 const API_KEY = API_KEYS[0];
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+// Longueur max (tokens) pour la génération du plan — l'itinéraire complet est long.
+const PLAN_MAX_TOKENS = parseInt(process.env.PLAN_MAX_TOKENS, 10) || 8000;
 const PORT = process.env.PORT || 3000;
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -140,8 +141,8 @@ async function listPlansForUser(userId) {
 const RETRYABLE = [408, 409, 429, 500, 502, 503, 504, 529];
 let KEY_CURSOR = 0;
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
-async function callClaude(system, messages, model) {
-  const body = JSON.stringify({ model: model || MODEL, max_tokens: 4096, system, messages: messages.map((m) => ({ role: m.role, content: m.content })) });
+async function callClaude(system, messages, model, maxTokens) {
+  const body = JSON.stringify({ model: model || MODEL, max_tokens: maxTokens || 4096, system, messages: messages.map((m) => ({ role: m.role, content: m.content })) });
   const n = API_KEYS.length || 1; const start = KEY_CURSOR; KEY_CURSOR = (KEY_CURSOR + 1) % n; let lastErr = null;
   for (let i = 0; i < n; i++) {
     const key = API_KEYS[(start + i) % n];
@@ -165,27 +166,72 @@ Tes principes, toujours : privilégier les pratiques durables — rotation et as
 function planSystem() {
   return DURABLE_CONTEXT + `
 
-TÂCHE : à partir des informations de la parcelle, rédige un PLAN DE CULTURE DURABLE personnalisé, en français, au format Markdown, avec EXACTEMENT ces sections (titres en ##) :
+TÂCHE : à partir des informations de la parcelle, rédige un ITINÉRAIRE TECHNIQUE DE CULTURE (ITK) COMPLET et personnalisé, en français, au format Markdown. L'ITK est la suite ORDONNÉE de toutes les opérations techniques, de la préparation de la parcelle jusqu'à l'après-récolte. Pour CHAQUE opération, précise : QUAND (période, ou stade / nombre de semaines après le semis), COMMENT (le geste concret : dose, écartement, méthode…) et POURQUOI (en une phrase simple).
 
-## Aperçu
-Deux ou trois phrases : la culture, l'objectif, et pourquoi l'approche durable choisie convient à cette parcelle.
+Respecte EXACTEMENT ces sections (titres en ##), dans cet ordre :
 
-## Calendrier de culture
-Une liste chronologique des phases (préparation du sol → semis/plantation → entretien → fertilisation naturelle → gestion de l'eau → protection biologique → récolte). Pour chaque phase : la période indicative (semaine/mois après le démarrage) et les gestes concrets à faire. Utilise des puces.
+## 1. Diagnostic de la parcelle
+La culture visée ; la zone agro-écologique et le régime des pluies (bimodal ou monomodal) de la région, qui détermine le calendrier ; le type de sol avec ses atouts et ses risques (ex. sableux = bien drainé mais pauvre et lessivable ; argileux = retient l'eau et les éléments mais peut s'asphyxier ; limoneux = bon potentiel mais sensible à la battance) ; le pH du sol UNIQUEMENT s'il a été fourni ; le précédent cultural si connu ; et l'objectif de la personne. Déduis-en les grands choix de l'itinéraire. Si une information manque, indique clairement l'hypothèse que tu prends — et ne reproche jamais à la personne de ne pas avoir une donnée (comme le pH).
 
-## Pratiques durables recommandées
-Rotation, associations bénéfiques (compagnonnage), compost/paillage, économie d'eau, biodiversité. Puces courtes et actionnables.
+## 2. Choix de la variété et des semences
+Type de variété adapté au climat local et à l'objectif (résistance aux maladies, cycle court ou long, tolérance à la chaleur ou à la sécheresse), qualité des semences (semences saines, taux de germination), et préparation éventuelle (pré-germination, traitement — en privilégiant les solutions naturelles).
 
-## Fertilisation & protection naturelles
-Quelles fumures organiques, quels traitements naturels (ex. purins, savon noir, cendre, plantes répulsives), et comment les préparer avec des moyens locaux.
+## 3. Préparation du sol
+Défrichage et nettoyage de la parcelle, travail du sol (labour, hersage, planage) et forme de culture (à plat, en billons, en buttes ou en planches) choisie selon le sol et le besoin de drainage. Rappelle l'intérêt d'un travail du sol limité et de la matière organique pour préserver un sol vivant, quand c'est possible.
 
-## Rendement attendu & bénéfices écologiques
-Une fourchette réaliste de rendement, et les bénéfices durables (sol vivant, moins d'eau, moins de produits chimiques, revenus).
+## 4. Fumure de fond et amendement
+Apports organiques avant plantation (compost, fumier bien décomposé) et leur enfouissement — ils nourrissent le sol ET tamponnent doucement le pH.
+Gestion du pH : si le pH du sol est FOURNI, utilise-le — sol acide (pH inférieur à ~6) : conseille un chaulage léger (chaux agricole ou cendre de bois) pour le remonter ; sol alcalin (pH supérieur à ~7,5) : évite le chaulage et mise sur la matière organique ; pH proche de 6–7 : rien à corriger, c'est idéal. Donne les apports en FOURCHETTES.
+Si le pH N'EST PAS fourni (c'est souvent le cas, et c'est NORMAL), ne bloque pas et ne l'invente pas : rappelle simplement que beaucoup de sols tropicaux sont légèrement acides, propose des moyens SIMPLES et peu coûteux de l'estimer si la personne le souhaite (plantes indicatrices, petit test maison au vinaigre et au bicarbonate, bandelettes de pH bon marché, ou une analyse de sol si elle en a la possibilité), et avance avec une approche prudente qui marche dans tous les cas : beaucoup de matière organique (elle corrige doucement l'acidité) et observation de la culture.
+Donne des ordres de grandeur réalistes sous forme de FOURCHETTES, jamais de chiffres inventés précis.
 
-## Points de vigilance
-Les 3 à 5 erreurs à éviter et les signaux d'alerte à surveiller.
+## 5. Semis / plantation
+Date de semis conseillée selon le régime des pluies de la région ; pépinière puis repiquage si la culture s'y prête (durée en pépinière) ; DENSITÉ et ÉCARTEMENT (distance entre les lignes et sur la ligne) ; profondeur de semis ; et un nombre indicatif de plants ou de graines pour la surface donnée.
 
-Reste réaliste et honnête sur les incertitudes (climat, ravageurs). N'invente pas de chiffres précis : donne des fourchettes. Ne mets pas d'introduction avant la première section.`;
+## 6. Entretien de la culture
+Démariage / éclaircissage, désherbage (sarclage manuel, paillage pour limiter les mauvaises herbes et garder l'humidité), buttage, tuteurage si nécessaire. Précise les périodes (nombre de semaines après le semis).
+
+## 7. Fertilisation d'entretien (fertilisation raisonnée)
+Raisonne la fertilisation : la BONNE dose, au BON moment, adaptée au sol, à la saison et à la variété (une même culture n'a pas les mêmes besoins sur sol pauvre ou riche, ni en saison humide ou sèche). Privilégie toujours les fumures organiques.
+Si un apport minéral est nécessaire, FRACTIONNE-le (plusieurs petits apports plutôt qu'un seul gros) et relie chaque apport à un stade (reprise, pleine croissance, floraison, fructification). Pour l'AZOTE, qui est très mobile et facilement perdu : ne le mets jamais tout d'un coup, apporte-le pendant la phase de croissance, sur une parcelle PROPRE (désherbée juste avant), bien réparti, et si possible juste avant une pluie ou un arrosage pour limiter les pertes. Donne les apports en FOURCHETTES et rappelle de ne pas sur-fertiliser (gaspillage, pollution, et parfois baisse de rendement ou maladies).
+Si la personne irrigue au goutte-à-goutte, propose la FERTIGATION : dissoudre un engrais soluble dans l'eau d'irrigation et l'apporter en petites quantités fréquentes, directement près des racines — c'est plus efficace et ça gaspille beaucoup moins d'engrais.
+
+## 8. Gestion de l'eau et irrigation
+Besoin en eau par stade (la culture est plus sensible à la sécheresse à certains moments, ex. floraison et formation des fruits), et rôle de la pluie face au déficit hydrique (pluie insuffisante par rapport à l'évaporation).
+Si la personne N'A PAS indiqué de mode d'irrigation, ou n'en possède pas, NE SUPPOSE RIEN : PROPOSE-lui toi-même une ou plusieurs solutions ADAPTÉES À SES MOYENS, en les classant du plus simple et économique au plus avancé, et en expliquant en une ligne le coût, l'effort et l'intérêt de chacune :
+- Pluvial strict (sans arrosage) : caler le calendrier sur la saison des pluies et RETENIR l'eau — paillage épais, cuvettes/poquets (type zaï), binage, demi-lunes, brise-vent, matière organique qui garde l'humidité.
+- Arrosage manuel (arrosoir, seau) tôt le matin ou en soirée, alimenté par une COLLECTE d'eau de pluie (toiture + fût, bassin, citerne) pour tenir en saison sèche.
+- Goutte-à-goutte « maison » très peu coûteux : bouteilles ou bidons percés près du pied, poteries enterrées (ollas) — idéal pour peu de moyens et peu de surface.
+- Goutte-à-goutte ou petite aspersion avec du matériel acheté si le budget le permet : c'est le plus économe en eau et le plus régulier.
+Recommande EN PRIORITÉ la solution la plus réaliste au vu de ses moyens et de la surface indiquée, puis dis vers quoi il pourra évoluer plus tard. Dans tous les cas, rappelle les gestes d'économie d'eau (paillage, arrosage aux heures fraîches) et ADAPTE le reste de l'itinéraire (date de semis, densité, choix de variété plus résistante à la sécheresse) à l'eau réellement disponible.
+
+## 9. Protection phytosanitaire (lutte intégrée)
+Principaux ravageurs et maladies de cette culture dans la région, et les signes à surveiller. Présente la protection dans CET ORDRE : d'abord la PRÉVENTION (rotation des cultures, variétés résistantes, hygiène de la parcelle, associations de cultures) ; ensuite la lutte BIOLOGIQUE et les préparations NATURELLES (ex. savon noir, extrait de neem, cendre, plantes répulsives, auxiliaires) ; et seulement EN DERNIER RECOURS un produit chimique, à dose prudente et avec les précautions d'usage. Ne donne jamais de conseil dangereux pour la santé ou l'environnement.
+
+## 10. Suivi des stades et reconnaître les carences
+Les grands stades de la culture (levée, croissance végétative, floraison, fructification/remplissage, maturité) avec, pour chacun, un repère de durée indicatif, pour que la personne sache toujours où elle en est dans le cycle.
+Apprends-lui aussi à LIRE les feuilles pour repérer tôt un manque et réagir : feuilles entièrement jaunes (limbe ET nervures), sur l'ensemble de la plante → manque d'AZOTE ; plante rabougrie, feuilles vert très foncé ou violacées → manque de PHOSPHORE ; jeunes feuilles jaunes mais nervures restées vertes → manque de FER ; taches ou plages jaunes par endroits sur les vieilles feuilles → manque de CALCIUM. Invite à corriger par un apport adapté (organique de préférence) et à continuer de surveiller.
+
+## 11. Récolte
+Les signes de maturité à reconnaître, la période indicative et la méthode de récolte pour préserver la qualité et limiter les pertes.
+
+## 12. Après-récolte
+Séchage, tri, conditionnement, stockage et réduction des pertes ; et quelques pistes simples de valorisation ou de vente si c'est pertinent pour l'objectif de la personne.
+
+## 13. Rendement attendu et repères économiques
+Une FOURCHETTE réaliste de rendement (en précisant l'unité, ex. t/ha, ou une estimation sur la surface indiquée), et les bénéfices durables de l'approche (sol vivant, moins d'eau, moins de produits chimiques, meilleurs revenus dans la durée).
+
+## 14. Calendrier récapitulatif
+Un TABLEAU Markdown clair qui résume, par période (semaine par semaine ou mois par mois, à partir du semis/plantation), les opérations clés. Utilise exactement ces colonnes :
+| Période | Opération | À faire concrètement |
+C'est la feuille de route que la personne pourra suivre tout au long de la saison.
+
+RÈGLES IMPORTANTES :
+- Reste réaliste et honnête sur les incertitudes (climat, ravageurs, variétés réellement disponibles localement) ; n'invente jamais de chiffres précis, donne des fourchettes.
+- Adapte TOUT aux moyens locaux (Côte d'Ivoire, matériaux et intrants disponibles sur place).
+- Langage simple et accessible, sans jargon inutile ; quand tu emploies un terme technique, explique-le en quelques mots.
+- Privilégie toujours les solutions durables et agroécologiques.
+- Ne mets aucune introduction avant la première section ## 1.`;
 }
 function planUserMessage(p) {
   return `Voici ma parcelle :
@@ -193,11 +239,12 @@ function planUserMessage(p) {
 - Région / localité : ${p.region || "non précisée"}
 - Surface : ${p.area || "non précisée"}
 - Type de sol : ${p.soil || "non précisé"}
+- pH du sol : ${p.ph ? p.ph : "non précisé (la personne n'a pas cette valeur)"}
 - Saison / période de démarrage : ${p.season || "non précisée"}
 - Objectif principal : ${p.goal || "produire durablement"}
 - Moyens / contraintes : ${p.notes || "aucun détail supplémentaire"}
 
-Rédige mon plan de culture durable.`;
+Rédige mon itinéraire technique de culture complet.`;
 }
 function advisorSystem(plan) {
   let s = DURABLE_CONTEXT + `
@@ -240,9 +287,9 @@ async function handlePlan(req, res) {
   let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
   const crop = String(p.crop || "").trim().slice(0, 120);
   if (!crop) return sendJson(res, 400, { error: "Indiquez au moins la culture souhaitée." });
-  const clean = { crop, region: String(p.region || "").slice(0, 120), area: String(p.area || "").slice(0, 80), soil: String(p.soil || "").slice(0, 80), season: String(p.season || "").slice(0, 80), goal: String(p.goal || "").slice(0, 120), notes: String(p.notes || "").slice(0, 500) };
+  const clean = { crop, region: String(p.region || "").slice(0, 120), area: String(p.area || "").slice(0, 80), soil: String(p.soil || "").slice(0, 80), ph: String(p.ph || "").slice(0, 40), season: String(p.season || "").slice(0, 80), goal: String(p.goal || "").slice(0, 120), notes: String(p.notes || "").slice(0, 500) };
   try {
-    const content = await callClaude(planSystem(), [{ role: "user", content: planUserMessage(clean) }]);
+    const content = await callClaude(planSystem(), [{ role: "user", content: planUserMessage(clean) }], null, PLAN_MAX_TOKENS);
     const rec = { id: newId(), user_id: user.id, title: crop + (clean.region ? " — " + clean.region : ""), crop, region: clean.region || null, area: clean.area || null, soil: clean.soil || null, season: clean.season || null, goal: clean.goal || null, notes: clean.notes || null, content, created_at: new Date().toISOString() };
     await savePlan(rec);
     sendJson(res, 200, { plan: rec });
