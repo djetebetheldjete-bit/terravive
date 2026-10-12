@@ -240,27 +240,46 @@ async function recentReadings(userId, limit) {
 }
 
 // ---------- Météo (Open-Meteo, gratuit, sans clé) ----------
-const WEATHER_CACHE = new Map(); // region -> { at, data }
+const WEATHER_CACHE = new Map(); // region -> { at, ttl, data }
 const WEATHER_TTL = 30 * 60 * 1000;
+const WEATHER_RETRY = 90 * 1000; // en cas d'échec, on retente vite (évite de figer une erreur 30 min)
+// Géocodage en PRIORITÉ en Côte d'Ivoire (sinon "San pedro" tombe sur le Honduras, etc.)
+async function geocodeCI(region) {
+  const q = encodeURIComponent((region && String(region).trim()) || "Yamoussoukro");
+  try {
+    // 1) on cherche d'abord en Côte d'Ivoire
+    let geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=5&language=fr&format=json&country_code=CI`).then((r) => r.json());
+    let g = geo && geo.results && geo.results[0];
+    if (g) return g;
+    // 2) sinon, recherche mondiale, mais on préfère un résultat ivoirien s'il existe
+    geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=5&language=fr&format=json`).then((r) => r.json());
+    const list = (geo && geo.results) || [];
+    return list.find((x) => x.country_code === "CI") || list[0] || null;
+  } catch (e) { return null; }
+}
 async function fetchWeather(region) {
   const key = normKey(region) || "_";
   const hit = WEATHER_CACHE.get(key);
-  if (hit && Date.now() - hit.at < WEATHER_TTL) return hit.data;
-  let data = null;
+  if (hit && Date.now() - hit.at < hit.ttl) return hit.data;
+  let data = null, ok = false;
   try {
-    const q = encodeURIComponent((region && String(region).trim()) || "Yamoussoukro");
-    const geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=1&language=fr&format=json`).then((r) => r.json());
-    const g = geo && geo.results && geo.results[0];
-    const lat = g ? g.latitude : 6.82, lon = g ? g.longitude : -5.28; // défaut : Yamoussoukro
+    const g = await geocodeCI(region);
+    const lat = g ? g.latitude : 6.82, lon = g ? g.longitude : -5.28; // défaut : Yamoussoukro (Côte d'Ivoire)
     const place = g ? (g.name + (g.admin1 ? ", " + g.admin1 : "")) : "Yamoussoukro";
     const f = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=4&timezone=auto`).then((r) => r.json());
-    data = {
-      place,
-      current: f.current ? { temp: Math.round(f.current.temperature_2m), hum: f.current.relative_humidity_2m, rain: f.current.precipitation, code: f.current.weather_code } : null,
-      daily: f.daily ? f.daily.time.map((t, i) => ({ date: t, code: f.daily.weather_code[i], tmax: Math.round(f.daily.temperature_2m_max[i]), tmin: Math.round(f.daily.temperature_2m_min[i]), rainP: f.daily.precipitation_probability_max ? f.daily.precipitation_probability_max[i] : null })) : []
-    };
+    if (f && f.current) {
+      ok = true;
+      data = {
+        place,
+        current: { temp: Math.round(f.current.temperature_2m), hum: f.current.relative_humidity_2m, rain: f.current.precipitation, code: f.current.weather_code },
+        daily: f.daily ? f.daily.time.map((t, i) => ({ date: t, code: f.daily.weather_code[i], tmax: Math.round(f.daily.temperature_2m_max[i]), tmin: Math.round(f.daily.temperature_2m_min[i]), rainP: f.daily.precipitation_probability_max ? f.daily.precipitation_probability_max[i] : null })) : []
+      };
+    } else {
+      data = { place, current: null, daily: [] };
+    }
   } catch (e) { data = null; }
-  WEATHER_CACHE.set(key, { at: Date.now(), data });
+  // On ne fige PAS un échec pendant 30 min : en cas de problème, on retente au bout de 90 s.
+  WEATHER_CACHE.set(key, { at: Date.now(), ttl: ok ? WEATHER_TTL : WEATHER_RETRY, data });
   return data;
 }
 
