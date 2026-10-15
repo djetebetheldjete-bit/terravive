@@ -223,6 +223,24 @@
   async function loadMe(){
     try{ const r = await fetch("/api/auth/me"); me = (await r.json()).user || null; }catch(e){ me=null; }
     render();
+    handleCropDeepLink();
+  }
+  // Arrive depuis « Quoi planter ? » (/app?culture=Concombre) : on pré-remplit la culture
+  // et on amène la personne droit au formulaire d'itinéraire technique.
+  let deepLinkDone=false;
+  function handleCropDeepLink(){
+    if(deepLinkDone) return;
+    let params; try{ params=new URLSearchParams(location.search); }catch(e){ return; }
+    const c=params.get("culture")||params.get("crop");
+    deepLinkDone=true;
+    if(!c) return;
+    const inp=$("crop"); if(inp){ inp.value=c; }
+    const reg=params.get("region"); if(reg && $("region") && !$("region").value){ $("region").value=reg; }
+    try{ (inp||document.body).scrollIntoView({behavior:"smooth",block:"center"}); }catch(e){}
+    try{ if(inp) inp.focus(); }catch(e){}
+    if(inp){ inp.style.transition="box-shadow .3s"; inp.style.boxShadow="0 0 0 3px var(--leaf,#3b6d11)"; setTimeout(function(){ inp.style.boxShadow=""; }, 1800); }
+    // Si la personne est déjà connectée et qu'on demande explicitement le démarrage auto.
+    if(params.get("auto")==="1" && me){ try{ generate(false); }catch(e){} }
   }
   function render(){
     if(me){

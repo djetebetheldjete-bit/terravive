@@ -516,8 +516,14 @@
       if(d.erreur){ vSetBusy(false, "Erreur : "+d.erreur); return; }
       const cls=v=> v==="Favorable"?"fav":(v==="Deconseille"?"dec":"prec");
       let html='<div class="valert ok">Mois : '+esc(d.mois||"")+' · Température ~'+(d.temperature_moy??"?")+'°C · Pluie sur ~90 j : '+(d.pluie_cycle_mm??"?")+' mm</div>';
-      (d.cultures||[]).forEach(c=>{ const k=cls(c.verdict); html+='<div class="vverdict '+k+'"><div class="tete"><span class="nom">'+esc(c.culture)+'</span><span class="vbadge '+k+'">'+esc(c.verdict)+'</span></div><ul>'+(c.raisons||[]).map(r=>'<li>'+esc(r)+'</li>').join("")+'</ul><div class="note">'+esc(c.note||"")+'</div></div>'; });
+      html+='<div class="valert" style="margin-top:6px">Cliquez une culture pour créer son <b>itinéraire technique</b> complet.</div>';
+      (d.cultures||[]).forEach(c=>{ const k=cls(c.verdict); html+='<div class="vverdict '+k+'" data-crop="'+esc(c.culture)+'" role="button" tabindex="0" title="Créer l\'itinéraire technique de « '+esc(c.culture)+' »" style="cursor:pointer"><div class="tete"><span class="nom">'+esc(c.culture)+'</span><span class="vbadge '+k+'">'+esc(c.verdict)+'</span></div><ul>'+(c.raisons||[]).map(r=>'<li>'+esc(r)+'</li>').join("")+'</ul><div class="note">'+esc(c.note||"")+'</div><div style="margin-top:8px;font-weight:700;color:var(--leaf,#3b6d11);font-size:.85rem">Créer l\'itinéraire technique →</div></div>'; });
       $("vOut").innerHTML=html;
+      $("vOut").querySelectorAll(".vverdict[data-crop]").forEach(function(el){
+        const go=function(){ const crop=el.getAttribute("data-crop")||""; if(crop) location.href="/app?culture="+encodeURIComponent(crop); };
+        el.addEventListener("click", go);
+        el.addEventListener("keydown", function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } });
+      });
       vSetBusy(false, "Conseil de plantation calculé.");
     }catch(e){ vSetBusy(false, "Impossible de joindre Vertea. Le service se réveille peut-être (réessayez dans ~30 s)."); }
   }
