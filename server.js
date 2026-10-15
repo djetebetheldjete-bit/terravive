@@ -247,19 +247,26 @@ async function clearReadings(userId) {
 const WEATHER_CACHE = new Map(); // region -> { at, ttl, data }
 const WEATHER_TTL = 30 * 60 * 1000;
 const WEATHER_RETRY = 90 * 1000; // en cas d'échec, on retente vite (évite de figer une erreur 30 min)
-// Géocodage en PRIORITÉ en Côte d'Ivoire (sinon "San pedro" tombe sur le Honduras, etc.)
+// Géocodage en PRIORITÉ en Côte d'Ivoire via Nominatim (OpenStreetMap), qui gère
+// un vrai filtre pays (countrycodes=ci). L'API d'Open-Meteo ignore ce filtre et
+// renvoyait "San pedro" -> San Pedro Sula (Honduras). Nominatim trouve San-Pédro (CI).
 async function geocodeCI(region) {
   const q = encodeURIComponent((region && String(region).trim()) || "Yamoussoukro");
+  const headers = { "User-Agent": "Terravive/1.0 (agriculture durable - Cote d'Ivoire)", "Accept-Language": "fr" };
+  const parse = (x) => {
+    if (!x) return null;
+    const parts = String(x.display_name || "").split(",").map((s) => s.trim());
+    return { name: parts[0] || "", admin1: parts[1] || "", latitude: +x.lat, longitude: +x.lon };
+  };
   try {
-    // 1) on cherche d'abord en Côte d'Ivoire
-    let geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=5&language=fr&format=json&country_code=CI`).then((r) => r.json());
-    let g = geo && geo.results && geo.results[0];
-    if (g) return g;
-    // 2) sinon, recherche mondiale, mais on préfère un résultat ivoirien s'il existe
-    geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=5&language=fr&format=json`).then((r) => r.json());
-    const list = (geo && geo.results) || [];
-    return list.find((x) => x.country_code === "CI") || list[0] || null;
-  } catch (e) { return null; }
+    // 1) filtré sur la Côte d'Ivoire
+    let r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ci&q=${q}`, { headers }).then((x) => x.json());
+    if (r && r[0]) return parse(r[0]);
+    // 2) dernier recours : recherche mondiale
+    r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`, { headers }).then((x) => x.json());
+    if (r && r[0]) return parse(r[0]);
+  } catch (e) {}
+  return null;
 }
 async function fetchWeather(region) {
   const key = normKey(region) || "_";
