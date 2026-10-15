@@ -268,6 +268,15 @@ async function geocodeCI(region) {
   } catch (e) {}
   return null;
 }
+// Prévisions Open-Meteo pour des coordonnées précises (partagé par la météo région et GPS).
+async function openMeteoForecast(lat, lon) {
+  const f = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=4&timezone=auto`).then((r) => r.json());
+  if (!f || !f.current) return null;
+  return {
+    current: { temp: Math.round(f.current.temperature_2m), hum: f.current.relative_humidity_2m, rain: f.current.precipitation, code: f.current.weather_code },
+    daily: f.daily ? f.daily.time.map((t, i) => ({ date: t, code: f.daily.weather_code[i], tmax: Math.round(f.daily.temperature_2m_max[i]), tmin: Math.round(f.daily.temperature_2m_min[i]), rainP: f.daily.precipitation_probability_max ? f.daily.precipitation_probability_max[i] : null })) : []
+  };
+}
 async function fetchWeather(region) {
   const key = normKey(region) || "_";
   const hit = WEATHER_CACHE.get(key);
@@ -277,19 +286,30 @@ async function fetchWeather(region) {
     const g = await geocodeCI(region);
     const lat = g ? g.latitude : 6.82, lon = g ? g.longitude : -5.28; // défaut : Yamoussoukro (Côte d'Ivoire)
     const place = g ? (g.name + (g.admin1 ? ", " + g.admin1 : "")) : "Yamoussoukro";
-    const f = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=4&timezone=auto`).then((r) => r.json());
-    if (f && f.current) {
-      ok = true;
-      data = {
-        place, lat, lon,
-        current: { temp: Math.round(f.current.temperature_2m), hum: f.current.relative_humidity_2m, rain: f.current.precipitation, code: f.current.weather_code },
-        daily: f.daily ? f.daily.time.map((t, i) => ({ date: t, code: f.daily.weather_code[i], tmax: Math.round(f.daily.temperature_2m_max[i]), tmin: Math.round(f.daily.temperature_2m_min[i]), rainP: f.daily.precipitation_probability_max ? f.daily.precipitation_probability_max[i] : null })) : []
-      };
-    } else {
-      data = { place, lat, lon, current: null, daily: [] };
-    }
+    const fc = await openMeteoForecast(lat, lon);
+    if (fc) { ok = true; data = Object.assign({ place, lat, lon }, fc); }
+    else { data = { place, lat, lon, current: null, daily: [] }; }
   } catch (e) { data = null; }
   // On ne fige PAS un échec pendant 30 min : en cas de problème, on retente au bout de 90 s.
+  WEATHER_CACHE.set(key, { at: Date.now(), ttl: ok ? WEATHER_TTL : WEATHER_RETRY, data });
+  return data;
+}
+// Météo pour une position GPS précise (+ nom du lieu par géocodage inverse).
+async function fetchWeatherLatLon(lat, lon) {
+  const key = "ll:" + lat.toFixed(3) + "," + lon.toFixed(3);
+  const hit = WEATHER_CACHE.get(key);
+  if (hit && Date.now() - hit.at < hit.ttl) return hit.data;
+  let data = null, ok = false;
+  try {
+    let place = "Ma position";
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=12&lat=${lat}&lon=${lon}`, { headers: { "User-Agent": "Terravive/1.0 (agriculture durable - Cote d'Ivoire)", "Accept-Language": "fr" } }).then((x) => x.json());
+      if (r && r.display_name) place = String(r.display_name).split(",").slice(0, 2).map((s) => s.trim()).join(", ");
+    } catch (e) {}
+    const fc = await openMeteoForecast(lat, lon);
+    if (fc) { ok = true; data = Object.assign({ place, lat, lon }, fc); }
+    else { data = { place, lat, lon, current: null, daily: [] }; }
+  } catch (e) { data = null; }
   WEATHER_CACHE.set(key, { at: Date.now(), ttl: ok ? WEATHER_TTL : WEATHER_RETRY, data });
   return data;
 }
@@ -620,6 +640,13 @@ async function handleStation(req, res) {
   if (!st) return sendJson(res, 500, { error: "Impossible de préparer la station." });
   sendJson(res, 200, { station: { id: st.id, name: st.name, device_key: st.device_key } });
 }
+async function handleWeather(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const u = new URL(req.url, "http://x");
+  const lat = parseFloat(u.searchParams.get("lat")), lon = parseFloat(u.searchParams.get("lon"));
+  if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return sendJson(res, 400, { error: "Coordonnées invalides." });
+  sendJson(res, 200, { weather: await fetchWeatherLatLon(lat, lon) });
+}
 async function handleReadingsClear(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
   await clearReadings(user.id);
@@ -674,6 +701,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && url === "/api/readings/clear") return handleReadingsClear(req, res);
   if (req.method === "GET" && url === "/api/station") return handleStation(req, res);
   if (req.method === "GET" && url === "/api/dashboard") return handleDashboard(req, res);
+  if (req.method === "GET" && url === "/api/weather") return handleWeather(req, res);
   if (req.method === "POST" && url === "/api/arduino") return handleArduino(req, res);
   if (req.method === "GET" && url === "/api/devices") return handleDevicesList(req, res);
   if (req.method === "GET" && url === "/api/device") return handleDeviceGet(req, res);

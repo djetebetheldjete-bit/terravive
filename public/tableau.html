@@ -233,7 +233,10 @@
         <!-- Colonne latérale -->
         <div>
           <div class="card">
-            <h2 class="ct">Météo</h2>
+            <div class="maprow" style="justify-content:space-between;margin-top:0;">
+              <h2 class="ct" style="margin:0;">Météo</h2>
+              <button class="btn" id="gpsWx" type="button" style="padding:7px 11px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> Ma position</button>
+            </div>
             <div class="muted" id="wxPlace">—</div>
             <div class="wx-now"><span class="wx-ic" id="wxIc"></span><span class="t" id="wxTemp">—</span><span class="muted" id="wxHum"></span></div>
             <div class="wx-days" id="wxDays"></div>
@@ -285,6 +288,28 @@
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 17h11a3.5 3.5 0 0 0 0-7 4.5 4.5 0 0 0-8.6-1"/></svg>';
   }
   const DAYS=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
+
+  // ===== Météo : rendu + position GPS =====
+  let usingGps=false, lastGpsWeather=null;
+  try{ usingGps = localStorage.getItem("trv-gps-weather")==="1"; }catch(e){}
+  function renderWeather(w){
+    if(w&&w.current){ $("wxPlace").textContent=(usingGps?"Ma position · ":"")+(w.place||""); $("wxIc").innerHTML=wxSvg(w.current.code); $("wxTemp").textContent=w.current.temp+"°C"; $("wxHum").textContent="Humidité "+w.current.hum+"%"; }
+    else { $("wxPlace").textContent="Météo indisponible pour le moment."; $("wxIc").innerHTML=""; $("wxTemp").textContent="—"; $("wxHum").textContent=""; }
+    if(w&&w.daily){ $("wxDays").innerHTML=w.daily.map(dd=>{ const dt=new Date(dd.date); return '<div class="wx-day"><div class="d">'+DAYS[dt.getDay()]+'</div><div class="dic">'+wxSvg(dd.code)+'</div><div class="tmax">'+dd.tmax+'°</div><div class="tmin">'+dd.tmin+'°</div></div>'; }).join(""); }
+    else { $("wxDays").innerHTML=""; }
+  }
+  function gpsWeather(silent){
+    if(!navigator.geolocation){ if(!silent) $("wxPlace").textContent="GPS non disponible sur cet appareil."; return; }
+    if(!silent) $("wxPlace").textContent="Localisation en cours… (autorisez l'accès à votre position)";
+    navigator.geolocation.getCurrentPosition(async (p)=>{
+      try{
+        const r=await fetch("/api/weather?lat="+p.coords.latitude+"&lon="+p.coords.longitude);
+        const d=await r.json();
+        if(r.ok && d.weather){ usingGps=true; lastGpsWeather=d.weather; try{ localStorage.setItem("trv-gps-weather","1"); }catch(e){} renderWeather(d.weather); }
+        else if(!silent){ $("wxPlace").textContent="Météo de votre position indisponible."; }
+      }catch(e){ if(!silent) $("wxPlace").textContent="Météo de votre position indisponible."; }
+    }, ()=>{ if(!silent){ $("wxPlace").textContent="Position refusée — météo de la région affichée."; } usingGps=false; try{ localStorage.removeItem("trv-gps-weather"); }catch(e){} }, { enableHighAccuracy:true, timeout:10000, maximumAge:600000 });
+  }
 
   // ===== Graphique de tendance (SVG, une seule série) =====
   function drawChart(readings){
@@ -350,11 +375,8 @@
     $("clearMeas").style.display = (d.readings && d.readings.length) ? "inline-flex" : "none";
     // graphique
     if(d.readings&&d.readings.length){ $("chartSub").textContent="Chaque point est une mesure envoyée par votre capteur (humidité du sol en %)."; drawChart(d.readings); }
-    // météo
-    const w=d.weather;
-    if(w&&w.current){ $("wxPlace").textContent=w.place||""; $("wxIc").innerHTML=wxSvg(w.current.code); $("wxTemp").textContent=w.current.temp+"°C"; $("wxHum").textContent="Humidité "+w.current.hum+"%"; }
-    else { $("wxPlace").textContent="Météo indisponible pour le moment."; }
-    if(w&&w.daily){ $("wxDays").innerHTML=w.daily.map(dd=>{ const dt=new Date(dd.date); return '<div class="wx-day"><div class="d">'+DAYS[dt.getDay()]+'</div><div class="dic">'+wxSvg(dd.code)+'</div><div class="tmax">'+dd.tmax+'°</div><div class="tmin">'+dd.tmin+'°</div></div>'; }).join(""); }
+    // météo — par défaut celle de la région, sauf si la personne a choisi sa position GPS
+    if(usingGps && lastGpsWeather){ renderWeather(lastGpsWeather); } else { renderWeather(d.weather); }
     // plans récents
     const rp=(d.recentPlans||[]);
     $("recentPlans").innerHTML = rp.length ? rp.map(p=>'<a href="/app"><span>'+esc(p.title||p.crop)+'</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>').join("") : "";
@@ -588,6 +610,8 @@ void loop() {
     if(!me){ $("authNote").style.display="block"; $("board").style.display="none"; return; }
     try{ const r=await fetch("/api/dashboard"); const d=await r.json(); if(r.ok) fillDashboard(d); }catch(e){}
     try{ const r=await fetch("/api/station"); const d=await r.json(); if(r.ok){ station=d.station; renderKey(); } }catch(e){}
+    // Si la personne avait choisi la météo de sa position, on la rafraîchit en silence.
+    if(usingGps){ gpsWeather(true); }
     // Actualisation automatique des mesures du capteur (toutes les 60 s) :
     // dès qu'une vraie carte envoie des données, elles apparaissent sans recharger la page.
     setInterval(refresh, 60000);
@@ -602,6 +626,7 @@ void loop() {
   $("btnNdvi").addEventListener("click", runNdvi);
   $("btnEau").addEventListener("click", runIrrigation);
   $("btnPlant").addEventListener("click", runPlantation);
+  $("gpsWx").addEventListener("click", ()=>gpsWeather(false));
   $("btnSearch").addEventListener("click", searchPlace);
   $("placeSearch").addEventListener("keydown", (e)=>{ if(e.key==="Enter") searchPlace(); });
   $("btnLocate").addEventListener("click", locateMe);
