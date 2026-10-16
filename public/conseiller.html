@@ -115,15 +115,45 @@
       {c:"Récolte & conservation", q:["Comment savoir que c'est le moment de récolter ?","Comment conserver ma récolte et limiter les pertes ?","Que faire des résidus après la récolte ?"]},
       {c:"Durabilité & outils", q:["Pourquoi faire une rotation des cultures ?","Qu'est-ce que l'agroforesterie et ses avantages ?","Que veut dire un NDVI faible sur ma parcelle ?","Comment améliorer mon indice de durabilité ?"]},
     ];
-    function buildSug(){
-      const box=$("sugList"); let html="";
-      SUG.forEach(function(g){
-        html+='<div class="cat"><div class="ct">'+esc(g.c)+'</div><div class="chips">'
+    function buildSug(dyn){
+      const box=$("sugList"); let html=""; const cats = (dyn && dyn.q.length) ? [dyn].concat(SUG) : SUG;
+      cats.forEach(function(g){
+        html+='<div class="cat"><div class="ct"'+(g.hot?' style="color:var(--sun)"':'')+'>'+esc(g.c)+'</div><div class="chips">'
           + g.q.map(function(q){ return '<button class="chip" type="button" data-q="'+esc(q)+'">'+esc(q)+'</button>'; }).join("")
           + '</div></div>';
       });
       box.innerHTML=html;
       box.querySelectorAll(".chip").forEach(function(b){ b.addEventListener("click", function(){ ask(b.getAttribute("data-q")); }); });
+    }
+    // Saison agricole approximative (Côte d'Ivoire).
+    function saisonNow(){ const m=new Date().getMonth()+1; return ([4,5,6,7,9,10].indexOf(m)>=0) ? "pluies" : "seche"; }
+    let userCrop=null;
+    // Construit une catégorie « Pour vous » à partir du contexte (parcelle, dernière culture, saison).
+    async function buildDynamic(){
+      let ctx={}; try{ ctx=JSON.parse(localStorage.getItem("trv-ctx")||"{}"); }catch(e){}
+      let crop = ctx.culture || null;
+      try{ const r=await fetch("/api/plans"); const d=await r.json(); if(r.ok && d.plans && d.plans.length){ if(!crop) crop=d.plans[0].crop; } }catch(e){}
+      if(crop) userCrop=crop;
+      const q=[]; const cl = crop ? crop.toLowerCase() : null;
+      // Contexte satellite récent
+      if(typeof ctx.ndvi==="number" && (ctx.ndvi<0.45 || (typeof ctx.pctFaible==="number" && ctx.pctFaible>=50))){
+        q.push("Le NDVI de ma parcelle est faible ("+ctx.ndvi.toFixed(2)+") : pourquoi et comment l'améliorer ?");
+      }
+      if(typeof ctx.water==="number" && ctx.water>0){
+        q.push("L'analyse indique un besoin d'irrigation d'environ "+ctx.water+" mm/jour : comment y répondre simplement ?");
+      }
+      // Questions liées à la culture
+      if(cl){
+        q.push("Comment fertiliser "+cl+" naturellement ?");
+        q.push("Quels ravageurs et maladies surveiller sur "+cl+" en ce moment ?");
+        q.push("Quand et comment récolter "+cl+" ?");
+      }
+      // Question de saison
+      q.push(saisonNow()==="pluies"
+        ? "Nous sommes en saison des pluies : comment protéger mes cultures des maladies et de l'excès d'eau ?"
+        : "Nous sommes en saison sèche : comment irriguer efficacement et retenir l'humidité du sol ?");
+      const label = crop ? ("Pour votre culture · "+crop) : "Pour vous · "+(saisonNow()==="pluies"?"saison des pluies":"saison sèche");
+      buildSug({ c: label, q: q.slice(0,6), hot:true });
     }
 
     const thread=$("thread"); let history=[]; let busy=false;
@@ -137,7 +167,7 @@
       bubble(esc(q),"me"); history.push({role:"user",content:q});
       const typing=document.createElement("div"); typing.className="typing"; typing.textContent="Le conseiller réfléchit…"; thread.appendChild(typing); thread.scrollTop=thread.scrollHeight;
       try{
-        const r=await fetch("/api/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ message:q, history: history.slice(0,-1) })});
+        const r=await fetch("/api/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ message:q, history: history.slice(0,-1), crop: userCrop||undefined })});
         typing.remove();
         if(r.status===401){ bubble("Connectez-vous pour poser vos questions (c'est gratuit). Ouvrez la page de connexion ci-dessous.","err"); $("loginNote").style.display="block"; history.pop(); }
         else { const d=await r.json(); if(!r.ok){ bubble(esc(d.error||"La réponse a échoué."),"err"); history.pop(); } else { bubble(renderMd(d.reply),"ai"); history.push({role:"assistant",content:d.reply}); } }
@@ -148,6 +178,7 @@
     $("sendBtn").addEventListener("click", send);
     $("chatInput").addEventListener("keydown", function(e){ if(e.key==="Enter") send(); });
     buildSug();
+    buildDynamic();   // ajoute une catégorie « Pour vous » selon la parcelle, la culture et la saison
     // Accueil personnalisé si connecté
     (async function(){ try{ const r=await fetch("/api/auth/me"); const d=await r.json(); if(d && d.user && d.user.name){ $("lead").textContent="Bonjour "+d.user.name+" — posez votre question en langage simple, ou choisissez-en une ci-dessous. Réponses courtes, concrètes et durables."; } else { $("loginNote").style.display="block"; } }catch(e){} })();
   </script>

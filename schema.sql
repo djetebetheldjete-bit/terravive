@@ -73,3 +73,13 @@ create table if not exists trv_readings (
   created_at timestamptz default now()
 );
 create index if not exists trv_readings_user_idx on trv_readings (user_id, created_at desc);
+
+-- Journal des questions posées au conseiller (pour voir ce que les cultivateurs cherchent à comprendre)
+create table if not exists trv_questions (
+  id text primary key,
+  user_id text,
+  question text,
+  crop text,
+  created_at timestamptz default now()
+);
+create index if not exists trv_questions_idx on trv_questions (created_at desc);

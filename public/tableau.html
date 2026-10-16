@@ -198,6 +198,13 @@
       <div class="grid cols">
         <!-- Colonne principale -->
         <div>
+          <div class="card" id="adminQCard" style="display:none;border-color:var(--sun);">
+            <h2 class="ct">Espace formateur — questions des cultivateurs</h2>
+            <div class="muted">Ce que les cultivateurs demandent au conseiller, pour repérer les incompréhensions fréquentes et y répondre (formation, itinéraires, FAQ).</div>
+            <div id="adminQThemes" class="section-gap"></div>
+            <div id="adminQRecent" class="section-gap"></div>
+          </div>
+
           <div class="card">
             <h2 class="ct">Humidité du sol — tendance</h2>
             <div class="muted" id="chartSub">En attente des premières mesures de votre capteur.</div>
@@ -300,6 +307,8 @@
 <script>
   const $=(id)=>document.getElementById(id);
   function esc(s){ const d=document.createElement("div"); d.textContent=(s==null?"":s); return d.innerHTML; }
+  // Contexte partagé (parcelle) : lu par le Conseiller pour des questions suggérées dynamiques.
+  function saveCtx(obj){ try{ var cur={}; try{ cur=JSON.parse(localStorage.getItem("trv-ctx")||"{}"); }catch(e){} Object.keys(obj).forEach(function(k){ if(obj[k]!==undefined && obj[k]!==null && obj[k]!=="") cur[k]=obj[k]; }); cur.at=Date.now(); localStorage.setItem("trv-ctx", JSON.stringify(cur)); }catch(e){} }
   let me=null, station=null, DASH=null;
 
   // ===== Thème (mémorisé) =====
@@ -494,6 +503,7 @@
       // Mémorise pour l'indice de durabilité (pilier environnemental) et le bilan carbone.
       if(typeof d.ndvi_moyen==="number"){ window.lastNdvi = d.ndvi_moyen; }
       if(typeof d.surface_ha==="number"){ window.lastSurfaceHa = d.surface_ha; var _da=document.getElementById("durArea"); if(_da && !_da.value) _da.value = d.surface_ha; }
+      saveCtx({ ndvi:d.ndvi_moyen, pctFaible:d.pct_faible, surface:d.surface_ha, culture:($("vCulture").value||"").trim() });
       if(ndviLayer) MAP.removeLayer(ndviLayer);
       if(d.tile_url){ ndviLayer=L.tileLayer(d.tile_url,{opacity:0.85}); ndviLayer.addTo(MAP); }
       const ac=alertClass(d.pct_faible,d.pct_moyen);
@@ -520,6 +530,7 @@
       const body = Object.assign({}, zoneActive, { culture, date_semis: ymd(daysAgo(110)), date_fin: ymd(daysAgo(50)) });
       const d = await vFetch("/irrigation", body);
       if(d.erreur){ vSetBusy(false, "Erreur : "+d.erreur); return; }
+      saveCtx({ water:d.besoin_irrigation_mm_j, culture:culture });
       const litres = Math.round((d.besoin_irrigation_mm_j||0)*10000);
       const ac = (d.besoin_irrigation_mm_j<=0) ? "ok" : "warn";
       const msg = (d.besoin_irrigation_mm_j<=0)
@@ -681,6 +692,27 @@ void loop() {
     // Actualisation automatique des mesures du capteur (toutes les 60 s) :
     // dès qu'une vraie carte envoie des données, elles apparaissent sans recharger la page.
     setInterval(refresh, 60000);
+    if(me && me.isAdmin){ loadAdminQuestions(); }
+  }
+  // Formateur : ce que les cultivateurs demandent au conseiller.
+  async function loadAdminQuestions(){
+    try{
+      const r=await fetch("/api/admin/questions"); const d=await r.json(); if(!r.ok) return;
+      $("adminQCard").style.display="block";
+      const th=$("adminQThemes"); const themes=d.themes||[];
+      if(themes.length){
+        const max=Math.max.apply(null, themes.map(function(t){return t.count;}))||1;
+        th.innerHTML='<div style="font-weight:700;color:var(--leaf);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Thèmes les plus demandés ('+d.total+' questions)</div>'
+          + themes.map(function(t){ const w=Math.max(4,Math.round(100*t.count/max)); return '<div class="durmeter"><div class="top"><b>'+esc(t.label)+'</b><span class="sc">'+t.count+'</span></div><div class="durbar"><span style="width:'+w+'%;background:var(--leaf)"></span></div></div>'; }).join("");
+      } else { th.innerHTML='<div class="muted">Aucune question posée pour l\'instant.</div>'; }
+      const rec=d.recent||[]; const box=$("adminQRecent");
+      if(rec.length){
+        box.innerHTML='<div style="font-weight:700;color:var(--leaf);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin:6px 0;">Dernières questions</div>'
+          + '<div style="max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;">'
+          + rec.map(function(x){ const when=x.at?new Date(x.at).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"}):""; return '<div style="padding:8px 11px;border-bottom:1px solid var(--line);font-size:.88rem;">'+esc(x.question)+(x.crop?' <span class="muted">· '+esc(x.crop)+'</span>':'')+' <span class="muted" style="float:right;">'+when+'</span></div>'; }).join("")
+          + '</div>';
+      } else { box.innerHTML=""; }
+    }catch(e){}
   }
   async function refresh(){
     if(!me){ return; }

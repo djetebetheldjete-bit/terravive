@@ -73,7 +73,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {} }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [] }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -137,6 +137,38 @@ async function getPlan(id) {
 async function listPlansForUser(userId) {
   if (USE_DB) { try { return (await sb(`/trv_plans?user_id=eq.${encodeURIComponent(userId)}&select=id,title,crop,region,created_at&order=created_at.desc`)) || []; } catch (e) { return []; } }
   return Object.values(loadStore().plans).filter((p) => p.user_id === userId).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+}
+
+// ---------- Journal des questions posées au conseiller ----------
+// Permet au formateur de voir ce que les cultivateurs cherchent à comprendre.
+async function logQuestion(rec) {
+  try {
+    if (USE_DB) { await sb(`/trv_questions`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); return; }
+    const s = loadStore(); if (!Array.isArray(s.questions)) s.questions = []; s.questions.push(rec); if (s.questions.length > 2000) s.questions = s.questions.slice(-2000); saveStore(s);
+  } catch (e) { /* le journal ne doit jamais bloquer la réponse */ }
+}
+async function recentQuestions(limit) {
+  limit = limit || 300;
+  if (USE_DB) { try { return (await sb(`/trv_questions?select=question,crop,created_at&order=created_at.desc&limit=${limit}`)) || []; } catch (e) { return []; } }
+  const s = loadStore(); const arr = Array.isArray(s.questions) ? s.questions.slice() : [];
+  return arr.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, limit);
+}
+// Thèmes agrégés par mots-clés (pour voir d'un coup d'œil les sujets qui reviennent).
+const Q_THEMES = [
+  { label: "Sol & fertilité", rx: /\b(sol|fertilit|compost|fumier|humus|mati[èe]re organique|ph|acide|amendement)\b/i },
+  { label: "Eau & irrigation", rx: /\b(eau|arros|irrig|goutte|pluie|s[ée]cheresse|paillage)\b/i },
+  { label: "Fertilisation", rx: /\b(engrais|fertilis|azote|npk|fumure|nutrit)\b/i },
+  { label: "Ravageurs & maladies", rx: /\b(ravageur|insecte|puceron|chenille|maladie|champignon|mildiou|tache|pourri|n[ée]matode|traitement|pesticide)\b/i },
+  { label: "Semis & calendrier", rx: /\b(semis|semer|plant|pépini|repiqu|[ée]cartement|densit|calendrier|saison)\b/i },
+  { label: "Carences (feuilles)", rx: /\b(jauniss|jaune|carence|feuille|flétri|rabougri)\b/i },
+  { label: "Récolte & conservation", rx: /\b(r[ée]colt|maturit|conserv|stock|s[ée]chage|perte)\b/i },
+  { label: "Satellite & outils", rx: /\b(ndvi|satellite|capteur|carte|durabilit|indice)\b/i },
+  { label: "Durabilité & pratiques", rx: /\b(rotation|association|agroforest|biodiversit|couverture|carbone|biologique)\b/i },
+];
+function themeCounts(rows) {
+  const c = Q_THEMES.map((t) => ({ label: t.label, count: 0 }));
+  (rows || []).forEach((r) => { const q = String(r.question || ""); Q_THEMES.forEach((t, i) => { if (t.rx.test(q)) c[i].count++; }); });
+  return c.filter((x) => x.count > 0).sort((a, b) => b.count - a.count);
 }
 
 // ---------- Bibliothèque partagée : réutilisation par CULTURE + SECTEUR ----------
@@ -580,7 +612,16 @@ async function handleChat(req, res) {
   try {
     const reply = await callClaude(advisorSystem(plan), history.concat([{ role: "user", content: q.slice(0, 2000) }]));
     sendJson(res, 200, { reply });
+    // Journal (après la réponse, sans bloquer) : ce que les cultivateurs cherchent à comprendre.
+    logQuestion({ id: newId(), user_id: user.id, question: q.slice(0, 400), crop: (plan && plan.crop) || String(p.crop || "").slice(0, 80) || null, created_at: new Date().toISOString() });
   } catch (e) { sendJson(res, e.status || 500, { error: e.message || "La réponse a échoué." }); }
+}
+// GET /api/admin/questions : journal des questions (réservé formateur).
+async function handleAdminQuestions(req, res) {
+  const u = await currentUser(req); if (!isAdmin(u)) return sendJson(res, 403, { error: "Réservé à l'administrateur." });
+  const rows = await recentQuestions(300);
+  const recent = rows.slice(0, 60).map((r) => ({ question: r.question, crop: r.crop || null, at: r.created_at }));
+  sendJson(res, 200, { total: rows.length, themes: themeCounts(rows), recent });
 }
 async function handleAdminUsers(req, res) {
   const u = await currentUser(req); if (!isAdmin(u)) return sendJson(res, 403, { error: "Réservé à l'administrateur." });
@@ -723,6 +764,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && url === "/api/device") return handleDeviceGet(req, res);
   if (req.method === "POST" && url === "/api/chat") return handleChat(req, res);
   if (req.method === "GET" && url === "/api/admin/users") return handleAdminUsers(req, res);
+  if (req.method === "GET" && url === "/api/admin/questions") return handleAdminQuestions(req, res);
   if (req.method === "GET") return serveStatic(req, res);
   res.writeHead(405); res.end("Méthode non autorisée");
 });
