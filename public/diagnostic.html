@@ -130,7 +130,7 @@
       <div class="resbar">
         <h2 style="margin:0;color:var(--deep);">Diagnostic</h2>
         <span class="spacer"></span>
-        <button class="btn" type="button" id="speakBtn" title="Lire à voix haute">🔊 Écouter</button>
+        <button class="btn" type="button" id="speakBtn" title="Lire à voix haute"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M19 6.5a8 8 0 0 1 0 11"/></svg>Écouter</button>
         <button class="btn" type="button" id="againBtn">Nouvelle photo</button>
       </div>
       <div id="resBody"></div>
@@ -142,6 +142,8 @@
   <script>
     const $=(id)=>document.getElementById(id);
     function esc(s){ const d=document.createElement("div"); d.textContent=(s==null?"":s); return d.innerHTML; }
+    const ICON_SPEAK='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M19 6.5a8 8 0 0 1 0 11"/></svg>';
+    const ICON_STOP='<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:4px"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
 
     // Thème partagé
     (function(){ var sel=$("themeSel"); var t="nature"; try{ t=localStorage.getItem("trv-theme")||"nature"; }catch(e){} document.documentElement.setAttribute("data-theme",t); if(sel){ sel.value=t; sel.addEventListener("change",function(){ document.documentElement.setAttribute("data-theme",sel.value); try{ localStorage.setItem("trv-theme",sel.value); }catch(e){} }); } })();
@@ -231,10 +233,10 @@
     // Lecture à voix haute (français fiable)
     $("speakBtn").addEventListener("click",function(){
       if(!window.trvSpeak) return;
-      if(speaking){ window.trvStop&&window.trvStop(); speaking=false; $("speakBtn").textContent="🔊 Écouter"; return; }
+      if(speaking){ window.trvStop&&window.trvStop(); speaking=false; $("speakBtn").innerHTML=ICON_SPEAK+"Écouter"; return; }
       const plain=lastText.replace(/[#*]/g," ").replace(/\s+/g," ").trim();
-      speaking=true; $("speakBtn").textContent="⏹ Arrêter";
-      window.trvSpeak(plain,function(){ speaking=false; $("speakBtn").textContent="🔊 Écouter"; },"fr");
+      speaking=true; $("speakBtn").innerHTML=ICON_STOP+"Arrêter";
+      window.trvSpeak(plain,function(){ speaking=false; $("speakBtn").innerHTML=ICON_SPEAK+"Écouter"; },"fr");
     });
 
     // Nouvelle photo : réinitialise

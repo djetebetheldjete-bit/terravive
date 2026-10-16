@@ -157,7 +157,7 @@
       const r=await api("/api/coop/member/plan","POST",body);
       btn.disabled=false;
       if(!r.ok){ msg.style.color="var(--bad)"; msg.textContent=(r.d&&r.d.error)||"Génération impossible."; return; }
-      msg.style.color="var(--good)"; msg.textContent="Itinéraire créé pour le membre ✓";
+      msg.style.color="var(--good)"; msg.textContent="Itinéraire créé pour le membre.";
       await loadMemberPlans();
     }
     async function fetchMemberPlan(id){ const r=await api("/api/coop/member/plan?memberId="+encodeURIComponent(curMember.id)+"&id="+encodeURIComponent(id)); return (r.ok && r.d.plan) ? r.d.plan : null; }
@@ -165,7 +165,7 @@
       const v=$("mpView"); v.innerHTML='<div class="muted">Chargement…</div>';
       const plan=await fetchMemberPlan(id);
       if(!plan){ v.innerHTML='<div class="err">Itinéraire introuvable.</div>'; return; }
-      v.innerHTML='<div class="card" style="box-shadow:none;"><div class="row" style="justify-content:space-between;align-items:center;"><h3 style="margin:0;text-transform:capitalize;">'+esc(plan.crop||"Itinéraire")+'</h3><button class="btn primary" id="mpFicheNow" type="button">🖨 Fiche à remettre</button></div><div class="mddoc" style="margin-top:10px;">'+renderMd(plan.content)+'</div></div>';
+      v.innerHTML='<div class="card" style="box-shadow:none;"><div class="row" style="justify-content:space-between;align-items:center;"><h3 style="margin:0;text-transform:capitalize;">'+esc(plan.crop||"Itinéraire")+'</h3><button class="btn primary" id="mpFicheNow" type="button"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2"/><rect x="6" y="13" width="12" height="8" rx="1"/></svg>Fiche à remettre</button></div><div class="mddoc" style="margin-top:10px;">'+renderMd(plan.content)+'</div></div>';
       $("mpFicheNow").addEventListener("click", function(){ printFiche(plan); });
       v.scrollIntoView({behavior:"smooth",block:"start"});
     }
@@ -246,7 +246,7 @@
       var r=await api("/api/animator/request");
       if(!r.ok){ area.innerHTML=''; return; }
       var req=r.d.request;
-      if(req && req.status==="en_attente"){ area.innerHTML='<div class="ok">✔ Votre demande pour devenir animateur a bien été envoyée. Elle est <b>en attente</b> de validation par le responsable de Terravive. Vous serez reconnu animateur dès qu\'elle sera acceptée.</div>'; return; }
+      if(req && req.status==="en_attente"){ area.innerHTML='<div class="ok">Votre demande pour devenir animateur a bien été envoyée. Elle est <b>en attente</b> de validation par le responsable de Terravive. Vous serez reconnu animateur dès qu\'elle sera acceptée.</div>'; return; }
       if(req && req.status==="refusée"){ area.innerHTML='<div class="muted" style="margin-bottom:8px;">Votre précédente demande n\'a pas été retenue. Vous pouvez en soumettre une nouvelle en précisant davantage votre projet.</div>'+animReqForm(); }
       else { area.innerHTML=animReqForm(); }
       var b=$("arSend"); if(!b) return;
@@ -284,7 +284,7 @@
       ) + '<div id="coOverview">'+card('<div class="muted">Chargement des membres…</div>')+'</div>'
         + '<div id="coopTools"></div>'
         + card('<div class="row"><button class="btn" id="coLeave" type="button" style="border-color:#c0392b;color:#c0392b;">Quitter / supprimer la coopérative</button></div><div class="err" id="coErr3"></div>');
-      $("coCopy").addEventListener("click", function(){ try{ navigator.clipboard && navigator.clipboard.writeText(c.code); }catch(e){} this.textContent="Copié ✓"; const t=this; setTimeout(function(){ t.textContent="Copier"; },1200); });
+      $("coCopy").addEventListener("click", function(){ try{ navigator.clipboard && navigator.clipboard.writeText(c.code); }catch(e){} this.textContent="Copié"; const t=this; setTimeout(function(){ t.textContent="Copier"; },1200); });
       wireLeave();
       loadOverview();
       renderTools();
@@ -325,12 +325,12 @@
 
     function renderTools(){
       var host=$("coopTools"); if(!host) return;
-      host.innerHTML = card('<h2>🔧 Matériel partagé</h2>'
+      host.innerHTML = card('<h2><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.3-.6-.6-2.3z"/></svg>Matériel partagé</h2>'
           + '<div class="muted">Mettez le matériel en commun (motopompe, pulvérisateur, tracteur…). Chacun propose le sien ; les autres le réservent.</div>'
           + '<div id="equipAdd" style="margin-top:12px;"></div>'
           + '<div id="equipList" style="margin-top:12px;"><div class="muted">Chargement…</div></div>'
           + '<div id="equipResa" style="margin-top:14px;"></div>')
-        + card('<h2>🛒 Achats groupés</h2>'
+        + card('<h2><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 4H5l2.3 11.1a1.4 1.4 0 0 0 1.4 1.1h8.6a1.4 1.4 0 0 0 1.4-1.1L20.5 8H6"/></svg>Achats groupés</h2>'
           + '<div class="muted">Regroupez vos besoins en intrants (engrais, semences…) pour acheter moins cher : plus la quantité totale est grande, plus le groupe pèse pour négocier.</div>'
           + '<div id="buyAdd" style="margin-top:12px;"></div>'
           + '<div id="buyList" style="margin-top:12px;"><div class="muted">Chargement…</div></div>');

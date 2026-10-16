@@ -99,7 +99,7 @@
       <div class="thread" id="thread"><div class="empty" id="threadEmpty">Votre conversation apparaîtra ici. Posez une question — par écrit ou avec le micro.</div></div>
       <div class="composer">
         <input id="chatInput" placeholder="ex. Mes feuilles de maïs jaunissent, que faire ?" maxlength="500" autocomplete="off">
-        <button class="btn" id="micBtn" type="button" title="Dicter la question (en français)" aria-label="Dicter">🎤</button>
+        <button class="btn" id="micBtn" type="button" title="Dicter la question (en français)" aria-label="Dicter"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg></button>
         <button class="btn primary" id="sendBtn" type="button">Envoyer</button>
       </div>
     </div>
@@ -110,6 +110,10 @@
   <script>
     const $=(id)=>document.getElementById(id);
     function esc(s){ const d=document.createElement("div"); d.textContent=(s==null?"":s); return d.innerHTML; }
+    const ICON_SPEAK='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M19 6.5a8 8 0 0 1 0 11"/></svg>';
+    const ICON_STOP='<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+    const ICON_MIC='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>';
+    const ICON_REC='<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px"><circle cx="12" cy="12" r="6"/></svg>';
     // Thème partagé
     (function(){ var sel=$("themeSel"); var t="nature"; try{ t=localStorage.getItem("trv-theme")||"nature"; }catch(e){} document.documentElement.setAttribute("data-theme",t); if(sel){ sel.value=t; sel.addEventListener("change",function(){ document.documentElement.setAttribute("data-theme",sel.value); try{ localStorage.setItem("trv-theme",sel.value); }catch(e){} }); } })();
 
@@ -205,10 +209,10 @@
     // Bouton « Écouter » sur une réponse (lecture à voix haute, surtout utile en français).
     function addSpeak(el, text){
       if(!el || !(window.trvCanSpeak && window.trvCanSpeak())) return;
-      const b=document.createElement("button"); b.type="button"; b.textContent="🔊 Écouter";
+      const b=document.createElement("button"); b.type="button"; b.innerHTML=ICON_SPEAK+"Écouter";
       b.style.cssText="margin-top:8px;background:transparent;border:1px solid var(--line);border-radius:999px;padding:4px 11px;font:inherit;font-size:.8rem;color:var(--leaf);cursor:pointer;";
       let on=false;
-      b.addEventListener("click", function(){ if(on){ trvStop(); on=false; b.textContent="🔊 Écouter"; return; } on=true; b.textContent="⏹ Arrêter"; trvSpeak(text, function(){ on=false; b.textContent="🔊 Écouter"; }); });
+      b.addEventListener("click", function(){ if(on){ trvStop(); on=false; b.innerHTML=ICON_SPEAK+"Écouter"; return; } on=true; b.innerHTML=ICON_STOP+"Arrêter"; trvSpeak(text, function(){ on=false; b.innerHTML=ICON_SPEAK+"Écouter"; }); });
       el.appendChild(b);
     }
     // Dictée de la question (reconnaissance vocale, en français).
@@ -218,8 +222,8 @@
       let listening=false, rec=null;
       b.addEventListener("click", function(){
         if(listening){ try{ rec && rec.stop(); }catch(e){} return; }
-        listening=true; b.textContent="●"; b.style.color="#c0392b"; b.title="Écoute… parlez";
-        rec=trvListen(function(t){ $("chatInput").value=t; }, function(){ listening=false; b.textContent="🎤"; b.style.color=""; b.title="Dicter la question (en français)"; const q=($("chatInput").value||"").trim(); if(q) send(); }, "fr-FR");
+        listening=true; b.innerHTML=ICON_REC; b.style.color="#c0392b"; b.title="Écoute… parlez";
+        rec=trvListen(function(t){ $("chatInput").value=t; }, function(){ listening=false; b.innerHTML=ICON_MIC; b.style.color=""; b.title="Dicter la question (en français)"; const q=($("chatInput").value||"").trim(); if(q) send(); }, "fr-FR");
       });
     })();
 

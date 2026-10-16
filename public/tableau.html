@@ -772,7 +772,7 @@ void loop() {
       const r=await fetch("/api/admin/animator",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:email,grant:grant})});
       const d=await r.json().catch(function(){return{};});
       if(!r.ok){ msg.style.color="var(--bad)"; msg.textContent=d.error||"Action impossible."; return; }
-      msg.style.color="var(--good)"; msg.textContent=(grant?"Statut d'animateur accordé à ":"Statut retiré à ")+(d.email||email)+" ✓";
+      msg.style.color="var(--good)"; msg.textContent=(grant?"Statut d'animateur accordé à ":"Statut retiré à ")+(d.email||email)+".";
       $("animEmail").value=""; loadAnimList();
     }
     $("animGrant").addEventListener("click",function(){ act(true); });

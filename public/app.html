@@ -178,7 +178,7 @@
           <div class="doc" id="planDoc"></div>
           <div class="toolbar">
             <button class="btn sun" id="pdfBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:15px;height:15px;vertical-align:-2px;margin-right:5px;"><path d="M6 3h8l4 4v14a0 0 0 0 1 0 0H6a0 0 0 0 1 0 0z"/><path d="M14 3v4h4"/><path d="M12 11v6M9 14l3 3 3-3"/></svg>Télécharger en PDF</button>
-            <button class="btn" id="listenBtn" type="button" style="display:none;">🔊 Écouter l'itinéraire</button>
+            <button class="btn" id="listenBtn" type="button" style="display:none;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M19 6.5a8 8 0 0 1 0 11"/></svg>Écouter l'itinéraire</button>
             <button class="btn" id="newBtn" type="button">Nouveau plan</button>
           </div>
         </div>
@@ -218,6 +218,8 @@
 
   // ---- Rendu Markdown minimal (##, listes -, **gras**, TABLEAUX, paragraphes) ----
   function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+  const ICON_SPEAK='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M19 6.5a8 8 0 0 1 0 11"/></svg>';
+  const ICON_STOP='<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:4px"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
   function inline(s){ return esc(s).replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>").replace(/\*([^*]+)\*/g,"<em>$1</em>"); }
   function mdTableSep(s){ return /^\s*\|?\s*:?-{2,}\s*(\|\s*:?-{2,}\s*)+\|?\s*$/.test(s); }
   function mdCells(s){ let t=s.trim(); if(t.startsWith("|")) t=t.slice(1); if(t.endsWith("|")) t=t.slice(0,-1); return t.split("|").map(c=>c.trim()); }
@@ -337,7 +339,7 @@
     const pills=[["Culture",plan.crop],["Région",plan.region],["Surface",plan.area],["Sol",plan.soil],["Saison",plan.season]].filter(x=>x[1]);
     $("planPills").innerHTML = pills.map(x=>'<span class="pill">'+x[0]+' : <b>'+esc(x[1])+'</b></span>').join("");
     $("planDoc").innerHTML = renderMd(plan.content);
-    { const lb=$("listenBtn"); if(lb){ if(window.trvCanSpeak && window.trvCanSpeak()){ lb.style.display="inline-block"; lb.textContent="🔊 Écouter l'itinéraire"; } else { lb.style.display="none"; } try{ if(window.trvStop) window.trvStop(); }catch(e){} } }
+    { const lb=$("listenBtn"); if(lb){ if(window.trvCanSpeak && window.trvCanSpeak()){ lb.style.display="inline-block"; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; } else { lb.style.display="none"; } try{ if(window.trvStop) window.trvStop(); }catch(e){} } }
     $("chatCard").style.display="block"; $("thread").innerHTML="";
     $("chatHint").innerHTML='Une question sur votre culture de <b>'+esc(plan.crop)+'</b> ? Un problème observé ? Demandez ici.';
     window.scrollTo({top:0,behavior:"smooth"});
@@ -439,7 +441,7 @@
       .replace(/\|/g," ")                         // tableaux
       .replace(/[#*_`>-]/g," ")                   // symboles markdown
       .replace(/\s+/g," ").trim(); }
-  { const lb=$("listenBtn"); if(lb){ let on=false; lb.addEventListener("click", function(){ if(on){ if(window.trvStop) trvStop(); on=false; lb.textContent="🔊 Écouter l'itinéraire"; return; } if(!currentPlan) return; on=true; lb.textContent="⏹ Arrêter la lecture"; trvSpeak(planToSpeech(currentPlan.content), function(){ on=false; lb.textContent="🔊 Écouter l'itinéraire"; }); }); } }
+  { const lb=$("listenBtn"); if(lb){ let on=false; lb.addEventListener("click", function(){ if(on){ if(window.trvStop) trvStop(); on=false; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; return; } if(!currentPlan) return; on=true; lb.innerHTML=ICON_STOP+"Arrêter la lecture"; trvSpeak(planToSpeech(currentPlan.content), function(){ on=false; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; }); }); } }
   $("newBtn").addEventListener("click", ()=>{ try{ if(window.trvStop) trvStop(); }catch(e){} $("planContent").style.display="none"; $("planPlaceholder").style.display="block"; $("chatCard").style.display="none"; window.scrollTo({top:0,behavior:"smooth"}); });
 
   loadMe();
