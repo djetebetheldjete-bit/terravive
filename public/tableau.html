@@ -135,6 +135,19 @@
   .vbadge{ font-size:.72rem; font-weight:700; padding:3px 9px; border-radius:20px; color:#fff; }
   .vbadge.fav{ background:var(--good); } .vbadge.prec{ background:var(--sun); color:#2a1d04; } .vbadge.dec{ background:var(--bad); }
   .vverdict ul{ margin:7px 0 0 18px; font-size:.84rem; color:var(--soft); } .vverdict .note{ font-size:.8rem; color:var(--faint); font-style:italic; margin-top:5px; }
+  /* Indice de durabilité */
+  .durq{ display:grid; grid-template-columns:1fr 190px; gap:8px 12px; align-items:center; margin:7px 0; }
+  .durq label{ font-size:.86rem; color:var(--ink); }
+  .durgrp{ font-weight:700; color:var(--leaf); font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; margin:14px 0 2px; }
+  .durhero{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; border:1px solid var(--line); border-radius:12px; padding:14px 16px; background:var(--surface2); }
+  .durhero .big{ font-size:2.6rem; font-weight:800; line-height:1; color:var(--leaf); }
+  .durhero .big small{ font-size:1rem; font-weight:600; color:var(--faint); }
+  .durmeter{ margin:9px 0; }
+  .durmeter .top{ display:flex; justify-content:space-between; align-items:baseline; font-size:.86rem; margin-bottom:4px; }
+  .durmeter .top b{ color:var(--ink); } .durmeter .top .sc{ font-weight:800; }
+  .durbar{ height:12px; border-radius:999px; background:var(--surface2); border:1px solid var(--line); overflow:hidden; }
+  .durbar>span{ display:block; height:100%; border-radius:999px; transition:width .5s ease; }
+  .durtag{ font-size:.72rem; font-weight:700; padding:2px 9px; border-radius:20px; color:#fff; }
 </style>
 </head>
 <body>
@@ -146,6 +159,8 @@
       <a href="/tableau" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg> Tableau de bord</a>
       <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V6a2 2 0 0 1 2-2h11l3 3v12.5"/><path d="M8 8h7M8 12h9M8 16h5"/></svg> Itinéraire de culture</a>
       <a href="/arduino"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="9" rx="2"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/><path d="M2 12h2M20 12h2"/></svg> Automatisation</a>
+      <a href="/conseiller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.6 8.6 0 0 1-3.9-.9L3 20l1.4-4.1A8.4 8.4 0 0 1 3.5 11.5 8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg> Conseiller</a>
+      <a href="/comprendre"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 5.5V20.5"/><path d="M8 7h8M8 11h6"/></svg> Comprendre</a>
     </nav>
     <div class="foot" id="sideFoot"></div>
   </aside>
@@ -225,6 +240,18 @@
             </div>
           </div>
 
+          <div class="card section-gap" id="durCard">
+            <h2 class="ct">Indice de durabilité de mon exploitation</h2>
+            <div class="muted">Auto-évaluation inspirée du cadre des agrosystèmes durables — trois piliers : environnemental, économique, social. Répondez en quelques clics ; si vous avez lancé la Santé (NDVI), elle est prise en compte automatiquement. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></div>
+            <div id="durForm" class="section-gap"></div>
+            <div class="maprow" style="align-items:center;">
+              <label class="muted" for="durArea">Surface (ha, pour le bilan carbone) :</label>
+              <input id="durArea" class="sel" style="width:110px;" placeholder="ex. 1" inputmode="decimal" autocomplete="off">
+              <button class="btn primary" id="durCalc" type="button">Calculer mon indice</button>
+            </div>
+            <div id="durOut" class="section-gap"></div>
+          </div>
+
           <div class="tipbar">
             <span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 1 4 10.5c-.7.7-1 1.2-1 2.5H9c0-1.3-.3-1.8-1-2.5A6 6 0 0 1 12 3z"/></svg></span>
             <div><b id="tipTitle">Petit à petit, le sol vit mieux.</b><div class="muted" id="tipText">Arrosez tôt le matin ou en soirée pour limiter l'évaporation.</div></div>
@@ -260,6 +287,7 @@
             <div class="list">
               <a href="/app"><span>Nouvel itinéraire de culture</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
               <a href="/arduino"><span>Nouveau projet d'automatisation</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
+              <a href="/conseiller"><span>Poser une question au conseiller</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
             </div>
             <div id="recentPlans" class="list section-gap"></div>
           </div>
@@ -463,6 +491,9 @@
     try{
       const d = await vFetch("/ndvi", Object.assign({}, zoneActive, { date_debut: ymd(daysAgo(180)), date_fin: ymd(new Date()) }));
       if(d.erreur){ vSetBusy(false, "Erreur : "+d.erreur); return; }
+      // Mémorise pour l'indice de durabilité (pilier environnemental) et le bilan carbone.
+      if(typeof d.ndvi_moyen==="number"){ window.lastNdvi = d.ndvi_moyen; }
+      if(typeof d.surface_ha==="number"){ window.lastSurfaceHa = d.surface_ha; var _da=document.getElementById("durArea"); if(_da && !_da.value) _da.value = d.surface_ha; }
       if(ndviLayer) MAP.removeLayer(ndviLayer);
       if(d.tile_url){ ndviLayer=L.tileLayer(d.tile_url,{opacity:0.85}); ndviLayer.addTo(MAP); }
       const ac=alertClass(d.pct_faible,d.pct_moyen);
@@ -669,6 +700,93 @@ void loop() {
   $("revealBtn").addEventListener("click", ()=>{ keyShown=!keyShown; $("revealBtn").textContent=keyShown?"Masquer":"Afficher"; renderKey(); });
   $("copyKeyBtn").addEventListener("click", copyKey);
   $("sketchBtn").addEventListener("click", downloadSketch);
+
+  // ===== Indice de durabilité multicritère (cadre des agrosystèmes durables) =====
+  const DUR_Q = [
+    {p:"Environnemental", k:"mo",      label:"Matière organique au sol (compost, fumier, résidus)", opts:[["Rarement",0],["De temps en temps",50],["Systématiquement",100]]},
+    {p:"Environnemental", k:"cov",     label:"Couverture du sol & travail réduit (paillage, non-labour)", opts:[["Sol nu, labour fréquent",0],["Parfois couvert",50],["Couvert, peu ou pas de labour",100]]},
+    {p:"Environnemental", k:"div",     label:"Diversité des cultures", opts:[["Monoculture",0],["Rotation d'une saison à l'autre",50],["Associations / agroforesterie",100]]},
+    {p:"Environnemental", k:"intrant", label:"Engrais & pesticides chimiques de synthèse", opts:[["Beaucoup",0],["Modéré",50],["Peu ou aucun (bio)",100]]},
+    {p:"Environnemental", k:"eau",     label:"Gestion de l'eau", opts:[["Pluvial non optimisé",0],["Arrosage / collecte de pluie",50],["Goutte-à-goutte / très économe",100]]},
+    {p:"Économique", k:"vente", label:"Débouché de vente", opts:[["Autoconsommation seule",0],["Vente occasionnelle",50],["Marché ou contrat régulier",100]]},
+    {p:"Économique", k:"rev",   label:"Diversité des revenus", opts:[["Une seule source",0],["Quelques cultures",50],["Diversifié + valorisation des résidus",100]]},
+    {p:"Économique", k:"cout",  label:"Maîtrise des coûts d'intrants", opts:[["Dépend surtout d'achats",0],["Mixte",50],["Surtout ressources locales",100]]},
+    {p:"Social", k:"foyer", label:"Nourrit votre foyer (sécurité alimentaire)", opts:[["Non",0],["En partie",50],["Oui",100]]},
+    {p:"Social", k:"form",  label:"Accès à la formation / au conseil", opts:[["Aucun",0],["De temps en temps",50],["Régulier",100]]},
+    {p:"Social", k:"coop",  label:"Entraide / coopérative", opts:[["Seul",0],["Échanges informels",50],["Coopérative / groupe",100]]},
+  ];
+  function durBuildForm(){
+    const box=$("durForm"); if(!box) return; let html=""; let grp="";
+    DUR_Q.forEach(function(q){
+      if(q.p!==grp){ grp=q.p; html+='<div class="durgrp">'+esc(grp)+'</div>'; }
+      html+='<div class="durq"><label for="durq_'+q.k+'">'+esc(q.label)+'</label><select class="sel" id="durq_'+q.k+'" data-k="'+q.k+'" data-p="'+esc(q.p)+'"><option value="">— choisir —</option>'
+        + q.opts.map(function(o){ return '<option value="'+o[1]+'">'+esc(o[0])+'</option>'; }).join("")
+        + '</select></div>';
+    });
+    box.innerHTML=html;
+  }
+  function durBand(s){ return s<40?["bad","Faible"]:s<70?["warn","Moyen"]:s<85?["good","Bon"]:["good","Excellent"]; }
+  function durCol(b){ return b==="bad"?"var(--bad)":b==="warn"?"var(--warn)":"var(--good)"; }
+  function durMeter(label,score){ const r=durBand(score), c=durCol(r[0]); return '<div class="durmeter"><div class="top"><b>'+esc(label)+'</b><span class="sc" style="color:'+c+'">'+Math.round(score)+'/100 <span class="durtag" style="background:'+c+'">'+r[1]+'</span></span></div><div class="durbar"><span style="width:'+Math.max(2,Math.round(score))+'%;background:'+c+'"></span></div></div>'; }
+  function durVal(k){ const el=document.getElementById("durq_"+k); if(!el||el.value==="") return null; return parseFloat(el.value); }
+  function durMean(keys){ const v=keys.map(durVal).filter(function(x){return x!==null;}); if(!v.length) return null; return v.reduce(function(a,b){return a+b;},0)/v.length; }
+  function durCarbon(){
+    // Estimation INDICATIVE de séquestration (tCO2/ha/an) selon les pratiques déclarées.
+    var c=0; const mo=durVal("mo"), cov=durVal("cov"), div=durVal("div"), intr=durVal("intrant");
+    if(mo===100)c+=0.8; else if(mo===50)c+=0.3;
+    if(cov===100)c+=0.6; else if(cov===50)c+=0.25;
+    if(div===100)c+=1.4; else if(div===50)c+=0.3;   // agroforesterie/associations stockent le plus
+    if(intr===100)c+=0.2; else if(intr===50)c+=0.1;
+    return c;
+  }
+  function durCalc(){
+    const out=$("durOut"); if(!out) return;
+    const envKeys=["mo","cov","div","intrant","eau"];
+    let env=durMean(envKeys);
+    // NDVI satellite (santé de la végétation) : intégré au pilier environnemental s'il existe.
+    let ndviScore=null;
+    if(typeof window.lastNdvi==="number"){ ndviScore=Math.max(0,Math.min(100,(window.lastNdvi-0.2)/(0.75-0.2)*100)); }
+    if(ndviScore!==null){ env = (env===null) ? ndviScore : (env*envKeys.length + ndviScore)/(envKeys.length+1); }
+    const eco=durMean(["vente","rev","cout"]);
+    const soc=durMean(["foyer","form","coop"]);
+    const parts=[env,eco,soc].filter(function(x){return x!==null;});
+    if(!parts.length){ out.innerHTML='<div class="valert warn">Répondez à au moins quelques questions pour obtenir votre indice.</div>'; return; }
+    const global=parts.reduce(function(a,b){return a+b;},0)/parts.length;
+    const gb=durBand(global);
+    // Bilan carbone
+    const carb=durCarbon();
+    const area=parseFloat(($("durArea").value||"").replace(",","."));
+    const total=(area>0)? carb*area : null;
+    const km=Math.round(carb* (area>0?area:1) *6000); // 1 tCO2 ≈ 6000 km voiture (indicatif)
+    // Conseils : pilier le plus faible
+    const pil=[["environnemental",env],["économique",eco],["social",soc]].filter(function(x){return x[1]!==null;}).sort(function(a,b){return a[1]-b[1];});
+    const faible=pil[0];
+    const conseils={
+      "environnemental":"Composter et pailler (sol couvert), introduire une rotation ou des associations (ex. une légumineuse qui fixe l'azote), et réduire les intrants chimiques.",
+      "économique":"Diversifier les débouchés (marché, contrat), valoriser les résidus (compost, fourrage, champignons) et s'appuyer davantage sur des ressources locales pour baisser les coûts.",
+      "social":"Rejoindre ou créer une coopérative, et se former régulièrement — Terravive et ses itinéraires techniques comptent comme accès au conseil."
+    };
+    let html='<div class="durhero"><div class="big">'+Math.round(global)+'<small>/100</small></div>'
+      +'<div><div style="font-weight:800;color:'+durCol(gb[0])+';font-size:1.05rem;">Durabilité : '+gb[1]+'</div>'
+      +'<div class="muted" style="font-size:.85rem;">Moyenne des piliers renseignés'+(ndviScore!==null?' · NDVI satellite inclus':'')+'.</div></div></div>';
+    html+='<div class="section-gap">';
+    if(env!==null) html+=durMeter("Environnemental",env);
+    if(eco!==null) html+=durMeter("Économique",eco);
+    if(soc!==null) html+=durMeter("Social",soc);
+    html+='</div>';
+    // Carbone
+    html+='<div class="vchips section-gap">'
+      +'<div class="vchip"><div class="l">Carbone stocké (est.)</div><div class="v">≈ '+carb.toFixed(1)+' tCO₂/ha/an</div></div>'
+      +(total!==null?('<div class="vchip"><div class="l">Sur '+area+' ha</div><div class="v">≈ '+total.toFixed(1)+' tCO₂/an</div></div>'):'')
+      +'<div class="vchip"><div class="l">Équivalent</div><div class="v">≈ '+km.toLocaleString("fr-FR")+' km en voiture évités</div></div>'
+      +'</div>';
+    html+='<div class="valert">Levier prioritaire — pilier <b>'+esc(faible[0])+'</b> ('+Math.round(faible[1])+'/100) : '+esc(conseils[faible[0]])+'</div>';
+    html+='<div class="muted" style="font-size:.78rem;margin-top:6px;">Estimations indicatives, à visée pédagogique (cadre des agrosystèmes durables). Le carbone dépend fortement du sol et du climat réels.</div>';
+    out.innerHTML=html;
+  }
+  durBuildForm();
+  { const b=$("durCalc"); if(b) b.addEventListener("click", durCalc); }
+
   load();
 </script>
 </body>

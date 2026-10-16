@@ -99,7 +99,7 @@
     <div>
       <div class="card">
         <h2 class="sec">Créer mon itinéraire technique</h2>
-        <p class="hint">Décrivez votre parcelle. L'IA agronome bâtit un itinéraire technique complet, tourné vers l'agroécologie.</p>
+        <p class="hint">Décrivez votre parcelle. L'IA agronome bâtit un itinéraire technique complet, tourné vers l'agroécologie. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></p>
         <label>Que voulez-vous cultiver ? *</label>
         <input id="crop" placeholder="ex. tomate, maïs, cacao, gombo…" maxlength="120">
         <div class="row2">
@@ -117,6 +117,25 @@
             <select id="season">
               <option value="">— à préciser —</option>
               <option>Début de saison des pluies</option><option>Pleine saison des pluies</option><option>Saison sèche (avec irrigation)</option><option>Maintenant</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2">
+          <div><label>Mode de conduite</label>
+            <select id="mode" title="Type d'agrosystème — adapte tout l'itinéraire">
+              <option value="">— à préciser —</option>
+              <option value="Agroécologie / régénératif">Agroécologie / régénératif</option>
+              <option value="Agriculture biologique">Biologique (sans chimie de synthèse)</option>
+              <option value="Agriculture de conservation (non-labour, couverture)">Agriculture de conservation</option>
+              <option value="Conventionnel raisonné">Conventionnel raisonné</option>
+            </select>
+          </div>
+          <div><label>Structure de culture</label>
+            <select id="structure" title="Comment la parcelle est organisée">
+              <option value="">— à préciser —</option>
+              <option value="Monoculture">Monoculture (une seule culture)</option>
+              <option value="Polyculture / cultures associées">Polyculture / cultures associées</option>
+              <option value="Agroforesterie (arbres + cultures)">Agroforesterie (arbres + cultures)</option>
             </select>
           </div>
         </div>
@@ -161,7 +180,8 @@
 
       <div class="card chat" id="chatCard" style="display:none;">
         <h2 class="sec">Conseiller Terravive</h2>
-        <p class="hint" id="chatHint">Une question sur votre culture ? Un problème (feuilles jaunes, insectes) ? Demandez ici — réponses tournées vers l'agriculture durable.</p>
+        <p class="hint" id="chatHint">Une question sur votre culture ? Un problème (feuilles jaunes, insectes) ? Demandez ici — réponses tournées vers l'agriculture durable. <a href="/conseiller" style="color:var(--leaf);font-weight:600;">Conseiller général</a></p>
+        <div id="chatSug" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px;"></div>
         <div class="thread" id="thread"></div>
         <div class="composer">
           <input id="chatInput" placeholder="ex. Mes feuilles de tomate jaunissent, que faire ?" maxlength="500">
@@ -326,7 +346,7 @@
     const btn=$("genBtn"); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Génération de l\'itinéraire…';
     var rb=document.getElementById("regenBtn"); if(rb){ rb.disabled=true; rb.innerHTML='<span class="spin"></span> Génération…'; }
     try{
-      const body={ crop, region:$("region").value, area:$("area").value, soil:$("soil").value, ph:$("ph").value, season:$("season").value, goal:$("goal").value, notes:$("notes").value, fresh:fresh };
+      const body={ crop, region:$("region").value, area:$("area").value, soil:$("soil").value, ph:$("ph").value, season:$("season").value, mode:($("mode")?$("mode").value:""), structure:($("structure")?$("structure").value:""), goal:$("goal").value, notes:$("notes").value, fresh:fresh };
       const r=await fetch("/api/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
       const d=await r.json();
       if(!r.ok){ err.textContent=d.error||"La génération a échoué."; }
@@ -398,6 +418,13 @@
   $("genBtn").addEventListener("click", ()=>generate(false));
   $("sendBtn").addEventListener("click", sendChat);
   $("chatInput").addEventListener("keydown",e=>{ if(e.key==="Enter") sendChat(); });
+  // Questions suggérées rapides dans le conseiller de l'itinéraire
+  (function(){
+    const box=$("chatSug"); if(!box) return;
+    const Q=["Mes feuilles jaunissent, que faire ?","Quand et comment arroser ?","Quel engrais naturel utiliser ?","Comment protéger sans pesticide ?","Quand récolter ?"];
+    box.innerHTML = Q.map(function(q){ return '<button type="button" class="sugchip" style="background:var(--surface2);border:1px solid var(--line);border-radius:20px;padding:6px 11px;font:inherit;font-size:.82rem;color:var(--ink);cursor:pointer;">'+q.replace(/</g,"&lt;")+'</button>'; }).join("");
+    box.querySelectorAll(".sugchip").forEach(function(b){ b.addEventListener("click", function(){ $("chatInput").value=b.textContent; sendChat(); }); });
+  })();
   $("pdfBtn").addEventListener("click", exportPlanPDF);
   $("newBtn").addEventListener("click", ()=>{ $("planContent").style.display="none"; $("planPlaceholder").style.display="block"; $("chatCard").style.display="none"; window.scrollTo({top:0,behavior:"smooth"}); });
 

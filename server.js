@@ -349,6 +349,7 @@ Respecte EXACTEMENT ces sections (titres en ##), dans cet ordre :
 
 ## 1. Diagnostic de la parcelle
 La culture visée ; la zone agro-écologique et le régime des pluies (bimodal ou monomodal) de la région, qui détermine le calendrier ; le type de sol avec ses atouts et ses risques (ex. sableux = bien drainé mais pauvre et lessivable ; argileux = retient l'eau et les éléments mais peut s'asphyxier ; limoneux = bon potentiel mais sensible à la battance) ; le pH du sol UNIQUEMENT s'il a été fourni ; le précédent cultural si connu ; et l'objectif de la personne. Déduis-en les grands choix de l'itinéraire. Si une information manque, indique clairement l'hypothèse que tu prends — et ne reproche jamais à la personne de ne pas avoir une donnée (comme le pH).
+TYPOLOGIE DE L'AGROSYSTÈME : tiens compte du MODE de conduite indiqué (conventionnel, biologique, agriculture de conservation, agroécologie/régénératif) et de la STRUCTURE voulue (monoculture, polyculture/cultures associées, agroforesterie). Adapte TOUT l'itinéraire à ce choix : par exemple, en mode biologique n'autorise aucun intrant chimique de synthèse ; en agriculture de conservation, mise sur le non-labour, la couverture permanente du sol et la rotation ; en agroforesterie/polyculture, intègre d'emblée les arbres et les associations. Si la personne a choisi la monoculture, signale avec bienveillance l'intérêt d'introduire un peu de diversité (rotation, association, bordures) pour la résilience, sans lui imposer.
 
 ## 2. Choix de la variété et des semences
 Type de variété adapté au climat local et à l'objectif (résistance aux maladies, cycle court ou long, tolérance à la chaleur ou à la sécheresse), qualité des semences (semences saines, taux de germination), et préparation éventuelle (pré-germination, traitement — en privilégiant les solutions naturelles).
@@ -403,10 +404,21 @@ Section OBLIGATOIRE et PROPRE À CETTE CULTURE. Commence par citer les résidus 
 - Petit revenu : sous-produits vendables (coques, son, compost en surplus, fourrage) selon le contexte local.
 Explique à chaque fois l'intérêt en une phrase (moins de déchets, un sol nourri gratuitement, une économie ou un revenu en plus). DÉCONSEILLE clairement le brûlage des résidus comme pratique par défaut : il détruit la matière organique, appauvrit le sol et pollue. Adapte toutes les propositions aux moyens locaux (Côte d'Ivoire) et à la quantité réellement disponible sur la surface indiquée.
 
-## 14. Rendement attendu et repères économiques
+## 14. Biodiversité, associations et services écosystémiques
+Section OBLIGATOIRE, dans l'esprit des agrosystèmes durables. Traite concrètement, pour CETTE culture et ce contexte :
+- ASSOCIATIONS DE CULTURES (plantes compagnes) : propose 1 à 3 associations bénéfiques et dis POURQUOI (ex. une légumineuse comme le niébé ou le haricot qui fixe l'azote et enrichit le sol pour une céréale ; une plante répulsive qui éloigne certains ravageurs ; une plante couvre-sol qui limite les mauvaises herbes). Donne l'agencement (lignes alternées, bordures…).
+- ROTATION DES CULTURES : que cultiver AVANT et APRÈS cette culture sur la même parcelle, et pourquoi (couper le cycle des ravageurs/maladies, alterner cultures gourmandes et cultures qui restituent, éviter d'épuiser le sol).
+- BIODIVERSITÉ FONCTIONNELLE : gestes simples pour attirer les AUXILIAIRES et POLLINISATEURS utiles (haies, bandes fleuries, zones non cultivées, refuges) et pour protéger la VIE DU SOL (vers de terre, bactéries, mycorhizes) — matière organique, sol couvert, travail du sol limité.
+- COUVERTURE DU SOL ET AGROFORESTERIE quand c'est pertinent : plantes de couverture entre les cycles, arbres ou arbustes utiles en bordure/association (ombrage, azote, fourrage, bois, fruits) pour un système plus résilient.
+- SERVICES RENDUS : rappelle en une phrase ce que ces choix apportent (fertilité entretenue, moins de ravageurs, meilleure rétention d'eau, pollinisation, résilience au climat).
+
+## 15. Climat et stockage de carbone
+En quelques lignes simples : comment cet itinéraire aide la parcelle à STOCKER du carbone dans le sol et la biomasse (matière organique, compost, couverture végétale, non-brûlage des résidus, agroforesterie) et à mieux RÉSISTER au changement climatique (sécheresses, pluies violentes). Indique, en ordre de grandeur et en restant prudent (fourchette, jamais de chiffre inventé précis), que les pratiques agroécologiques peuvent séquestrer du carbone et réduire les émissions par rapport à une conduite avec brûlage et beaucoup d'intrants chimiques. Relie cela à un bénéfice concret pour la personne (sol plus fertile et plus vivant, qui retient mieux l'eau).
+
+## 16. Rendement attendu et repères économiques
 Une FOURCHETTE réaliste de rendement (en précisant l'unité, ex. t/ha, ou une estimation sur la surface indiquée), et les bénéfices durables de l'approche (sol vivant, moins d'eau, moins de produits chimiques, meilleurs revenus dans la durée).
 
-## 15. Calendrier récapitulatif
+## 17. Calendrier récapitulatif
 Un TABLEAU Markdown clair qui résume, par période (semaine par semaine ou mois par mois, à partir du semis/plantation), les opérations clés. Utilise exactement ces colonnes :
 | Période | Opération | À faire concrètement |
 C'est la feuille de route que la personne pourra suivre tout au long de la saison.
@@ -426,6 +438,8 @@ function planUserMessage(p) {
 - Type de sol : ${p.soil || "non précisé"}
 - pH du sol : ${p.ph ? p.ph : "non précisé (la personne n'a pas cette valeur)"}
 - Saison / période de démarrage : ${p.season || "non précisée"}
+- Mode de conduite souhaité : ${p.mode || "non précisé (propose une approche agroécologique adaptée)"}
+- Structure de culture souhaitée : ${p.structure || "non précisée"}
 - Objectif principal : ${p.goal || "produire durablement"}
 - Moyens / contraintes : ${p.notes || "aucun détail supplémentaire"}
 
@@ -524,7 +538,7 @@ async function handlePlan(req, res) {
   let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
   const crop = String(p.crop || "").trim().slice(0, 120);
   if (!crop) return sendJson(res, 400, { error: "Indiquez au moins la culture souhaitée." });
-  const clean = { crop, region: String(p.region || "").slice(0, 120), area: String(p.area || "").slice(0, 80), soil: String(p.soil || "").slice(0, 80), ph: String(p.ph || "").slice(0, 40), season: String(p.season || "").slice(0, 80), goal: String(p.goal || "").slice(0, 120), notes: String(p.notes || "").slice(0, 500) };
+  const clean = { crop, region: String(p.region || "").slice(0, 120), area: String(p.area || "").slice(0, 80), soil: String(p.soil || "").slice(0, 80), ph: String(p.ph || "").slice(0, 40), season: String(p.season || "").slice(0, 80), mode: String(p.mode || "").slice(0, 80), structure: String(p.structure || "").slice(0, 80), goal: String(p.goal || "").slice(0, 120), notes: String(p.notes || "").slice(0, 500) };
   const fresh = p.fresh === true || p.fresh === "1" || p.fresh === 1;
 
   // 1) RÉUTILISATION : un itinéraire existe-t-il déjà pour cette culture dans ce secteur ?
@@ -677,6 +691,8 @@ function serveStatic(req, res) {
   if (urlPath === "/accueil") urlPath = "/accueil.html";
   if (urlPath === "/arduino") urlPath = "/arduino.html";
   if (urlPath === "/tableau" || urlPath === "/dashboard") urlPath = "/tableau.html";
+  if (urlPath === "/comprendre") urlPath = "/comprendre.html";
+  if (urlPath === "/conseiller" || urlPath === "/chat") urlPath = "/conseiller.html";
   const safe = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(PUBLIC_DIR, safe);
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end("Accès interdit"); }

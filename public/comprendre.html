@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terravive — Comprendre les agrosystèmes durables</title>
+<meta name="description" content="Notions clés des agrosystèmes durables : typologie, composantes, indicateurs de durabilité et outils de gestion, appliqués à Terravive.">
+<style>
+  :root{
+    --leaf:#2E7D46; --deep:#174D2B; --sun:#C58A2A; --line:#dce6da;
+    --bg:#eef4ec; --surface:#ffffff; --surface2:#f4f9f2;
+    --ink:#15251B; --soft:#53625a; --faint:#8a988e;
+    --good:#2E8B6F; --warn:#C58A2A; --bad:#c0392b;
+    --shadow:0 8px 28px rgba(20,50,30,.08); --f-display:Georgia,'Times New Roman',serif;
+  }
+  :root[data-theme="clair"]{ --leaf:#2f855a; --deep:#276749; --sun:#b7791f; --line:#e6e9ec; --bg:#f3f5f7; --surface:#ffffff; --surface2:#f7f9fb; --ink:#1a2430; --soft:#5a6675; --faint:#95a0ae; --shadow:0 8px 28px rgba(30,40,60,.07); }
+  :root[data-theme="sombre"]{ --leaf:#5bbf84; --deep:#8fd6a9; --sun:#e0b25a; --line:#223228; --bg:#0e1712; --surface:#15241b; --surface2:#1a2c21; --ink:#e7f1ea; --soft:#a6b7ad; --faint:#7c8d83; --shadow:0 10px 30px rgba(0,0,0,.35); }
+  :root[data-theme="terre"]{ --leaf:#7a6a3a; --deep:#5c4a22; --sun:#c7892f; --line:#e6ddcb; --bg:#f4efe3; --surface:#fffdf8; --surface2:#f7f1e5; --ink:#2a2416; --soft:#6b6150; --faint:#9a8f78; --shadow:0 8px 28px rgba(80,60,20,.1); }
+
+  *{ box-sizing:border-box; } html,body{ margin:0; }
+  body{ font-family:"Segoe UI",system-ui,Arial,sans-serif; color:var(--ink); background:var(--bg); line-height:1.6; }
+  a{ color:var(--leaf); text-decoration:none; font-weight:600; }
+  .top{ position:sticky; top:0; z-index:10; background:var(--surface); border-bottom:1px solid var(--line); }
+  .topin{ max-width:860px; margin:0 auto; padding:12px 20px; display:flex; align-items:center; gap:14px; }
+  .brand{ display:flex; align-items:center; gap:9px; font-family:var(--f-display); font-weight:700; font-size:18px; color:var(--deep); }
+  .brand .em{ width:30px; height:30px; }
+  .spacer{ flex:1; }
+  select.sel{ padding:7px 10px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); font:inherit; }
+  .btn{ padding:7px 13px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); font:inherit; font-weight:600; cursor:pointer; }
+  .btn.primary{ background:var(--leaf); color:#fff; border-color:var(--leaf); }
+  main{ max-width:860px; margin:0 auto; padding:26px 20px 70px; }
+  h1{ font-family:var(--f-display); font-size:2rem; color:var(--deep); margin:.2em 0 .1em; }
+  .lead{ color:var(--soft); font-size:1.05rem; margin:0 0 6px; }
+  .src{ color:var(--faint); font-size:.82rem; margin-bottom:22px; }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin:16px 0; box-shadow:var(--shadow); }
+  h2{ font-family:var(--f-display); color:var(--leaf); font-size:1.3rem; margin:.1em 0 .4em; display:flex; align-items:center; gap:9px; }
+  h2 .n{ display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--leaf); color:#fff; font-family:"Segoe UI",sans-serif; font-size:.85rem; font-weight:800; flex:none; }
+  h3{ font-size:1rem; margin:1em 0 .2em; color:var(--ink); }
+  p{ margin:.5em 0; } ul{ margin:.4em 0 .6em; padding-left:20px; } li{ margin:.25em 0; }
+  .tv{ background:var(--surface2); border-left:4px solid var(--leaf); border-radius:8px; padding:10px 13px; margin:12px 0; font-size:.92rem; }
+  .tv b{ color:var(--deep); }
+  .pill{ display:inline-block; background:var(--surface2); border:1px solid var(--line); border-radius:20px; padding:3px 11px; font-size:.82rem; margin:3px 5px 3px 0; }
+  .toc{ display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 0; }
+  .toc a{ background:var(--surface2); border:1px solid var(--line); border-radius:20px; padding:5px 12px; font-size:.84rem; }
+  table{ width:100%; border-collapse:collapse; margin:10px 0; font-size:.9rem; }
+  th,td{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th{ color:var(--deep); }
+  .foot{ color:var(--faint); font-size:.8rem; text-align:center; margin-top:30px; }
+</style>
+</head>
+<body>
+  <div class="top"><div class="topin">
+    <span class="brand"><span class="em"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" fill="var(--leaf)" opacity=".14"/><path d="M24 38c0-9 4-15 12-18-2 10-6 15-12 18zM24 38c0-9-4-15-12-18 2 10 6 15 12 18zM24 38V20" stroke="var(--leaf)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Terravive</span>
+    <span class="spacer"></span>
+    <a href="/tableau" class="btn">← Tableau de bord</a>
+    <select class="sel" id="themeSel" title="Thème">
+      <option value="nature">Nature</option><option value="clair">Clair</option><option value="sombre">Sombre</option><option value="terre">Terre</option>
+    </select>
+  </div></div>
+
+  <main>
+    <h1>Comprendre les agrosystèmes durables</h1>
+    <p class="lead">Les notions essentielles pour lire votre parcelle comme un système vivant — et faire des choix qui tiennent dans la durée.</p>
+    <p class="src">Synthèse pédagogique inspirée du cours « Typologie des agrosystèmes durables » (Master 1, Université de San-Pédro), reliée aux outils de Terravive.</p>
+
+    <div class="toc">
+      <a href="#c1">1. Qu'est-ce qu'un agrosystème</a>
+      <a href="#c2">2. Classer son système (typologie)</a>
+      <a href="#c3">3. Les composantes et leurs interactions</a>
+      <a href="#c4">4. Mesurer la durabilité</a>
+      <a href="#c5">5. Les outils pour s'améliorer</a>
+    </div>
+
+    <div class="card" id="c1">
+      <h2><span class="n">1</span> Qu'est-ce qu'un agrosystème&nbsp;?</h2>
+      <p>Un <b>agrosystème</b> est un écosystème que l'agriculteur modifie pour produire ce dont il a besoin (cultures, élevage). Comparé à une forêt naturelle, il est volontairement <b>moins diversifié</b> et vise une <b>forte production</b> — ce qui le rend aussi plus fragile et dépendant d'apports extérieurs.</p>
+      <p>Chaque récolte <b>exporte</b> de la matière et donc des éléments minéraux hors de la parcelle. Si rien ne compense cette sortie, le sol s'appauvrit. Tout l'enjeu d'une agriculture durable est de <b>refermer ce cycle</b> autant que possible : nourrir le sol, recycler les résidus, entretenir la vie du sol, plutôt que de seulement puiser.</p>
+      <div class="tv">Dans Terravive — l'<b>itinéraire technique</b> part toujours du sol et prévoit une section de <b>valorisation des résidus</b> : c'est exactement cette logique de cycle refermé.</div>
+    </div>
+
+    <div class="card" id="c2">
+      <h2><span class="n">2</span> Classer son système (typologie)</h2>
+      <p>Avant de conseiller, on <b>caractérise</b>. Un même champ peut être décrit selon plusieurs critères&nbsp;:</p>
+      <table>
+        <tr><th>Critère</th><th>Possibilités</th></tr>
+        <tr><td>Structure des cultures</td><td>Monoculture · Polyculture (cultures associées) · Agroforesterie (arbres + cultures)</td></tr>
+        <tr><td>Mode de conduite</td><td>Conventionnel · Biologique · Agriculture de conservation (non-labour) · Agroécologie / régénératif</td></tr>
+        <tr><td>Gestion de l'eau</td><td>Pluvial · Irrigué · Rotation / jachère</td></tr>
+        <tr><td>Objectif</td><td>Subsistance (nourrir le foyer) · Commercial (vendre)</td></tr>
+        <tr><td>Niveau technologique</td><td>Traditionnel · Agriculture de précision (capteurs, satellite, GPS)</td></tr>
+      </table>
+      <p>Pourquoi c'est utile&nbsp;? Parce que <b>le bon conseil dépend du type de système</b>. On ne conduit pas une monoculture conventionnelle comme une parcelle en agroforesterie biologique. En général, plus un système est <b>diversifié</b> (polyculture, rotation, arbres), plus il est <b>résilient</b> face aux ravageurs, aux maladies et aux aléas du climat.</p>
+      <div class="tv">Dans Terravive — au moment de créer un itinéraire, vous précisez votre <b>mode de conduite</b> et votre <b>structure</b> : l'IA agronome adapte alors tout le plan à votre type d'agrosystème.</div>
+    </div>
+
+    <div class="card" id="c3">
+      <h2><span class="n">3</span> Les composantes et leurs interactions</h2>
+      <p>Un agrosystème se lit sur deux plans qui interagissent en permanence.</p>
+      <h3>Composantes abiotiques (le non-vivant)</h3>
+      <p><span class="pill">Climat (température, pluie, ensoleillement)</span><span class="pill">Sol (texture, structure, fertilité, pH)</span><span class="pill">Eau (disponibilité, qualité)</span><span class="pill">Topographie (pente, drainage)</span></p>
+      <h3>Composantes biotiques (le vivant)</h3>
+      <p><span class="pill">Cultures & plantes de couverture</span><span class="pill">Plantes compagnes (associations)</span><span class="pill">Pollinisateurs & auxiliaires</span><span class="pill">Ravageurs</span><span class="pill">Micro-organismes du sol (bactéries, mycorhizes, vers de terre)</span></p>
+      <p>Ces éléments ne sont pas isolés. Quelques interactions clés&nbsp;:</p>
+      <ul>
+        <li>Les <b>légumineuses</b> (niébé, haricot, arachide) hébergent des bactéries qui <b>fixent l'azote de l'air</b> et enrichissent le sol pour la culture suivante ou associée.</li>
+        <li>Les <b>mycorhizes</b> (champignons du sol) aident les racines à capter l'eau et les nutriments.</li>
+        <li>Les <b>pollinisateurs</b> et les <b>prédateurs naturels</b> des ravageurs (coccinelles, araignées, oiseaux) rendent des services gratuits — à condition de leur laisser des refuges.</li>
+        <li>Un <b>sol couvert et vivant</b> retient mieux l'eau, résiste à l'érosion et libère ses nutriments progressivement.</li>
+      </ul>
+      <div class="tv">Dans Terravive — l'itinéraire propose désormais systématiquement des <b>associations</b>, une <b>rotation</b> et des gestes pour la <b>biodiversité fonctionnelle</b> (haies, bandes fleuries, vie du sol).</div>
+    </div>
+
+    <div class="card" id="c4">
+      <h2><span class="n">4</span> Mesurer la durabilité</h2>
+      <p>« Durable » ne se décrète pas, cela se <b>mesure</b> sur trois piliers complémentaires&nbsp;:</p>
+      <table>
+        <tr><th>Pilier</th><th>Ce qu'on regarde</th></tr>
+        <tr><td><b>Environnemental</b></td><td>Santé du sol, efficacité de l'eau, biodiversité, réduction des intrants chimiques, stockage de carbone.</td></tr>
+        <tr><td><b>Économique</b></td><td>Rentabilité dans la durée, maîtrise des coûts d'intrants, résilience face aux prix et aux aléas.</td></tr>
+        <tr><td><b>Social</b></td><td>Sécurité alimentaire du foyer, accès à la formation et au conseil, entraide et coopératives.</td></tr>
+      </table>
+      <p>Un bon système cherche l'<b>équilibre</b> entre les trois : très productif mais qui épuise le sol n'est pas durable ; très écologique mais sans revenu non plus. On parle d'<b>analyse multicritère</b>. On y ajoute souvent les <b>services écosystémiques</b> rendus (régulation du climat, pollinisation, gestion de l'eau) et un <b>bilan carbone</b> (émissions vs. carbone stocké dans le sol et la biomasse).</p>
+      <div class="tv">Dans Terravive — l'<b>Indice de durabilité</b> du tableau de bord calcule justement un score sur ces trois piliers, intègre votre NDVI satellite et estime le carbone stocké, puis pointe votre levier prioritaire.</div>
+    </div>
+
+    <div class="card" id="c5">
+      <h2><span class="n">5</span> Les outils pour s'améliorer</h2>
+      <p>Des pratiques éprouvées permettent d'augmenter la durabilité sans sacrifier la production&nbsp;:</p>
+      <h3>Agronomie & sol</h3>
+      <ul>
+        <li><b>Rotation des cultures</b> : alterner les familles pour couper le cycle des ravageurs et ne pas épuiser le sol.</li>
+        <li><b>Associations & agroforesterie</b> : combiner des plantes (et des arbres) qui se rendent service.</li>
+        <li><b>Couverture végétale & non-labour</b> : garder le sol couvert, limiter le travail du sol, nourrir la matière organique.</li>
+        <li><b>Compostage & valorisation des résidus</b> : transformer les déchets en fertilité gratuite — ne pas brûler.</li>
+      </ul>
+      <h3>Eau</h3>
+      <ul>
+        <li><b>Goutte-à-goutte</b> (même « maison » : bouteilles, ollas) et <b>collecte des eaux de pluie</b>.</li>
+        <li><b>Paillage</b> et arrosage aux heures fraîches pour limiter l'évaporation.</li>
+      </ul>
+      <h3>Protection & intrants</h3>
+      <ul>
+        <li><b>Lutte intégrée (IPM)</b> : prévention d'abord, solutions naturelles ensuite, chimie en tout dernier recours.</li>
+        <li><b>Biofertilisants & biopesticides</b> ; apports d'engrais <b>raisonnés et fractionnés</b>.</li>
+      </ul>
+      <h3>Précision & suivi</h3>
+      <ul>
+        <li><b>Satellite & capteurs</b> : NDVI pour la santé des cultures, capteurs de sol, météo pour planifier semis et irrigation.</li>
+        <li><b>Suivi dans la durée</b> pour ajuster et comparer d'une saison à l'autre.</li>
+      </ul>
+      <div class="tv">Dans Terravive — ces outils sont intégrés : itinéraire technique agroécologique, analyse satellite (Vertea), besoin en eau (FAO-56), projets Arduino pour les capteurs, et bientôt plus encore.</div>
+    </div>
+
+    <p class="foot">Terravive · Agriculture durable, accessible à toutes et à tous.</p>
+  </main>
+
+  <script>
+    (function(){
+      var sel=document.getElementById("themeSel");
+      var t="nature"; try{ t=localStorage.getItem("trv-theme")||"nature"; }catch(e){}
+      document.documentElement.setAttribute("data-theme", t); if(sel) sel.value=t;
+      if(sel) sel.addEventListener("change", function(){ document.documentElement.setAttribute("data-theme", sel.value); try{ localStorage.setItem("trv-theme", sel.value); }catch(e){} });
+    })();
+  </script>
+</body>
+</html>
