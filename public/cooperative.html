@@ -48,6 +48,11 @@
   .meter{ margin:7px 0; } .meter .t{ display:flex; justify-content:space-between; font-size:.86rem; margin-bottom:3px; } .meter .t b{ text-transform:capitalize; }
   .err{ color:var(--bad); font-size:.86rem; margin-top:6px; } .ok{ color:var(--good); font-size:.86rem; margin-top:6px; }
   .note{ color:var(--faint); font-size:.8rem; }
+  .modal-bg{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:999; padding:16px; overflow:auto; }
+  .modal{ max-width:800px; margin:22px auto; background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:18px 20px; }
+  textarea.sel{ width:100%; resize:vertical; }
+  .mddoc h3{ color:var(--deep); font-size:1rem; margin:12px 0 4px; } .mddoc p{ margin:5px 0; } .mddoc ul{ margin:4px 0 6px 18px; } .mddoc li{ margin:2px 0; }
+  table.md{ border-collapse:collapse; width:100%; margin:8px 0; font-size:.85rem; } table.md th, table.md td{ border:1px solid var(--line); padding:5px 8px; text-align:left; vertical-align:top; } table.md th{ background:var(--surface2); color:var(--deep); }
 </style>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#2E7D46">
@@ -71,6 +76,16 @@
     <p class="note">Confidentialité : au sein d'une coopérative, l'animateur voit le nom, la région, le nombre de parcelles et les cultures des membres — pas leurs données personnelles détaillées.</p>
   </main>
 
+  <div id="memModal" class="modal-bg">
+    <div class="modal">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <h2 id="memTitle" style="margin:0;color:var(--deep);">Membre</h2>
+        <button class="btn" id="memClose" type="button">Fermer</button>
+      </div>
+      <div id="memBody"><div class="muted">Chargement…</div></div>
+    </div>
+  </div>
+
   <script>
     const $=(id)=>document.getElementById(id);
     function esc(s){ const d=document.createElement("div"); d.textContent=(s==null?"":s); return d.innerHTML; }
@@ -78,6 +93,110 @@
 
     const view=$("view");
     function card(html){ return '<div class="card">'+html+'</div>'; }
+    let COOPM=[], COOPINFO=null, curMember=null;
+
+    // Rendu Markdown (titres, gras, listes, tableaux) pour afficher et imprimer un itinéraire.
+    function mdInline(s){ return esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>'); }
+    function mdTable(rows){ if(!rows.length) return ""; let h='<table class="md"><thead><tr>'+rows[0].map(function(c){return '<th>'+esc(c)+'</th>';}).join("")+'</tr></thead><tbody>'; for(let r=1;r<rows.length;r++){ h+='<tr>'+rows[r].map(function(c){return '<td>'+esc(c)+'</td>';}).join("")+'</tr>'; } return h+'</tbody></table>'; }
+    function renderMd(md){
+      const lines=String(md||"").replace(/\r/g,"").split("\n"); let html="", inList=false, inTable=false, tbl=[];
+      function flushList(){ if(inList){ html+="</ul>"; inList=false; } }
+      function flushTable(){ if(inTable){ html+=mdTable(tbl); tbl=[]; inTable=false; } }
+      for(let i=0;i<lines.length;i++){ const ln=lines[i];
+        if(/^\s*\|.*\|\s*$/.test(ln)){ flushList(); if(inTable && /^\s*\|?[\s:\-|]+\|?\s*$/.test(ln)) continue; inTable=true; tbl.push(ln.trim().replace(/^\||\|$/g,"").split("|").map(function(c){return c.trim();})); continue; }
+        flushTable();
+        if(/^\s*#{1,6}\s+/.test(ln)){ flushList(); html+='<h3>'+mdInline(ln.replace(/^\s*#{1,6}\s+/,""))+'</h3>'; continue; }
+        if(/^\s*[-*]\s+/.test(ln)){ if(!inList){ html+="<ul>"; inList=true; } html+='<li>'+mdInline(ln.replace(/^\s*[-*]\s+/,""))+'</li>'; continue; }
+        if(ln.trim()===""){ flushList(); continue; }
+        flushList(); html+='<p>'+mdInline(ln)+'</p>';
+      }
+      flushList(); flushTable(); return html;
+    }
+
+    // ----- Kit de l'animateur : gérer les itinéraires d'un membre -----
+    function openMember(m){
+      curMember=m; const md=$("memModal"); if(!md) return;
+      $("memTitle").textContent="Membre : "+(m.name||"—");
+      md.style.display="block";
+      loadMemberPlans();
+    }
+    function closeMember(){ const md=$("memModal"); if(md) md.style.display="none"; curMember=null; }
+    async function loadMemberPlans(){
+      const body=$("memBody"); if(!curMember){ return; }
+      body.innerHTML='<div class="muted">Chargement des itinéraires…</div>';
+      const r=await api("/api/coop/member/plans?memberId="+encodeURIComponent(curMember.id));
+      let list='';
+      if(r.ok && r.d.plans && r.d.plans.length){
+        list='<div style="display:flex;flex-direction:column;gap:7px;">'+r.d.plans.map(function(p){ const when=p.created_at?(" · "+new Date(p.created_at).toLocaleDateString("fr-FR")):""; return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:8px 11px;background:var(--surface2);"><span style="flex:1;font-weight:600;min-width:120px;text-transform:capitalize;">'+esc(p.crop||p.title)+'<span class="muted" style="font-weight:400;font-size:.8rem;"> '+esc(p.region?("· "+p.region):"")+when+'</span></span><button class="btn" type="button" data-fiche="'+esc(p.id)+'">Fiche à remettre</button><button class="btn" type="button" data-see="'+esc(p.id)+'">Voir</button></div>'; }).join("")+'</div>';
+      } else if(r.ok){ list='<div class="muted">Aucun itinéraire pour ce membre. Créez-en un ci-dessous.</div>'; }
+      else { list='<div class="err">'+((r.d&&r.d.error)||"Chargement impossible.")+'</div>'; }
+      body.innerHTML =
+        '<h3 style="margin:.3em 0;">Itinéraires du membre</h3>'+list
+        + '<h3 style="margin:16px 0 .3em;">Créer un itinéraire pour ce membre</h3>'
+        + '<div class="muted" style="font-size:.84rem;margin-bottom:8px;">Il sera enregistré sous le compte du membre ; vous pourrez en sortir une fiche à lui remettre.</div>'
+        + '<div class="stack">'
+        + '<input class="sel" id="mpCrop" placeholder="Culture * (ex. tomate, maïs, riz…)" maxlength="120">'
+        + '<div class="grid2"><input class="sel" id="mpRegion" placeholder="Région / localité" maxlength="120" value="'+esc((curMember.region)||"")+'"><input class="sel" id="mpArea" placeholder="Surface (ex. 500 m², 1 ha)" maxlength="80"></div>'
+        + '<div class="grid2">'
+        + '<select class="sel" id="mpSoil"><option value="">Type de sol (facultatif)</option><option>Sableux</option><option>Argileux</option><option>Limoneux</option><option>Latéritique</option><option>Riche / humifère</option><option>Pauvre / dégradé</option></select>'
+        + '<select class="sel" id="mpSeason"><option value="">Saison (facultatif)</option><option>Début de saison des pluies</option><option>Pleine saison des pluies</option><option>Saison sèche (avec irrigation)</option><option>Maintenant</option></select>'
+        + '</div>'
+        + '<textarea class="sel" id="mpNotes" placeholder="Moyens / contraintes (facultatif)" maxlength="500" style="min-height:60px;"></textarea>'
+        + '<div class="row"><button class="btn primary" id="mpGen" type="button">Générer l\'itinéraire</button><span id="mpMsg" class="muted"></span></div>'
+        + '</div>'
+        + '<div id="mpView" style="margin-top:14px;"></div>';
+      body.querySelectorAll("[data-see]").forEach(function(b){ b.addEventListener("click", function(){ viewMemberPlan(b.getAttribute("data-see")); }); });
+      body.querySelectorAll("[data-fiche]").forEach(function(b){ b.addEventListener("click", function(){ ficheMemberPlan(b.getAttribute("data-fiche")); }); });
+      $("mpGen").addEventListener("click", createMemberPlan);
+    }
+    async function createMemberPlan(){
+      const crop=($("mpCrop").value||"").trim(); const msg=$("mpMsg"); msg.style.color=""; msg.textContent="";
+      if(!crop){ msg.style.color="var(--bad)"; msg.textContent="Indiquez la culture."; return; }
+      const btn=$("mpGen"); btn.disabled=true; msg.textContent="Génération de l'itinéraire… (jusqu'à 30 s)";
+      const body={ memberId:curMember.id, crop:crop, region:$("mpRegion").value, area:$("mpArea").value, soil:$("mpSoil").value, season:$("mpSeason").value, notes:$("mpNotes").value };
+      const r=await api("/api/coop/member/plan","POST",body);
+      btn.disabled=false;
+      if(!r.ok){ msg.style.color="var(--bad)"; msg.textContent=(r.d&&r.d.error)||"Génération impossible."; return; }
+      msg.style.color="var(--good)"; msg.textContent="Itinéraire créé pour le membre ✓";
+      await loadMemberPlans();
+    }
+    async function fetchMemberPlan(id){ const r=await api("/api/coop/member/plan?memberId="+encodeURIComponent(curMember.id)+"&id="+encodeURIComponent(id)); return (r.ok && r.d.plan) ? r.d.plan : null; }
+    async function viewMemberPlan(id){
+      const v=$("mpView"); v.innerHTML='<div class="muted">Chargement…</div>';
+      const plan=await fetchMemberPlan(id);
+      if(!plan){ v.innerHTML='<div class="err">Itinéraire introuvable.</div>'; return; }
+      v.innerHTML='<div class="card" style="box-shadow:none;"><div class="row" style="justify-content:space-between;align-items:center;"><h3 style="margin:0;text-transform:capitalize;">'+esc(plan.crop||"Itinéraire")+'</h3><button class="btn primary" id="mpFicheNow" type="button">🖨 Fiche à remettre</button></div><div class="mddoc" style="margin-top:10px;">'+renderMd(plan.content)+'</div></div>';
+      $("mpFicheNow").addEventListener("click", function(){ printFiche(plan); });
+      v.scrollIntoView({behavior:"smooth",block:"start"});
+    }
+    async function ficheMemberPlan(id){ const plan=await fetchMemberPlan(id); if(plan) printFiche(plan); }
+    function printFiche(plan){
+      const coop=COOPINFO||{}; const member=curMember||{};
+      const today=new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"});
+      const pills=[["Culture",plan.crop],["Région",plan.region],["Surface",plan.area],["Sol",plan.soil],["Saison",plan.season]].filter(function(x){return x[1];});
+      const w=window.open("","_blank"); if(!w){ alert("Autorisez les fenêtres pop-up pour imprimer la fiche."); return; }
+      const doc='<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Fiche — '+esc(plan.crop||"Itinéraire")+'</title><style>'
+        +'@page{size:A4;margin:14mm;} body{font-family:"Segoe UI",system-ui,Arial,sans-serif;color:#15251B;line-height:1.5;} '
+        +'.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2E7D46;padding-bottom:10px;margin-bottom:12px;} '
+        +'.hd .b{font-weight:800;color:#174D2B;font-size:20px;} .hd .s{color:#53625a;font-size:12px;} '
+        +'.meta{font-size:12px;color:#333;margin-bottom:10px;} .meta b{color:#174D2B;} '
+        +'.pills span{display:inline-block;border:1px solid #dce6da;border-radius:14px;padding:2px 9px;margin:2px 5px 2px 0;font-size:12px;} '
+        +'h3{color:#2E7D46;font-size:15px;margin:14px 0 4px;} p{margin:5px 0;} ul{margin:4px 0 6px 18px;} li{margin:2px 0;} '
+        +'table.md{border-collapse:collapse;width:100%;margin:8px 0;font-size:12px;} table.md th,table.md td{border:1px solid #cfe0d4;padding:5px 7px;text-align:left;vertical-align:top;} table.md th{background:#eaf3ec;color:#174D2B;} '
+        +'.foot{margin-top:16px;border-top:1px solid #dce6da;padding-top:8px;color:#8a988e;font-size:11px;} '
+        +'@media print{.noprint{display:none;}}'
+        +'</style></head><body>'
+        +'<div class="hd"><div><div class="b">Terravive — Fiche de culture</div><div class="s">Itinéraire technique à suivre</div></div>'
+        +'<div class="s" style="text-align:right;">'+(coop.name?('<b>'+esc(coop.name)+'</b><br>'):'')+esc(today)+'</div></div>'
+        +'<div class="meta"><b>Agriculteur :</b> '+esc(member.name||"—")+(member.region?(' &nbsp; <b>Localité :</b> '+esc(member.region)):'')+'</div>'
+        +(pills.length?('<div class="pills">'+pills.map(function(x){return '<span><b>'+esc(x[0])+' :</b> '+esc(x[1])+'</span>';}).join("")+'</div>'):'')
+        +'<div>'+renderMd(plan.content)+'</div>'
+        +'<div class="foot">Fiche remise par la coopérative via Terravive — conseils agroécologiques adaptés à la Côte d\'Ivoire. À conserver et suivre au fil de la saison.</div>'
+        +'<div class="noprint" style="margin-top:16px;text-align:center;"><button onclick="window.print()" style="background:#2E7D46;color:#fff;border:none;border-radius:8px;padding:10px 18px;font:600 14px sans-serif;cursor:pointer;">Imprimer / Enregistrer en PDF</button></div>'
+        +'<script>setTimeout(function(){try{window.print();}catch(e){}},400);<\/script>'
+        +'</body></html>';
+      w.document.write(doc); w.document.close();
+    }
 
     async function api(path, method, body){
       const opt={ method:method||"GET" };
@@ -128,7 +247,7 @@
     }
 
     function renderAnimateur(d){
-      const c=d.coop;
+      const c=d.coop; COOPINFO=c;
       view.innerHTML = card(
         '<h2>'+esc(c.name)+'</h2>'
         + '<div class="muted">'+(c.region?('Région : '+esc(c.region)+' · '):'')+'Vous êtes <b>animateur</b>.</div>'
@@ -151,8 +270,10 @@
       html+='<h2 style="margin-top:16px;">Membres</h2>';
       if(!d.members||!d.members.length){ html+='<div class="muted">Aucun membre pour l\'instant. Partagez le code.</div>'; }
       else {
-        html+='<div style="overflow-x:auto;"><table><tr><th>Nom</th><th>Région</th><th>Rôle</th><th>Parcelles</th><th>Itinéraires</th><th>Dernière culture</th></tr>'
-          + d.members.map(function(m){ return '<tr><td>'+esc(m.name)+'</td><td>'+esc(m.region||"—")+'</td><td>'+(m.role==="animateur"?"Animateur":"Membre")+'</td><td>'+m.parcels+'</td><td>'+m.plans+'</td><td class="crop">'+esc(m.lastCrop||"—")+'</td></tr>'; }).join("")
+        COOPM = d.members.slice();
+        html+='<div class="muted" style="font-size:.84rem;margin-bottom:6px;">Cliquez « Gérer » pour créer un itinéraire à un membre (même sans téléphone) et sortir une <b>fiche à remettre</b>.</div>';
+        html+='<div style="overflow-x:auto;"><table><tr><th>Nom</th><th>Région</th><th>Rôle</th><th>Parcelles</th><th>Itin.</th><th>Dernière culture</th><th></th></tr>'
+          + d.members.map(function(m){ return '<tr><td>'+esc(m.name)+'</td><td>'+esc(m.region||"—")+'</td><td>'+(m.role==="animateur"?"Animateur":"Membre")+'</td><td>'+m.parcels+'</td><td>'+m.plans+'</td><td class="crop">'+esc(m.lastCrop||"—")+'</td><td><button class="btn" type="button" data-manage="'+esc(m.id)+'" style="padding:5px 11px;">Gérer</button></td></tr>'; }).join("")
           + '</table></div>';
       }
       // Cultures agrégées → achats groupés / mise en marché
@@ -165,6 +286,7 @@
         html+='<div style="margin-top:10px;">'+cult.map(function(x){ const w=Math.max(6,Math.round(100*x.membres/max)); return '<div class="meter"><div class="t"><b>'+esc(x.culture)+'</b><span>'+x.membres+' membre'+(x.membres>1?'s':'')+'</span></div><div class="bar"><span style="width:'+w+'%"></span></div></div>'; }).join("")+'</div>';
       }
       box.innerHTML=card(html);
+      box.querySelectorAll("[data-manage]").forEach(function(b){ b.addEventListener("click", function(){ const m=(COOPM||[]).find(function(x){return x.id===b.getAttribute("data-manage");}); if(m) openMember(m); }); });
     }
 
     function wireLeave(){
@@ -178,6 +300,8 @@
       });
     }
 
+    { const b=$("memClose"); if(b) b.addEventListener("click", closeMember); }
+    { const bg=$("memModal"); if(bg) bg.addEventListener("click", function(e){ if(e.target===bg) closeMember(); }); }
     load();
   </script>
 </body>

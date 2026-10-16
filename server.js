@@ -756,10 +756,52 @@ async function handleCoopOverview(req, res) {
     const st = await memberStats(mem.user_id);
     totalParcels += st.parcels;
     st.crops.forEach((c) => { cropAgg[c] = (cropAgg[c] || 0) + 1; });
-    members.push({ name: (u && u.name) || "—", region: (u && u.region) || null, role: mem.role, plans: st.plans, parcels: st.parcels, lastCrop: st.lastCrop, joined_at: mem.joined_at });
+    members.push({ id: mem.user_id, name: (u && u.name) || "—", region: (u && u.region) || null, role: mem.role, plans: st.plans, parcels: st.parcels, lastCrop: st.lastCrop, joined_at: mem.joined_at });
   }
   const cultures = Object.keys(cropAgg).map((c) => ({ culture: c, membres: cropAgg[c] })).sort((a, b) => b.membres - a.membres);
   sendJson(res, 200, { coop: await coopPublic(coop), totals: { membres: rows.length, parcelles: totalParcels, cultures: cultures.length }, members, cultures });
+}
+// --- Kit de l'animateur : gérer les itinéraires des membres (même sans téléphone) ---
+async function animateurMemberCoop(user, memberId) {
+  if (!user || !memberId) return null;
+  const m = await getMembership(user.id);
+  if (!m || m.role !== "animateur") return null;
+  const members = await listCoopMembers(m.coop_id);
+  if (!members.some((x) => x.user_id === memberId)) return null;
+  return m.coop_id;
+}
+async function handleCoopMemberPlans(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const memberId = new URL(req.url, "http://x").searchParams.get("memberId");
+  if (!(await animateurMemberCoop(user, memberId))) return sendJson(res, 403, { error: "Membre introuvable dans votre coopérative." });
+  sendJson(res, 200, { plans: await listPlansForUser(memberId) });
+}
+async function handleCoopMemberPlanGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const u = new URL(req.url, "http://x"); const memberId = u.searchParams.get("memberId"); const id = u.searchParams.get("id");
+  if (!(await animateurMemberCoop(user, memberId))) return sendJson(res, 403, { error: "Accès refusé." });
+  const plan = id ? await getPlan(id) : null;
+  if (!plan || plan.user_id !== memberId) return sendJson(res, 404, { error: "Itinéraire introuvable." });
+  sendJson(res, 200, { plan });
+}
+async function handleCoopMemberPlanCreate(req, res) {
+  if (!API_KEY) return sendJson(res, 500, { error: "Clé IA manquante (ANTHROPIC_API_KEY)." });
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const memberId = String(p.memberId || "");
+  if (!(await animateurMemberCoop(user, memberId))) return sendJson(res, 403, { error: "Membre introuvable dans votre coopérative." });
+  const crop = String(p.crop || "").trim().slice(0, 120);
+  if (!crop) return sendJson(res, 400, { error: "Indiquez au moins la culture." });
+  if (!rateOk("coopplan:" + user.id, 40, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Beaucoup d'itinéraires générés aujourd'hui. Reprenez plus tard." });
+  const clean = { crop, region: String(p.region || "").slice(0, 120), area: String(p.area || "").slice(0, 80), soil: String(p.soil || "").slice(0, 80), ph: String(p.ph || "").slice(0, 40), season: String(p.season || "").slice(0, 80), mode: String(p.mode || "").slice(0, 80), structure: String(p.structure || "").slice(0, 80), goal: String(p.goal || "").slice(0, 120), notes: String(p.notes || "").slice(0, 500) };
+  let content = null, reused = false;
+  try { const ex = await findSharedPlan(crop, clean.region); if (ex && ex.content) { content = ex.content; reused = true; } } catch (e) {}
+  try {
+    if (!content) content = await callClaude(planSystem(), [{ role: "user", content: planUserMessage(clean) }], null, PLAN_MAX_TOKENS);
+    const rec = { id: newId(), user_id: memberId, title: crop + (clean.region ? " — " + clean.region : ""), crop, region: clean.region || null, area: clean.area || null, soil: clean.soil || null, season: clean.season || null, goal: clean.goal || null, notes: clean.notes || null, content, created_at: new Date().toISOString() };
+    await savePlan(rec);
+    sendJson(res, 200, { plan: rec, reused });
+  } catch (e) { sendJson(res, e.status || 500, { error: e.message || "La génération a échoué." }); }
 }
 async function handleChat(req, res) {
   if (!API_KEY) return sendJson(res, 500, { error: "Clé IA manquante (ANTHROPIC_API_KEY)." });
@@ -925,6 +967,9 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && url === "/api/coop/join") return handleCoopJoin(req, res);
   if (req.method === "POST" && url === "/api/coop/leave") return handleCoopLeave(req, res);
   if (req.method === "GET" && url === "/api/coop/overview") return handleCoopOverview(req, res);
+  if (req.method === "GET" && url.startsWith("/api/coop/member/plans")) return handleCoopMemberPlans(req, res);
+  if (req.method === "GET" && url.startsWith("/api/coop/member/plan")) return handleCoopMemberPlanGet(req, res);
+  if (req.method === "POST" && url === "/api/coop/member/plan") return handleCoopMemberPlanCreate(req, res);
   if (req.method === "POST" && url === "/api/ingest") return handleIngest(req, res);
   if (req.method === "POST" && url === "/api/readings/clear") return handleReadingsClear(req, res);
   if (req.method === "GET" && url === "/api/station") return handleStation(req, res);
