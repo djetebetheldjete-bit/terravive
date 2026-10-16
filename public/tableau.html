@@ -211,6 +211,18 @@
             <div id="adminQRecent" class="section-gap"></div>
           </div>
 
+          <div class="card" id="adminACard" style="display:none;border-color:var(--sun);">
+            <h2 class="ct">Propriétaire — animateurs désignés</h2>
+            <div class="muted">Vous seul accordez le statut d'<b>animateur</b> (droit de créer et d'animer une coopérative). La personne doit déjà avoir un compte Terravive.</div>
+            <div class="row" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <input class="sel" id="animEmail" style="flex:1;min-width:200px;" placeholder="adresse e-mail du compte" autocomplete="off">
+              <button class="btn primary" id="animGrant" type="button">Désigner animateur</button>
+              <button class="btn" id="animRevoke" type="button">Retirer le statut</button>
+            </div>
+            <div id="animMsg" class="muted" style="margin-top:7px;"></div>
+            <div id="animList" class="section-gap"></div>
+          </div>
+
           <div class="card">
             <h2 class="ct">Humidité du sol — tendance</h2>
             <div class="muted" id="chartSub">En attente des premières mesures de votre capteur.</div>
@@ -747,7 +759,34 @@ void loop() {
     // dès qu'une vraie carte envoie des données, elles apparaissent sans recharger la page.
     setInterval(refresh, 60000);
     loadParcels();
-    if(me && me.isAdmin){ loadAdminQuestions(); }
+    if(me && me.isAdmin){ loadAdminQuestions(); initAdminAnimators(); }
+  }
+  // Propriétaire : désigner / retirer les animateurs.
+  function initAdminAnimators(){
+    const card=$("adminACard"); if(!card) return; card.style.display="block";
+    const msg=$("animMsg");
+    async function act(grant){
+      const email=($("animEmail").value||"").trim(); msg.style.color=""; msg.textContent="";
+      if(!email){ msg.style.color="var(--bad)"; msg.textContent="Entrez une adresse e-mail."; return; }
+      const r=await fetch("/api/admin/animator",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:email,grant:grant})});
+      const d=await r.json().catch(function(){return{};});
+      if(!r.ok){ msg.style.color="var(--bad)"; msg.textContent=d.error||"Action impossible."; return; }
+      msg.style.color="var(--good)"; msg.textContent=(grant?"Statut d'animateur accordé à ":"Statut retiré à ")+(d.email||email)+" ✓";
+      $("animEmail").value=""; loadAnimList();
+    }
+    $("animGrant").addEventListener("click",function(){ act(true); });
+    $("animRevoke").addEventListener("click",function(){ act(false); });
+    loadAnimList();
+  }
+  async function loadAnimList(){
+    const box=$("animList"); if(!box) return;
+    try{
+      const r=await fetch("/api/admin/users"); const d=await r.json(); if(!r.ok) return;
+      const anims=(d.users||[]).filter(function(u){ return u.animator || u.isAdmin; });
+      if(!anims.length){ box.innerHTML='<div class="muted" style="margin-top:8px;">Aucun animateur désigné pour l\'instant.</div>'; return; }
+      box.innerHTML='<div style="font-weight:700;color:var(--leaf);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin:8px 0 6px;">Animateurs actuels</div>'
+        + anims.map(function(u){ return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:9px;padding:6px 10px;margin-bottom:5px;"><span style="flex:1;min-width:160px;"><b>'+esc(u.name||u.email)+'</b> <span class="muted" style="font-size:.82rem;">'+esc(u.email)+'</span></span>'+(u.isAdmin?'<span class="muted" style="font-size:.78rem;">propriétaire</span>':'<span style="font-size:.76rem;font-weight:700;color:var(--leaf);border:1px solid var(--leaf);border-radius:12px;padding:1px 8px;">animateur</span>')+'</div>'; }).join("");
+    }catch(e){}
   }
   // Formateur : ce que les cultivateurs demandent au conseiller.
   async function loadAdminQuestions(){

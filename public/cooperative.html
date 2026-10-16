@@ -209,23 +209,24 @@
       const r=await api("/api/coop/me");
       if(r.status===401){ view.innerHTML=card('<h2>Connexion requise</h2><div class="muted">Pour créer ou rejoindre une coopérative, <a href="/app">connectez-vous</a> (gratuit).</div>'); return; }
       if(r.d && r.d.coop){ if(r.d.isAnimateur){ renderAnimateur(r.d); } else { renderMembre(r.d); } }
-      else { renderNoCoop(); }
+      else { renderNoCoop(!!(r.d && r.d.animator)); }
     }
 
-    function renderNoCoop(){
-      view.innerHTML =
-        '<div class="grid2">'
-        + card('<h2>Créer une coopérative</h2><div class="muted">Vous devenez l\'<b>animateur</b> : vous recevez un code à partager, et vous suivez les membres.</div>'
+    function renderNoCoop(canCreate){
+      const createCard = canCreate
+        ? card('<h2>Créer une coopérative</h2><div class="muted">Vous êtes <b>animateur</b> : vous recevez un code à partager, et vous suivez les membres.</div>'
             + '<div class="stack" style="margin-top:12px;"><input class="sel" id="coName" placeholder="Nom (ex. Coopérative des maraîchers de San-Pédro)" maxlength="100"><input class="sel" id="coRegion" placeholder="Région / localité (facultatif)" maxlength="100"><button class="btn primary" id="coCreate" type="button">Créer la coopérative</button><div class="err" id="coErr1"></div></div>')
+        : card('<h2>Animer une coopérative</h2><div class="muted">La création d\'une coopérative est réservée aux <b>animateurs désignés par Terravive</b>. Si vous souhaitez animer un groupe d\'agriculteurs, demandez ce statut au responsable de Terravive. En attendant, vous pouvez <b>rejoindre</b> une coopérative existante avec un code.</div>');
+      view.innerHTML = '<div class="grid2">' + createCard
         + card('<h2>Rejoindre une coopérative</h2><div class="muted">Entrez le <b>code</b> donné par votre animateur.</div>'
             + '<div class="stack" style="margin-top:12px;"><input class="sel" id="coCode" placeholder="Code (6 caractères, ex. K7P2QX)" maxlength="12" style="letter-spacing:3px;text-transform:uppercase;"><button class="btn primary" id="coJoin" type="button">Rejoindre</button><div class="err" id="coErr2"></div></div>')
         + '</div>';
-      $("coCreate").addEventListener("click", async function(){
+      if(canCreate){ $("coCreate").addEventListener("click", async function(){
         const name=$("coName").value.trim(); const region=$("coRegion").value.trim(); const e=$("coErr1"); e.textContent="";
         if(name.length<2){ e.textContent="Donnez un nom à la coopérative."; return; }
         this.disabled=true; const r=await api("/api/coop/create","POST",{name:name,region:region});
         this.disabled=false; if(!r.ok){ e.textContent=(r.d&&r.d.error)||"Création impossible."; return; } load();
-      });
+      }); }
       $("coJoin").addEventListener("click", async function(){
         const code=$("coCode").value.trim(); const e=$("coErr2"); e.textContent="";
         if(!code){ e.textContent="Entrez le code."; return; }

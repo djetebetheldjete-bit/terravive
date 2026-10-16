@@ -123,7 +123,12 @@ function setSessionCookie(res, token) { res.setHeader("Set-Cookie", `${SESSION_C
 function clearSessionCookie(res) { res.setHeader("Set-Cookie", `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax${COOKIE_SECURE}; Max-Age=0`); }
 async function currentUser(req) { const t = parseCookies(req)[SESSION_COOKIE]; return t ? await getSessionUser(t) : null; }
 function isAdmin(u) { return !!u && ADMIN_EMAILS.includes(normEmail(u.email)); }
-function publicUser(u) { return u ? { id: u.id, email: u.email, name: u.name, region: u.region || null, isAdmin: isAdmin(u) } : null; }
+function isAnimator(u) { return !!u && (!!u.animator || isAdmin(u)); }
+function publicUser(u) { return u ? { id: u.id, email: u.email, name: u.name, region: u.region || null, isAdmin: isAdmin(u), animator: isAnimator(u) } : null; }
+async function setUserAnimator(userId, val) {
+  if (USE_DB) { try { await sb(`/trv_users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ animator: !!val }) }); } catch (e) { console.error("setUserAnimator:", e.message); } return; }
+  const s = loadStore(); if (s.users[userId]) { s.users[userId].animator = !!val; saveStore(s); }
+}
 
 // ---------- Plans de culture ----------
 async function savePlan(rec) {
@@ -779,15 +784,16 @@ async function coopPublic(coop) { return coop ? { id: coop.id, name: coop.name, 
 async function handleCoopMe(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
   const m = await getMembership(user.id);
-  if (!m) return sendJson(res, 200, { coop: null });
+  if (!m) return sendJson(res, 200, { coop: null, animator: isAnimator(user) });
   const coop = await getCoopById(m.coop_id);
-  if (!coop) { await removeMembership(user.id); return sendJson(res, 200, { coop: null }); }
+  if (!coop) { await removeMembership(user.id); return sendJson(res, 200, { coop: null, animator: isAnimator(user) }); }
   const members = await listCoopMembers(coop.id);
   let animateur = null; try { const a = members.find((x) => x.role === "animateur"); if (a) { const au = await getUserById(a.user_id); animateur = au ? (au.name || au.email) : null; } } catch (e) {}
-  sendJson(res, 200, { coop: await coopPublic(coop), role: m.role, membersCount: members.length, animateur, isAnimateur: m.role === "animateur" });
+  sendJson(res, 200, { coop: await coopPublic(coop), role: m.role, membersCount: members.length, animateur, isAnimateur: m.role === "animateur", animator: isAnimator(user) });
 }
 async function handleCoopCreate(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Connectez-vous pour créer une coopérative." });
+  if (!isAnimator(user)) return sendJson(res, 403, { error: "Seul un animateur désigné par Terravive peut créer une coopérative. Demandez l'accès au responsable." });
   if (await getMembership(user.id)) return sendJson(res, 400, { error: "Vous faites déjà partie d'une coopérative. Quittez-la d'abord." });
   let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
   const name = String(p.name || "").trim().slice(0, 100); if (name.length < 2) return sendJson(res, 400, { error: "Donnez un nom à la coopérative." });
@@ -1065,10 +1071,20 @@ async function handleAdminQuestions(req, res) {
 async function handleAdminUsers(req, res) {
   const u = await currentUser(req); if (!isAdmin(u)) return sendJson(res, 403, { error: "Réservé à l'administrateur." });
   let users = [], plans = [];
-  if (USE_DB) { try { users = (await sb(`/trv_users?select=id,email,name,region,created_at&order=created_at.desc`)) || []; plans = (await sb(`/trv_plans?select=user_id`)) || []; } catch (e) {} }
+  if (USE_DB) { try { users = (await sb(`/trv_users?select=id,email,name,region,animator,created_at&order=created_at.desc`)) || []; plans = (await sb(`/trv_plans?select=user_id`)) || []; } catch (e) {} }
   else { const s = loadStore(); users = Object.values(s.users); plans = Object.values(s.plans); }
   const count = {}; plans.forEach((p) => { count[p.user_id] = (count[p.user_id] || 0) + 1; });
-  sendJson(res, 200, { users: users.map((x) => ({ id: x.id, email: x.email, name: x.name, region: x.region || null, created_at: x.created_at, plans: count[x.id] || 0 })), totalPlans: plans.length });
+  sendJson(res, 200, { users: users.map((x) => ({ id: x.id, email: x.email, name: x.name, region: x.region || null, created_at: x.created_at, plans: count[x.id] || 0, animator: !!x.animator, isAdmin: isAdmin(x) })), totalPlans: plans.length });
+}
+// Accorder / retirer le statut d'animateur à une adresse (réservé au propriétaire).
+async function handleAdminSetAnimator(req, res) {
+  const u = await currentUser(req); if (!isAdmin(u)) return sendJson(res, 403, { error: "Réservé à l'administrateur." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const email = normEmail(p.email); if (!validEmail(email)) return sendJson(res, 400, { error: "Adresse e-mail invalide." });
+  const target = await findUserByEmail(email); if (!target) return sendJson(res, 404, { error: "Aucun compte avec cette adresse. La personne doit d'abord créer son compte." });
+  const grant = !(p.grant === false || p.grant === "false" || p.grant === 0);
+  await setUserAnimator(target.id, grant);
+  sendJson(res, 200, { ok: true, email: target.email, name: target.name || null, animator: grant });
 }
 
 async function handleArduino(req, res) {
@@ -1228,6 +1244,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && url === "/api/diagnostic") return handleDiagnostic(req, res);
   if (req.method === "GET" && url === "/api/admin/users") return handleAdminUsers(req, res);
   if (req.method === "GET" && url === "/api/admin/questions") return handleAdminQuestions(req, res);
+  if (req.method === "POST" && url === "/api/admin/animator") return handleAdminSetAnimator(req, res);
   if (req.method === "GET") return serveStatic(req, res);
   res.writeHead(405); res.end("Méthode non autorisée");
 });

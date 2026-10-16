@@ -14,6 +14,9 @@ create table if not exists trv_users (
   created_at timestamptz default now()
 );
 
+-- Statut « animateur » accordé par le propriétaire (true = peut créer/animer une coopérative)
+alter table trv_users add column if not exists animator boolean default false;
+
 -- Sessions de connexion (jeton aléatoire)
 create table if not exists trv_sessions (
   token text primary key,
