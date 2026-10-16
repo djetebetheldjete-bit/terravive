@@ -55,6 +55,11 @@
   .composer input{ flex:1; padding:11px 13px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font:inherit; }
   .note{ color:var(--faint); font-size:.78rem; margin-top:10px; text-align:center; }
 </style>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2E7D46">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<script src="/pwa.js" defer></script>
+<script src="/voice.js"></script>
 </head>
 <body>
   <div class="top"><div class="topin">
@@ -77,9 +82,23 @@
     </div>
 
     <div class="panel chat">
-      <div class="thread" id="thread"><div class="empty" id="threadEmpty">Votre conversation apparaîtra ici. Posez une question pour commencer.</div></div>
+      <div class="vbar" style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:11px 14px;border-bottom:1px solid var(--line);">
+        <span class="muted" style="font-size:.86rem;">Répondre en :</span>
+        <select class="sel" id="langSel" style="padding:7px 10px;">
+          <option value="fr">Français</option>
+          <option value="dioula">Dioula (Jula)</option>
+          <option value="baoule">Baoulé</option>
+          <option value="bete">Bété</option>
+          <option value="senoufo">Sénoufo</option>
+          <option value="agni">Agni</option>
+          <option value="malinke">Malinké</option>
+        </select>
+        <span id="langNote" class="faint" style="font-size:.78rem;"></span>
+      </div>
+      <div class="thread" id="thread"><div class="empty" id="threadEmpty">Votre conversation apparaîtra ici. Posez une question — par écrit ou avec le micro.</div></div>
       <div class="composer">
         <input id="chatInput" placeholder="ex. Mes feuilles de maïs jaunissent, que faire ?" maxlength="500" autocomplete="off">
+        <button class="btn" id="micBtn" type="button" title="Dicter la question (en français)" aria-label="Dicter">🎤</button>
         <button class="btn primary" id="sendBtn" type="button">Envoyer</button>
       </div>
     </div>
@@ -167,16 +186,42 @@
       bubble(esc(q),"me"); history.push({role:"user",content:q});
       const typing=document.createElement("div"); typing.className="typing"; typing.textContent="Le conseiller réfléchit…"; thread.appendChild(typing); thread.scrollTop=thread.scrollHeight;
       try{
-        const r=await fetch("/api/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ message:q, history: history.slice(0,-1), crop: userCrop||undefined })});
+        const r=await fetch("/api/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ message:q, history: history.slice(0,-1), crop: userCrop||undefined, lang: curLang() })});
         typing.remove();
         if(r.status===401){ bubble("Connectez-vous pour poser vos questions (c'est gratuit). Ouvrez la page de connexion ci-dessous.","err"); $("loginNote").style.display="block"; history.pop(); }
-        else { const d=await r.json(); if(!r.ok){ bubble(esc(d.error||"La réponse a échoué."),"err"); history.pop(); } else { bubble(renderMd(d.reply),"ai"); history.push({role:"assistant",content:d.reply}); } }
+        else { const d=await r.json(); if(!r.ok){ bubble(esc(d.error||"La réponse a échoué."),"err"); history.pop(); } else { const el=bubble(renderMd(d.reply),"ai"); addSpeak(el, d.reply); history.push({role:"assistant",content:d.reply}); } }
       }catch(e){ typing.remove(); bubble("Impossible de joindre le serveur. Réessayez dans un instant.","err"); history.pop(); }
       busy=false; $("sendBtn").disabled=false;
     }
     function send(){ const inp=$("chatInput"); const q=inp.value; inp.value=""; ask(q); }
     $("sendBtn").addEventListener("click", send);
     $("chatInput").addEventListener("keydown", function(e){ if(e.key==="Enter") send(); });
+
+    // ----- Voix & langue -----
+    function curLang(){ const s=$("langSel"); const v=s?s.value:"fr"; return (v&&v!=="fr")?v:undefined; }
+    function updateLangNote(){ const s=$("langSel"), n=$("langNote"); if(!s||!n) return; n.textContent = (s.value&&s.value!=="fr") ? "Traduction approximative par l'IA — le français reste la référence." : ""; }
+    { const s=$("langSel"); if(s){ s.addEventListener("change", updateLangNote); try{ const sv=localStorage.getItem("trv-lang"); if(sv){ s.value=sv; } }catch(e){} s.addEventListener("change", function(){ try{ localStorage.setItem("trv-lang", s.value); }catch(e){} }); updateLangNote(); } }
+    // Bouton « Écouter » sur une réponse (lecture à voix haute, surtout utile en français).
+    function addSpeak(el, text){
+      if(!el || !(window.trvCanSpeak && window.trvCanSpeak())) return;
+      const b=document.createElement("button"); b.type="button"; b.textContent="🔊 Écouter";
+      b.style.cssText="margin-top:8px;background:transparent;border:1px solid var(--line);border-radius:999px;padding:4px 11px;font:inherit;font-size:.8rem;color:var(--leaf);cursor:pointer;";
+      let on=false;
+      b.addEventListener("click", function(){ if(on){ trvStop(); on=false; b.textContent="🔊 Écouter"; return; } on=true; b.textContent="⏹ Arrêter"; trvSpeak(text, function(){ on=false; b.textContent="🔊 Écouter"; }); });
+      el.appendChild(b);
+    }
+    // Dictée de la question (reconnaissance vocale, en français).
+    (function(){
+      const b=$("micBtn"); if(!b) return;
+      if(!(window.trvCanListen && window.trvCanListen())){ b.style.display="none"; return; }
+      let listening=false, rec=null;
+      b.addEventListener("click", function(){
+        if(listening){ try{ rec && rec.stop(); }catch(e){} return; }
+        listening=true; b.textContent="●"; b.style.color="#c0392b"; b.title="Écoute… parlez";
+        rec=trvListen(function(t){ $("chatInput").value=t; }, function(){ listening=false; b.textContent="🎤"; b.style.color=""; b.title="Dicter la question (en français)"; const q=($("chatInput").value||"").trim(); if(q) send(); }, "fr-FR");
+      });
+    })();
+
     buildSug();
     buildDynamic();   // ajoute une catégorie « Pour vous » selon la parcelle, la culture et la saison
     // Accueil personnalisé si connecté

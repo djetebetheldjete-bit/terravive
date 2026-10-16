@@ -48,7 +48,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
 
 // ---------- Utilitaires HTTP ----------
-const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".ico": "image/x-icon", ".png": "image/png", ".svg": "image/svg+xml", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml; charset=utf-8", ".jpg": "image/jpeg" };
+const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".ico": "image/x-icon", ".png": "image/png", ".svg": "image/svg+xml", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml; charset=utf-8", ".jpg": "image/jpeg", ".webmanifest": "application/manifest+json; charset=utf-8", ".json": "application/json; charset=utf-8" };
 function sendJson(res, code, obj) { res.writeHead(code, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(obj)); }
 function readBody(req) { return new Promise((resolve, reject) => { let b = ""; req.on("data", (c) => { b += c; if (b.length > 6e6) req.destroy(); }); req.on("end", () => resolve(b)); req.on("error", reject); }); }
 function normEmail(s) { return String(s || "").trim().toLowerCase(); }
@@ -540,11 +540,25 @@ function planUserMessage(p) {
 
 Rédige mon itinéraire technique de culture complet.`;
 }
-function advisorSystem(plan) {
+// Langues locales proposées (traduction best-effort par l'IA).
+const CHAT_LANGS = {
+  fr: null,
+  dioula: "dioula (jula)",
+  baoule: "baoulé",
+  bete: "bété",
+  senoufo: "sénoufo",
+  agni: "agni",
+  malinke: "malinké",
+};
+function advisorSystem(plan, lang) {
   let s = DURABLE_CONTEXT + `
 
 Tu réponds aux questions de l'agriculteur au fil de sa saison : diagnostic de problèmes (à partir de sa description : feuilles jaunes, taches, insectes, sol…), conseils d'arrosage, de fertilisation naturelle, de protection biologique, de récolte. Réponses courtes, concrètes, pas à pas. Si un symptôme peut avoir plusieurs causes, propose comment les distinguer. Termine par l'action durable la plus simple à essayer en premier.`;
   if (plan) s += `\n\nContexte de sa parcelle : culture « ${plan.crop} », région « ${plan.region || "?"} », sol « ${plan.soil || "?"} », saison « ${plan.season || "?"} ».`;
+  const lname = lang && CHAT_LANGS[lang];
+  if (lname) {
+    s += `\n\nLANGUE : réponds en ${lname} (une langue de Côte d'Ivoire), dans un langage simple et parlé. C'est une aide de compréhension, pas une traduction officielle : si tu n'es pas sûr d'un mot technique, garde le terme en français entre parenthèses. Reste fidèle au conseil agronomique. Ne préviens pas que tu traduis, réponds directement.`;
+  }
   return s;
 }
 
@@ -755,9 +769,10 @@ async function handleChat(req, res) {
   let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
   const q = String(p.message || "").trim(); if (!q) return sendJson(res, 400, { error: "Message vide." });
   let plan = null; if (p.planId) { const pl = await getPlan(p.planId); if (pl && pl.user_id === user.id) plan = pl; }
+  const lang = (typeof p.lang === "string" && Object.prototype.hasOwnProperty.call(CHAT_LANGS, p.lang) && p.lang !== "fr") ? p.lang : null;
   const history = Array.isArray(p.history) ? p.history.slice(-8).filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string").map((m) => ({ role: m.role, content: m.content.slice(0, 2000) })) : [];
   try {
-    const reply = await callClaude(advisorSystem(plan), history.concat([{ role: "user", content: q.slice(0, 2000) }]));
+    const reply = await callClaude(advisorSystem(plan, lang), history.concat([{ role: "user", content: q.slice(0, 2000) }]));
     sendJson(res, 200, { reply });
     // Journal (après la réponse, sans bloquer) : ce que les cultivateurs cherchent à comprendre.
     logQuestion({ id: newId(), user_id: user.id, question: q.slice(0, 400), crop: (plan && plan.crop) || String(p.crop || "").slice(0, 80) || null, created_at: new Date().toISOString() });
