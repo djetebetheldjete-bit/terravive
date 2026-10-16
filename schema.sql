@@ -169,3 +169,18 @@ create table if not exists trv_coop_buy_join (
   created_at timestamptz default now()
 );
 create index if not exists trv_coop_buy_join_buy_idx on trv_coop_buy_join (buy_id);
+
+-- Demandes pour devenir animateur (soumises dans l'app, décidées par le propriétaire)
+create table if not exists trv_anim_requests (
+  id text primary key,
+  user_id text,
+  name text,
+  email text,
+  region text,
+  message text,
+  status text,                -- 'en_attente' | 'acceptée' | 'refusée'
+  created_at timestamptz default now(),
+  decided_at timestamptz
+);
+create index if not exists trv_anim_requests_status_idx on trv_anim_requests (status, created_at desc);
+create index if not exists trv_anim_requests_user_idx on trv_anim_requests (user_id);

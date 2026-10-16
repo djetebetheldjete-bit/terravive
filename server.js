@@ -73,7 +73,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [] }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [] }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -128,6 +128,28 @@ function publicUser(u) { return u ? { id: u.id, email: u.email, name: u.name, re
 async function setUserAnimator(userId, val) {
   if (USE_DB) { try { await sb(`/trv_users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ animator: !!val }) }); } catch (e) { console.error("setUserAnimator:", e.message); } return; }
   const s = loadStore(); if (s.users[userId]) { s.users[userId].animator = !!val; saveStore(s); }
+}
+// Demandes pour devenir animateur (soumises par l'agriculteur, décidées par le propriétaire).
+async function listAnimRequests(status) {
+  if (USE_DB) { try { const q = status ? `&status=eq.${encodeURIComponent(status)}` : ""; return (await sb(`/trv_anim_requests?select=*${q}&order=created_at.desc`)) || []; } catch (e) { return []; } }
+  let a = (loadStore().animReqs || []); if (status) a = a.filter((r) => r.status === status); return a.slice().sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)));
+}
+async function getAnimRequestByUser(userId) {
+  if (USE_DB) { try { const r = await sb(`/trv_anim_requests?user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc&limit=1`); return (r && r[0]) || null; } catch (e) { return null; } }
+  const a = (loadStore().animReqs || []).filter((r) => r.user_id === userId).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at))); return a[0] || null;
+}
+async function getAnimRequest(id) {
+  if (!id) return null;
+  if (USE_DB) { try { const r = await sb(`/trv_anim_requests?id=eq.${encodeURIComponent(id)}&select=*`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return (loadStore().animReqs || []).find((r) => r.id === id) || null;
+}
+async function addAnimRequest(rec) {
+  if (USE_DB) { try { await sb(`/trv_anim_requests`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("addAnimRequest:", e.message); } return; }
+  const s = loadStore(); (s.animReqs = s.animReqs || []).push(rec); saveStore(s);
+}
+async function updateAnimRequest(id, fields) {
+  if (USE_DB) { try { await sb(`/trv_anim_requests?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(fields) }); } catch (e) {} return; }
+  const s = loadStore(); const r = (s.animReqs || []).find((x) => x.id === id); if (r) { Object.assign(r, fields); saveStore(s); }
 }
 
 // ---------- Plans de culture ----------
@@ -1076,6 +1098,39 @@ async function handleAdminUsers(req, res) {
   const count = {}; plans.forEach((p) => { count[p.user_id] = (count[p.user_id] || 0) + 1; });
   sendJson(res, 200, { users: users.map((x) => ({ id: x.id, email: x.email, name: x.name, region: x.region || null, created_at: x.created_at, plans: count[x.id] || 0, animator: !!x.animator, isAdmin: isAdmin(x) })), totalPlans: plans.length });
 }
+// L'agriculteur consulte / soumet sa demande pour devenir animateur.
+async function handleAnimRequestGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  if (isAnimator(user)) return sendJson(res, 200, { animator: true, request: null });
+  const r = await getAnimRequestByUser(user.id);
+  sendJson(res, 200, { animator: false, request: r ? { status: r.status, created_at: r.created_at, message: r.message || null } : null });
+}
+async function handleAnimRequestCreate(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Connectez-vous d'abord." });
+  if (isAnimator(user)) return sendJson(res, 400, { error: "Vous êtes déjà animateur." });
+  if (!rateOk("animreq:" + user.id, 5, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de demandes aujourd'hui. Réessayez demain." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const existing = await getAnimRequestByUser(user.id);
+  if (existing && existing.status === "en_attente") return sendJson(res, 200, { ok: true, status: "en_attente", already: true });
+  const rec = { id: newId(), user_id: user.id, name: user.name || null, email: user.email, region: String(p.region || user.region || "").trim().slice(0, 100) || null, message: String(p.message || "").trim().slice(0, 500) || null, status: "en_attente", created_at: new Date().toISOString(), decided_at: null };
+  await addAnimRequest(rec);
+  sendJson(res, 200, { ok: true, status: "en_attente" });
+}
+// Le propriétaire liste et décide des demandes.
+async function handleAdminAnimRequests(req, res) {
+  const u = await currentUser(req); if (!isAdmin(u)) return sendJson(res, 403, { error: "Réservé à l'administrateur." });
+  const pending = await listAnimRequests("en_attente");
+  sendJson(res, 200, { requests: pending.map((r) => ({ id: r.id, name: r.name || null, email: r.email, region: r.region || null, message: r.message || null, created_at: r.created_at })) });
+}
+async function handleAdminAnimDecide(req, res) {
+  const u = await currentUser(req); if (!isAdmin(u)) return sendJson(res, 403, { error: "Réservé à l'administrateur." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const r = await getAnimRequest(String(p.id || "")); if (!r) return sendJson(res, 404, { error: "Demande introuvable." });
+  const approve = !(p.approve === false || p.approve === "false" || p.approve === 0);
+  if (approve) await setUserAnimator(r.user_id, true);
+  await updateAnimRequest(r.id, { status: approve ? "acceptée" : "refusée", decided_at: new Date().toISOString() });
+  sendJson(res, 200, { ok: true, status: approve ? "acceptée" : "refusée", email: r.email });
+}
 // Accorder / retirer le statut d'animateur à une adresse (réservé au propriétaire).
 async function handleAdminSetAnimator(req, res) {
   const u = await currentUser(req); if (!isAdmin(u)) return sendJson(res, 403, { error: "Réservé à l'administrateur." });
@@ -1245,6 +1300,10 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && url === "/api/admin/users") return handleAdminUsers(req, res);
   if (req.method === "GET" && url === "/api/admin/questions") return handleAdminQuestions(req, res);
   if (req.method === "POST" && url === "/api/admin/animator") return handleAdminSetAnimator(req, res);
+  if (req.method === "GET" && url === "/api/admin/animator-requests") return handleAdminAnimRequests(req, res);
+  if (req.method === "POST" && url === "/api/admin/animator-requests/decide") return handleAdminAnimDecide(req, res);
+  if (req.method === "GET" && url === "/api/animator/request") return handleAnimRequestGet(req, res);
+  if (req.method === "POST" && url === "/api/animator/request") return handleAnimRequestCreate(req, res);
   if (req.method === "GET") return serveStatic(req, res);
   res.writeHead(405); res.end("Méthode non autorisée");
 });

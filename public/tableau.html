@@ -220,6 +220,7 @@
               <button class="btn" id="animRevoke" type="button">Retirer le statut</button>
             </div>
             <div id="animMsg" class="muted" style="margin-top:7px;"></div>
+            <div id="animReqList" class="section-gap"></div>
             <div id="animList" class="section-gap"></div>
           </div>
 
@@ -776,7 +777,30 @@ void loop() {
     }
     $("animGrant").addEventListener("click",function(){ act(true); });
     $("animRevoke").addEventListener("click",function(){ act(false); });
+    loadAnimReqs();
     loadAnimList();
+  }
+  async function loadAnimReqs(){
+    const box=$("animReqList"); if(!box) return;
+    try{
+      const r=await fetch("/api/admin/animator-requests"); const d=await r.json(); if(!r.ok) return;
+      const reqs=d.requests||[];
+      if(!reqs.length){ box.innerHTML=''; return; }
+      box.innerHTML='<div style="font-weight:700;color:var(--sun);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin:10px 0 6px;">Demandes en attente ('+reqs.length+')</div>'
+        + reqs.map(function(q){ const when=q.created_at?new Date(q.created_at).toLocaleDateString("fr-FR"):"";
+          return '<div style="border:1px solid var(--sun);border-radius:10px;padding:9px 11px;margin-bottom:7px;background:color-mix(in srgb,var(--sun) 8%,var(--surface));">'
+            +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="flex:1;min-width:150px;"><b>'+esc(q.name||q.email)+'</b> <span class="muted" style="font-size:.82rem;">'+esc(q.email)+(q.region?(" · "+esc(q.region)):"")+' · '+esc(when)+'</span></span>'
+            +'<button class="btn primary" type="button" data-areq="'+esc(q.id)+'|1" style="padding:5px 11px;">Approuver</button>'
+            +'<button class="btn" type="button" data-areq="'+esc(q.id)+'|0" style="padding:5px 11px;border-color:#c0392b;color:#c0392b;">Refuser</button></div>'
+            +(q.message?('<div class="muted" style="font-size:.86rem;margin-top:5px;">'+esc(q.message)+'</div>'):'')
+          +'</div>';
+        }).join("");
+      box.querySelectorAll("[data-areq]").forEach(function(b){ b.addEventListener("click", async function(){
+        const pr=b.getAttribute("data-areq").split("|"); b.disabled=true;
+        const rr=await fetch("/api/admin/animator-requests/decide",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:pr[0],approve:pr[1]==="1"})});
+        if(rr.ok){ loadAnimReqs(); loadAnimList(); } else { b.disabled=false; }
+      }); });
+    }catch(e){}
   }
   async function loadAnimList(){
     const box=$("animList"); if(!box) return;

@@ -216,7 +216,7 @@
       const createCard = canCreate
         ? card('<h2>Créer une coopérative</h2><div class="muted">Vous êtes <b>animateur</b> : vous recevez un code à partager, et vous suivez les membres.</div>'
             + '<div class="stack" style="margin-top:12px;"><input class="sel" id="coName" placeholder="Nom (ex. Coopérative des maraîchers de San-Pédro)" maxlength="100"><input class="sel" id="coRegion" placeholder="Région / localité (facultatif)" maxlength="100"><button class="btn primary" id="coCreate" type="button">Créer la coopérative</button><div class="err" id="coErr1"></div></div>')
-        : card('<h2>Animer une coopérative</h2><div class="muted">La création d\'une coopérative est réservée aux <b>animateurs désignés par Terravive</b>. Si vous souhaitez animer un groupe d\'agriculteurs, demandez ce statut au responsable de Terravive. En attendant, vous pouvez <b>rejoindre</b> une coopérative existante avec un code.</div>');
+        : card('<h2>Animer une coopérative</h2><div class="muted">La création d\'une coopérative est réservée aux <b>animateurs désignés par Terravive</b>. Vous pouvez <b>demander ce statut</b> ci-dessous, ou <b>rejoindre</b> une coopérative existante avec un code.</div><div id="animReqArea" style="margin-top:12px;"><div class="muted">Chargement…</div></div>');
       view.innerHTML = '<div class="grid2">' + createCard
         + card('<h2>Rejoindre une coopérative</h2><div class="muted">Entrez le <b>code</b> donné par votre animateur.</div>'
             + '<div class="stack" style="margin-top:12px;"><input class="sel" id="coCode" placeholder="Code (6 caractères, ex. K7P2QX)" maxlength="12" style="letter-spacing:3px;text-transform:uppercase;"><button class="btn primary" id="coJoin" type="button">Rejoindre</button><div class="err" id="coErr2"></div></div>')
@@ -232,6 +232,32 @@
         if(!code){ e.textContent="Entrez le code."; return; }
         this.disabled=true; const r=await api("/api/coop/join","POST",{code:code});
         this.disabled=false; if(!r.ok){ e.textContent=(r.d&&r.d.error)||"Code introuvable."; return; } load();
+      });
+      if(!canCreate){ loadAnimReq(); }
+    }
+    function animReqForm(){
+      return '<div class="stack">'
+        +'<input class="sel" id="arRegion" placeholder="Votre région / localité" maxlength="100">'
+        +'<textarea class="sel" id="arMsg" placeholder="Décrivez brièvement votre projet : quel groupe d\'agriculteurs voulez-vous animer, où, et pourquoi vous ?" maxlength="500" style="min-height:70px;"></textarea>'
+        +'<div class="row"><button class="btn primary" id="arSend" type="button">Demander à devenir animateur</button><span id="arMsgOut" class="muted"></span></div></div>';
+    }
+    async function loadAnimReq(){
+      var area=$("animReqArea"); if(!area) return;
+      var r=await api("/api/animator/request");
+      if(!r.ok){ area.innerHTML=''; return; }
+      var req=r.d.request;
+      if(req && req.status==="en_attente"){ area.innerHTML='<div class="ok">✔ Votre demande pour devenir animateur a bien été envoyée. Elle est <b>en attente</b> de validation par le responsable de Terravive. Vous serez reconnu animateur dès qu\'elle sera acceptée.</div>'; return; }
+      if(req && req.status==="refusée"){ area.innerHTML='<div class="muted" style="margin-bottom:8px;">Votre précédente demande n\'a pas été retenue. Vous pouvez en soumettre une nouvelle en précisant davantage votre projet.</div>'+animReqForm(); }
+      else { area.innerHTML=animReqForm(); }
+      var b=$("arSend"); if(!b) return;
+      b.addEventListener("click", async function(){
+        var out=$("arMsgOut"); out.style.color=""; out.textContent="";
+        var msg=($("arMsg").value||"").trim();
+        if(msg.length<10){ out.style.color="var(--bad)"; out.textContent="Décrivez un peu votre projet (au moins une phrase)."; return; }
+        b.disabled=true; var rr=await api("/api/animator/request","POST",{ region:($("arRegion")||{}).value, message:msg });
+        b.disabled=false;
+        if(!rr.ok){ out.style.color="var(--bad)"; out.textContent=(rr.d&&rr.d.error)||"Envoi impossible."; return; }
+        loadAnimReq();
       });
     }
 
