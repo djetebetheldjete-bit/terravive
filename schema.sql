@@ -112,3 +112,57 @@ create table if not exists trv_coop_members (
 );
 create index if not exists trv_coop_members_coop_idx on trv_coop_members (coop_id);
 create index if not exists trv_coop_members_user_idx on trv_coop_members (user_id);
+
+-- Matériel partagé de la coopérative (tracteur, pulvérisateur, motopompe…)
+create table if not exists trv_coop_equipment (
+  id text primary key,
+  coop_id text,
+  owner_id text,              -- membre qui met le matériel à disposition
+  name text,
+  kind text,                  -- type (facultatif)
+  note text,
+  status text,                -- 'dispo' par défaut
+  created_at timestamptz default now()
+);
+create index if not exists trv_coop_equipment_coop_idx on trv_coop_equipment (coop_id, created_at desc);
+
+-- Réservations / emprunts de matériel entre membres
+create table if not exists trv_coop_resa (
+  id text primary key,
+  coop_id text,
+  equipment_id text,
+  equipment_name text,
+  user_id text,               -- membre qui réserve
+  date_from text,             -- date souhaitée (texte AAAA-MM-JJ)
+  date_to text,
+  note text,
+  status text,                -- 'demandée' | 'acceptée' | 'refusée' | 'annulée' | 'terminée'
+  created_at timestamptz default now()
+);
+create index if not exists trv_coop_resa_coop_idx on trv_coop_resa (coop_id, created_at desc);
+create index if not exists trv_coop_resa_equip_idx on trv_coop_resa (equipment_id);
+
+-- Achats groupés d'intrants (campagnes)
+create table if not exists trv_coop_buy (
+  id text primary key,
+  coop_id text,
+  created_by text,
+  item text,                  -- ce qu'on achète (ex. engrais NPK)
+  unit text,                  -- unité (sac, kg, litre…)
+  deadline text,              -- date limite (texte AAAA-MM-JJ)
+  note text,
+  status text,                -- 'ouvert' | 'clos'
+  created_at timestamptz default now()
+);
+create index if not exists trv_coop_buy_coop_idx on trv_coop_buy (coop_id, created_at desc);
+
+-- Participations des membres à un achat groupé (quantité demandée)
+create table if not exists trv_coop_buy_join (
+  id text primary key,
+  buy_id text,
+  user_id text,
+  qty real,
+  name text,
+  created_at timestamptz default now()
+);
+create index if not exists trv_coop_buy_join_buy_idx on trv_coop_buy_join (buy_id);

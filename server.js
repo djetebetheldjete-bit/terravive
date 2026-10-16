@@ -73,7 +73,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, coops: {}, coopMembers: [] }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [] }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -232,6 +232,77 @@ async function memberStats(userId) {
   const crops = {}; let lastCrop = null;
   (plans || []).forEach((p, i) => { const c = (p.crop || "").trim(); if (c) { crops[c.toLowerCase()] = (crops[c.toLowerCase()] || 0) + 1; if (i === 0) lastCrop = c; } });
   return { plans: (plans || []).length, parcels: (parcels || []).length, lastCrop, crops: Object.keys(crops) };
+}
+
+// ---------- Coopérative : matériel partagé + achats groupés (stockage) ----------
+async function listEquipment(coopId) {
+  if (USE_DB) { try { return (await sb(`/trv_coop_equipment?coop_id=eq.${encodeURIComponent(coopId)}&select=*&order=created_at.desc`)) || []; } catch (e) { return []; } }
+  return (loadStore().coopEquip || []).filter((x) => x.coop_id === coopId).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+}
+async function getEquipment(id) {
+  if (!id) return null;
+  if (USE_DB) { try { const r = await sb(`/trv_coop_equipment?id=eq.${encodeURIComponent(id)}&select=*`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return (loadStore().coopEquip || []).find((x) => x.id === id) || null;
+}
+async function addEquipment(rec) {
+  if (USE_DB) { try { await sb(`/trv_coop_equipment`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("addEquipment:", e.message); } return; }
+  const s = loadStore(); (s.coopEquip = s.coopEquip || []).push(rec); saveStore(s);
+}
+async function deleteEquipment(id) {
+  if (USE_DB) { try { await sb(`/trv_coop_equipment?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); } catch (e) {} try { await sb(`/trv_coop_resa?equipment_id=eq.${encodeURIComponent(id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); } catch (e) {} return; }
+  const s = loadStore(); s.coopEquip = (s.coopEquip || []).filter((x) => x.id !== id); s.coopResa = (s.coopResa || []).filter((r) => r.equipment_id !== id); saveStore(s);
+}
+async function listResa(coopId) {
+  if (USE_DB) { try { return (await sb(`/trv_coop_resa?coop_id=eq.${encodeURIComponent(coopId)}&select=*&order=created_at.desc`)) || []; } catch (e) { return []; } }
+  return (loadStore().coopResa || []).filter((r) => r.coop_id === coopId).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+}
+async function getResa(id) {
+  if (!id) return null;
+  if (USE_DB) { try { const r = await sb(`/trv_coop_resa?id=eq.${encodeURIComponent(id)}&select=*`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return (loadStore().coopResa || []).find((x) => x.id === id) || null;
+}
+async function addResa(rec) {
+  if (USE_DB) { try { await sb(`/trv_coop_resa`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("addResa:", e.message); } return; }
+  const s = loadStore(); (s.coopResa = s.coopResa || []).push(rec); saveStore(s);
+}
+async function updateResaStatus(id, status) {
+  if (USE_DB) { try { await sb(`/trv_coop_resa?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status }) }); } catch (e) {} return; }
+  const s = loadStore(); const r = (s.coopResa || []).find((x) => x.id === id); if (r) { r.status = status; saveStore(s); }
+}
+async function listBuy(coopId) {
+  if (USE_DB) { try { return (await sb(`/trv_coop_buy?coop_id=eq.${encodeURIComponent(coopId)}&select=*&order=created_at.desc`)) || []; } catch (e) { return []; } }
+  return (loadStore().coopBuy || []).filter((x) => x.coop_id === coopId).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+}
+async function getBuy(id) {
+  if (!id) return null;
+  if (USE_DB) { try { const r = await sb(`/trv_coop_buy?id=eq.${encodeURIComponent(id)}&select=*`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return (loadStore().coopBuy || []).find((x) => x.id === id) || null;
+}
+async function addBuy(rec) {
+  if (USE_DB) { try { await sb(`/trv_coop_buy`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("addBuy:", e.message); } return; }
+  const s = loadStore(); (s.coopBuy = s.coopBuy || []).push(rec); saveStore(s);
+}
+async function updateBuyStatus(id, status) {
+  if (USE_DB) { try { await sb(`/trv_coop_buy?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status }) }); } catch (e) {} return; }
+  const s = loadStore(); const b = (s.coopBuy || []).find((x) => x.id === id); if (b) { b.status = status; saveStore(s); }
+}
+async function deleteBuy(id) {
+  if (USE_DB) { try { await sb(`/trv_coop_buy?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); } catch (e) {} try { await sb(`/trv_coop_buy_join?buy_id=eq.${encodeURIComponent(id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); } catch (e) {} return; }
+  const s = loadStore(); s.coopBuy = (s.coopBuy || []).filter((x) => x.id !== id); s.coopBuyJoin = (s.coopBuyJoin || []).filter((j) => j.buy_id !== id); saveStore(s);
+}
+async function listBuyJoins(buyId) {
+  if (USE_DB) { try { return (await sb(`/trv_coop_buy_join?buy_id=eq.${encodeURIComponent(buyId)}&select=*`)) || []; } catch (e) { return []; } }
+  return (loadStore().coopBuyJoin || []).filter((j) => j.buy_id === buyId);
+}
+async function setBuyJoin(buyId, userId, qty, name) {
+  if (USE_DB) {
+    try { await sb(`/trv_coop_buy_join?buy_id=eq.${encodeURIComponent(buyId)}&user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); } catch (e) {}
+    if (qty > 0) { try { await sb(`/trv_coop_buy_join`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ id: newId(), buy_id: buyId, user_id: userId, qty, name: name || null, created_at: new Date().toISOString() }]) }); } catch (e) { console.error("setBuyJoin:", e.message); } }
+    return;
+  }
+  const s = loadStore(); s.coopBuyJoin = (s.coopBuyJoin || []).filter((j) => !(j.buy_id === buyId && j.user_id === userId));
+  if (qty > 0) s.coopBuyJoin.push({ id: newId(), buy_id: buyId, user_id: userId, qty, name: name || null, created_at: new Date().toISOString() });
+  saveStore(s);
 }
 
 // ---------- Bibliothèque partagée : réutilisation par CULTURE + SECTEUR ----------
@@ -803,6 +874,109 @@ async function handleCoopMemberPlanCreate(req, res) {
     sendJson(res, 200, { plan: rec, reused });
   } catch (e) { sendJson(res, e.status || 500, { error: e.message || "La génération a échoué." }); }
 }
+// --- Coopérative : matériel partagé + achats groupés (handlers) ---
+async function coopCtx(req) {
+  const user = await currentUser(req);
+  if (!user) return { code: 401, error: "Connectez-vous." };
+  const m = await getMembership(user.id);
+  if (!m) return { code: 400, error: "Vous ne faites pas partie d'une coopérative." };
+  return { user, m };
+}
+async function userNameMap(coopId) {
+  const map = {};
+  try { const members = await listCoopMembers(coopId); for (const mm of members) { let u = null; try { u = await getUserById(mm.user_id); } catch (e) {} map[mm.user_id] = (u && (u.name || u.email)) || "Membre"; } } catch (e) {}
+  return map;
+}
+// Matériel partagé
+async function handleEquipList(req, res) {
+  const c = await coopCtx(req); if (c.error) return sendJson(res, c.code, { error: c.error });
+  const names = await userNameMap(c.m.coop_id);
+  const items = (await listEquipment(c.m.coop_id)).map((e) => ({ id: e.id, name: e.name, kind: e.kind || null, note: e.note || null, ownerName: names[e.owner_id] || "Membre", isOwner: e.owner_id === c.user.id, created_at: e.created_at }));
+  const resas = (await listResa(c.m.coop_id)).map((r) => ({ id: r.id, equipment_id: r.equipment_id, equipment_name: r.equipment_name || null, byName: names[r.user_id] || "Membre", isMine: r.user_id === c.user.id, date_from: r.date_from, date_to: r.date_to || null, note: r.note || null, status: r.status, created_at: r.created_at }));
+  sendJson(res, 200, { items, resas, isAnimateur: c.m.role === "animateur" });
+}
+async function handleEquipAdd(req, res) {
+  const c = await coopCtx(req); if (c.error) return sendJson(res, c.code, { error: c.error });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const name = String(p.name || "").trim().slice(0, 100); if (name.length < 2) return sendJson(res, 400, { error: "Donnez un nom au matériel." });
+  const rec = { id: newId(), coop_id: c.m.coop_id, owner_id: c.user.id, name, kind: String(p.kind || "").trim().slice(0, 60) || null, note: String(p.note || "").trim().slice(0, 300) || null, status: "dispo", created_at: new Date().toISOString() };
+  await addEquipment(rec); sendJson(res, 200, { ok: true, id: rec.id });
+}
+async function handleEquipDelete(req, res) {
+  const c = await coopCtx(req); if (c.error) return sendJson(res, c.code, { error: c.error });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const eq = await getEquipment(String(p.id || ""));
+  if (!eq || eq.coop_id !== c.m.coop_id) return sendJson(res, 404, { error: "Matériel introuvable." });
+  if (eq.owner_id !== c.user.id && c.m.role !== "animateur") return sendJson(res, 403, { error: "Seul le propriétaire ou l'animateur peut retirer ce matériel." });
+  await deleteEquipment(eq.id); sendJson(res, 200, { ok: true });
+}
+async function handleEquipReserve(req, res) {
+  const c = await coopCtx(req); if (c.error) return sendJson(res, c.code, { error: c.error });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const eq = await getEquipment(String(p.equipmentId || ""));
+  if (!eq || eq.coop_id !== c.m.coop_id) return sendJson(res, 404, { error: "Matériel introuvable." });
+  const from = String(p.from || "").slice(0, 20); if (!from) return sendJson(res, 400, { error: "Indiquez au moins la date souhaitée." });
+  const rec = { id: newId(), coop_id: c.m.coop_id, equipment_id: eq.id, equipment_name: eq.name, user_id: c.user.id, date_from: from, date_to: String(p.to || "").slice(0, 20) || null, note: String(p.note || "").trim().slice(0, 200) || null, status: "demandée", created_at: new Date().toISOString() };
+  await addResa(rec); sendJson(res, 200, { ok: true, id: rec.id });
+}
+async function handleEquipResaUpdate(req, res) {
+  const c = await coopCtx(req); if (c.error) return sendJson(res, c.code, { error: c.error });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const resa = await getResa(String(p.id || ""));
+  if (!resa || resa.coop_id !== c.m.coop_id) return sendJson(res, 404, { error: "Réservation introuvable." });
+  const status = String(p.status || ""); const allowed = ["acceptée", "refusée", "annulée", "terminée"];
+  if (allowed.indexOf(status) < 0) return sendJson(res, 400, { error: "Statut invalide." });
+  const eq = await getEquipment(resa.equipment_id);
+  const isOwner = !!(eq && eq.owner_id === c.user.id); const isRequester = resa.user_id === c.user.id; const isAnim = c.m.role === "animateur";
+  if (status === "annulée") { if (!isRequester && !isAnim) return sendJson(res, 403, { error: "Accès refusé." }); }
+  else { if (!isOwner && !isAnim) return sendJson(res, 403, { error: "Seul le propriétaire du matériel ou l'animateur peut valider." }); }
+  await updateResaStatus(resa.id, status); sendJson(res, 200, { ok: true });
+}
+// Achats groupés
+async function handleBuyList(req, res) {
+  const c = await coopCtx(req); if (c.error) return sendJson(res, c.code, { error: c.error });
+  const names = await userNameMap(c.m.coop_id);
+  const rows = await listBuy(c.m.coop_id); const out = [];
+  for (const b of rows) {
+    const joins = await listBuyJoins(b.id);
+    let total = 0, mine = 0; const participants = [];
+    for (const j of joins) { const q = Number(j.qty) || 0; total += q; if (j.user_id === c.user.id) mine = q; participants.push({ name: names[j.user_id] || j.name || "Membre", qty: q }); }
+    out.push({ id: b.id, item: b.item, unit: b.unit, deadline: b.deadline || null, note: b.note || null, status: b.status, created_at: b.created_at, creatorName: names[b.created_by] || "Membre", isCreator: b.created_by === c.user.id, total: Math.round(total * 100) / 100, mine, count: joins.length, participants });
+  }
+  sendJson(res, 200, { buys: out, isAnimateur: c.m.role === "animateur" });
+}
+async function handleBuyCreate(req, res) {
+  const c = await coopCtx(req); if (c.error) return sendJson(res, c.code, { error: c.error });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const item = String(p.item || "").trim().slice(0, 100); if (item.length < 2) return sendJson(res, 400, { error: "Indiquez ce qu'on achète (ex. engrais NPK, semences de maïs)." });
+  const rec = { id: newId(), coop_id: c.m.coop_id, created_by: c.user.id, item, unit: String(p.unit || "").trim().slice(0, 30) || "unité", deadline: String(p.deadline || "").slice(0, 20) || null, note: String(p.note || "").trim().slice(0, 300) || null, status: "ouvert", created_at: new Date().toISOString() };
+  await addBuy(rec); sendJson(res, 200, { ok: true, id: rec.id });
+}
+async function handleBuyJoin(req, res) {
+  const c = await coopCtx(req); if (c.error) return sendJson(res, c.code, { error: c.error });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const b = await getBuy(String(p.buyId || ""));
+  if (!b || b.coop_id !== c.m.coop_id) return sendJson(res, 404, { error: "Achat groupé introuvable." });
+  if (b.status !== "ouvert") return sendJson(res, 400, { error: "Cet achat groupé est clôturé." });
+  let qty = Number(p.qty); if (!isFinite(qty) || qty < 0) qty = 0; qty = Math.min(qty, 1e9);
+  await setBuyJoin(b.id, c.user.id, qty, c.user.name || null); sendJson(res, 200, { ok: true });
+}
+async function handleBuyClose(req, res) {
+  const c = await coopCtx(req); if (c.error) return sendJson(res, c.code, { error: c.error });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const b = await getBuy(String(p.id || ""));
+  if (!b || b.coop_id !== c.m.coop_id) return sendJson(res, 404, { error: "Achat groupé introuvable." });
+  if (b.created_by !== c.user.id && c.m.role !== "animateur") return sendJson(res, 403, { error: "Seul le créateur ou l'animateur peut clôturer." });
+  await updateBuyStatus(b.id, b.status === "ouvert" ? "clos" : "ouvert"); sendJson(res, 200, { ok: true });
+}
+async function handleBuyDelete(req, res) {
+  const c = await coopCtx(req); if (c.error) return sendJson(res, c.code, { error: c.error });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const b = await getBuy(String(p.id || ""));
+  if (!b || b.coop_id !== c.m.coop_id) return sendJson(res, 404, { error: "Achat groupé introuvable." });
+  if (b.created_by !== c.user.id && c.m.role !== "animateur") return sendJson(res, 403, { error: "Seul le créateur ou l'animateur peut supprimer." });
+  await deleteBuy(b.id); sendJson(res, 200, { ok: true });
+}
 async function handleChat(req, res) {
   if (!API_KEY) return sendJson(res, 500, { error: "Clé IA manquante (ANTHROPIC_API_KEY)." });
   const user = await currentUser(req);
@@ -1032,6 +1206,16 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && url.startsWith("/api/coop/member/plans")) return handleCoopMemberPlans(req, res);
   if (req.method === "GET" && url.startsWith("/api/coop/member/plan")) return handleCoopMemberPlanGet(req, res);
   if (req.method === "POST" && url === "/api/coop/member/plan") return handleCoopMemberPlanCreate(req, res);
+  if (req.method === "GET" && url === "/api/coop/equipment") return handleEquipList(req, res);
+  if (req.method === "POST" && url === "/api/coop/equipment") return handleEquipAdd(req, res);
+  if (req.method === "POST" && url === "/api/coop/equipment/delete") return handleEquipDelete(req, res);
+  if (req.method === "POST" && url === "/api/coop/equipment/reserve") return handleEquipReserve(req, res);
+  if (req.method === "POST" && url === "/api/coop/equipment/reservation") return handleEquipResaUpdate(req, res);
+  if (req.method === "GET" && url === "/api/coop/buy") return handleBuyList(req, res);
+  if (req.method === "POST" && url === "/api/coop/buy") return handleBuyCreate(req, res);
+  if (req.method === "POST" && url === "/api/coop/buy/join") return handleBuyJoin(req, res);
+  if (req.method === "POST" && url === "/api/coop/buy/close") return handleBuyClose(req, res);
+  if (req.method === "POST" && url === "/api/coop/buy/delete") return handleBuyDelete(req, res);
   if (req.method === "POST" && url === "/api/ingest") return handleIngest(req, res);
   if (req.method === "POST" && url === "/api/readings/clear") return handleReadingsClear(req, res);
   if (req.method === "GET" && url === "/api/station") return handleStation(req, res);

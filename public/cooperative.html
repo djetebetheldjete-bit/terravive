@@ -242,8 +242,9 @@
         + '<div class="ok" style="margin-top:10px;">Vous êtes membre de cette coopérative. Vos itinéraires et parcelles aident l\'animateur à organiser les achats groupés et la vente commune.</div>'
         + '<div class="row" style="margin-top:14px;"><button class="btn" id="coLeave" type="button" style="border-color:#c0392b;color:#c0392b;">Quitter la coopérative</button></div>'
         + '<div class="err" id="coErr3"></div>'
-      );
+      ) + '<div id="coopTools"></div>';
       wireLeave();
+      renderTools();
     }
 
     function renderAnimateur(d){
@@ -254,10 +255,12 @@
         + '<div class="row" style="margin-top:12px;align-items:center;"><span class="muted">Code à partager :</span> <span class="codebox" id="coCodeBox">'+esc(c.code)+'</span> <button class="btn" id="coCopy" type="button">Copier</button></div>'
         + '<div class="faint" style="margin-top:6px;">Donnez ce code aux agriculteurs pour qu\'ils rejoignent la coopérative depuis cette page.</div>'
       ) + '<div id="coOverview">'+card('<div class="muted">Chargement des membres…</div>')+'</div>'
+        + '<div id="coopTools"></div>'
         + card('<div class="row"><button class="btn" id="coLeave" type="button" style="border-color:#c0392b;color:#c0392b;">Quitter / supprimer la coopérative</button></div><div class="err" id="coErr3"></div>');
       $("coCopy").addEventListener("click", function(){ try{ navigator.clipboard && navigator.clipboard.writeText(c.code); }catch(e){} this.textContent="Copié ✓"; const t=this; setTimeout(function(){ t.textContent="Copier"; },1200); });
       wireLeave();
       loadOverview();
+      renderTools();
     }
 
     async function loadOverview(){
@@ -287,6 +290,126 @@
       }
       box.innerHTML=card(html);
       box.querySelectorAll("[data-manage]").forEach(function(b){ b.addEventListener("click", function(){ const m=(COOPM||[]).find(function(x){return x.id===b.getAttribute("data-manage");}); if(m) openMember(m); }); });
+    }
+
+    // ====== Matériel partagé + Achats groupés (pour tous les membres) ======
+    function fmtDate(s){ if(!s) return ""; try{ return new Date(s).toLocaleDateString("fr-FR"); }catch(e){ return s; } }
+    function statusPill(st){ var col={ "demandée":"var(--sun)","acceptée":"var(--good)","refusée":"var(--bad)","annulée":"var(--faint)","terminée":"var(--faint)","ouvert":"var(--good)","clos":"var(--faint)" }[st]||"var(--faint)"; return '<span style="font-size:.76rem;font-weight:700;color:'+col+';border:1px solid '+col+';border-radius:12px;padding:1px 8px;">'+esc(st)+'</span>'; }
+
+    function renderTools(){
+      var host=$("coopTools"); if(!host) return;
+      host.innerHTML = card('<h2>🔧 Matériel partagé</h2>'
+          + '<div class="muted">Mettez le matériel en commun (motopompe, pulvérisateur, tracteur…). Chacun propose le sien ; les autres le réservent.</div>'
+          + '<div id="equipAdd" style="margin-top:12px;"></div>'
+          + '<div id="equipList" style="margin-top:12px;"><div class="muted">Chargement…</div></div>'
+          + '<div id="equipResa" style="margin-top:14px;"></div>')
+        + card('<h2>🛒 Achats groupés</h2>'
+          + '<div class="muted">Regroupez vos besoins en intrants (engrais, semences…) pour acheter moins cher : plus la quantité totale est grande, plus le groupe pèse pour négocier.</div>'
+          + '<div id="buyAdd" style="margin-top:12px;"></div>'
+          + '<div id="buyList" style="margin-top:12px;"><div class="muted">Chargement…</div></div>');
+      $("equipAdd").innerHTML='<div class="stack">'
+        + '<div class="grid2"><input class="sel" id="eqName" placeholder="Matériel * (ex. motopompe)" maxlength="100"><input class="sel" id="eqKind" placeholder="Type (facultatif)" maxlength="60"></div>'
+        + '<input class="sel" id="eqNote" placeholder="Précision (facultatif : état, conditions de prêt…)" maxlength="300">'
+        + '<div class="row"><button class="btn primary" id="eqAddBtn" type="button">Proposer ce matériel</button><span id="eqMsg" class="muted"></span></div></div>';
+      $("eqAddBtn").addEventListener("click", addEquip);
+      $("buyAdd").innerHTML='<div class="stack">'
+        + '<div class="grid2"><input class="sel" id="byItem" placeholder="À acheter * (ex. engrais NPK)" maxlength="100"><input class="sel" id="byUnit" placeholder="Unité (sac, kg, litre…)" maxlength="30"></div>'
+        + '<div class="grid2"><input class="sel" id="byDeadline" type="date" title="Date limite (facultatif)"><span></span></div>'
+        + '<input class="sel" id="byNote" placeholder="Précision (facultatif)" maxlength="300">'
+        + '<div class="row"><button class="btn primary" id="byAddBtn" type="button">Lancer l\'achat groupé</button><span id="byMsg" class="muted"></span></div></div>';
+      $("byAddBtn").addEventListener("click", addBuy);
+      loadEquip(); loadBuy();
+    }
+    async function addEquip(){
+      var name=($("eqName").value||"").trim(); var msg=$("eqMsg"); msg.style.color=""; msg.textContent="";
+      if(name.length<2){ msg.style.color="var(--bad)"; msg.textContent="Donnez un nom au matériel."; return; }
+      var r=await api("/api/coop/equipment","POST",{ name:name, kind:$("eqKind").value, note:$("eqNote").value });
+      if(!r.ok){ msg.style.color="var(--bad)"; msg.textContent=(r.d&&r.d.error)||"Impossible."; return; }
+      $("eqName").value=""; $("eqKind").value=""; $("eqNote").value=""; loadEquip();
+    }
+    async function loadEquip(){
+      var box=$("equipList"), rbox=$("equipResa"); if(!box) return;
+      var r=await api("/api/coop/equipment");
+      if(!r.ok){ box.innerHTML='<div class="err">'+((r.d&&r.d.error)||"Chargement impossible.")+'</div>'; return; }
+      var items=r.d.items||[], resas=r.d.resas||[], isAnim=!!r.d.isAnimateur;
+      if(!items.length){ box.innerHTML='<div class="muted">Aucun matériel partagé pour l\'instant. Proposez le vôtre ci-dessus.</div>'; }
+      else {
+        box.innerHTML=items.map(function(it){ var canDel=it.isOwner||isAnim;
+          return '<div style="border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-bottom:8px;background:var(--surface2);">'
+            +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><b style="flex:1;min-width:120px;">'+esc(it.name)+(it.kind?(' <span class="muted" style="font-weight:400;">· '+esc(it.kind)+'</span>'):'')+'</b>'
+            +'<button class="btn" type="button" data-resa="'+esc(it.id)+'" style="padding:5px 11px;">Réserver</button>'
+            +(canDel?('<button class="btn" type="button" data-eqdel="'+esc(it.id)+'" style="padding:5px 11px;border-color:#c0392b;color:#c0392b;">Retirer</button>'):'')
+            +'</div><div class="muted" style="font-size:.82rem;margin-top:3px;">Proposé par '+esc(it.ownerName)+(it.note?(' · '+esc(it.note)):'')+'</div>'
+            +'<div id="rb_'+esc(it.id)+'" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);">'
+              +'<div class="grid2"><input class="sel" id="rbfrom_'+esc(it.id)+'" type="date"><input class="sel" id="rbnote_'+esc(it.id)+'" placeholder="Pour quoi / note (facultatif)" maxlength="200"></div>'
+              +'<div class="row" style="margin-top:6px;"><button class="btn primary" type="button" data-resaok="'+esc(it.id)+'" style="padding:6px 12px;">Demander</button><span class="muted" id="rbmsg_'+esc(it.id)+'"></span></div>'
+            +'</div></div>';
+        }).join("");
+        box.querySelectorAll("[data-resa]").forEach(function(b){ b.addEventListener("click",function(){ var el=$("rb_"+b.getAttribute("data-resa")); if(el) el.style.display=(el.style.display==="none"?"block":"none"); }); });
+        box.querySelectorAll("[data-resaok]").forEach(function(b){ b.addEventListener("click",function(){ reserveEquip(b.getAttribute("data-resaok")); }); });
+        box.querySelectorAll("[data-eqdel]").forEach(function(b){ b.addEventListener("click",function(){ delEquip(b.getAttribute("data-eqdel"),b); }); });
+      }
+      if(!resas.length){ rbox.innerHTML=''; }
+      else {
+        rbox.innerHTML='<h3 style="margin:.3em 0;">Réservations</h3>'+resas.map(function(r2){ var acts='';
+          if(r2.status==="demandée"){ acts+='<button class="btn" type="button" data-rstat="'+esc(r2.id)+'|accept" style="padding:4px 9px;">Accepter</button><button class="btn" type="button" data-rstat="'+esc(r2.id)+'|refuse" style="padding:4px 9px;">Refuser</button>'; if(r2.isMine) acts+='<button class="btn" type="button" data-rstat="'+esc(r2.id)+'|annul" style="padding:4px 9px;">Annuler</button>'; }
+          else if(r2.status==="acceptée"){ acts+='<button class="btn" type="button" data-rstat="'+esc(r2.id)+'|fin" style="padding:4px 9px;">Terminer</button>'; }
+          return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:7px 10px;margin-bottom:6px;"><span style="flex:1;min-width:140px;"><b>'+esc(r2.equipment_name||"Matériel")+'</b> <span class="muted" style="font-size:.82rem;">· '+esc(r2.byName)+' · '+esc(fmtDate(r2.date_from))+(r2.date_to?(' → '+esc(fmtDate(r2.date_to))):'')+(r2.note?(' · '+esc(r2.note)):'')+'</span></span>'+statusPill(r2.status)+acts+'</div>';
+        }).join("");
+        rbox.querySelectorAll("[data-rstat]").forEach(function(b){ b.addEventListener("click",function(){ var pr=b.getAttribute("data-rstat").split("|"); var map={accept:"acceptée",refuse:"refusée",annul:"annulée",fin:"terminée"}; updateResa(pr[0],map[pr[1]]); }); });
+      }
+    }
+    async function reserveEquip(id){
+      var fe=$("rbfrom_"+id), ne=$("rbnote_"+id), msg=$("rbmsg_"+id);
+      var from=fe?fe.value:""; var note=ne?ne.value:""; if(msg){ msg.style.color=""; msg.textContent=""; }
+      if(!from){ if(msg){ msg.style.color="var(--bad)"; msg.textContent="Choisissez une date."; } return; }
+      var r=await api("/api/coop/equipment/reserve","POST",{ equipmentId:id, from:from, note:note });
+      if(!r.ok){ if(msg){ msg.style.color="var(--bad)"; msg.textContent=(r.d&&r.d.error)||"Impossible."; } return; }
+      loadEquip();
+    }
+    async function delEquip(id,btn){
+      if(btn && btn.getAttribute("data-armed")!=="1"){ btn.setAttribute("data-armed","1"); var t=btn.textContent; btn.textContent="Confirmer ?"; setTimeout(function(){ btn.setAttribute("data-armed",""); btn.textContent=t; },3000); return; }
+      var r=await api("/api/coop/equipment/delete","POST",{ id:id }); if(r.ok) loadEquip();
+    }
+    async function updateResa(id,status){ await api("/api/coop/equipment/reservation","POST",{ id:id, status:status }); loadEquip(); }
+    async function addBuy(){
+      var item=($("byItem").value||"").trim(); var msg=$("byMsg"); msg.style.color=""; msg.textContent="";
+      if(item.length<2){ msg.style.color="var(--bad)"; msg.textContent="Indiquez ce qu'on achète."; return; }
+      var r=await api("/api/coop/buy","POST",{ item:item, unit:$("byUnit").value, deadline:$("byDeadline").value, note:$("byNote").value });
+      if(!r.ok){ msg.style.color="var(--bad)"; msg.textContent=(r.d&&r.d.error)||"Impossible."; return; }
+      $("byItem").value=""; $("byUnit").value=""; $("byDeadline").value=""; $("byNote").value=""; loadBuy();
+    }
+    async function loadBuy(){
+      var box=$("buyList"); if(!box) return; var r=await api("/api/coop/buy");
+      if(!r.ok){ box.innerHTML='<div class="err">'+((r.d&&r.d.error)||"Chargement impossible.")+'</div>'; return; }
+      var buys=r.d.buys||[], isAnim=!!r.d.isAnimateur;
+      if(!buys.length){ box.innerHTML='<div class="muted">Aucun achat groupé en cours. Lancez-en un ci-dessus.</div>'; return; }
+      box.innerHTML=buys.map(function(b){ var open=b.status==="ouvert";
+        var parts=(b.participants||[]).slice(0,40).map(function(p){ return esc(p.name)+' ('+p.qty+')'; }).join(", ");
+        var manage=(b.isCreator||isAnim);
+        return '<div style="border:1px solid var(--line);border-radius:11px;padding:11px 12px;margin-bottom:9px;background:var(--surface2);">'
+          +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><b style="flex:1;min-width:120px;">'+esc(b.item)+'</b>'+statusPill(open?"ouvert":"clos")+'</div>'
+          +'<div class="muted" style="font-size:.82rem;margin-top:3px;">Lancé par '+esc(b.creatorName)+(b.deadline?(' · avant le '+esc(fmtDate(b.deadline))):'')+(b.note?(' · '+esc(b.note)):'')+'</div>'
+          +'<div style="margin-top:7px;font-weight:700;color:var(--deep);">Total demandé : '+b.total+' '+esc(b.unit)+' <span class="muted" style="font-weight:400;">· '+b.count+' participant'+(b.count>1?'s':'')+'</span></div>'
+          +(parts?('<div class="muted" style="font-size:.8rem;margin-top:2px;">'+parts+'</div>'):'')
+          +(open?('<div class="row" style="margin-top:8px;align-items:center;gap:7px;flex-wrap:wrap;"><input class="sel" id="qty_'+esc(b.id)+'" type="number" min="0" step="any" value="'+(b.mine||"")+'" placeholder="Ma quantité" style="max-width:140px;"><span class="muted">'+esc(b.unit)+'</span><button class="btn primary" type="button" data-join="'+esc(b.id)+'" style="padding:6px 12px;">'+(b.mine?"Mettre à jour":"Je participe")+'</button><span class="muted" id="jmsg_'+esc(b.id)+'"></span></div>'):'')
+          +(manage?('<div class="row" style="margin-top:8px;"><button class="btn" type="button" data-bclose="'+esc(b.id)+'" style="padding:4px 10px;">'+(open?"Clôturer":"Rouvrir")+'</button><button class="btn" type="button" data-bdel="'+esc(b.id)+'" style="padding:4px 10px;border-color:#c0392b;color:#c0392b;">Supprimer</button></div>'):'')
+        +'</div>';
+      }).join("");
+      box.querySelectorAll("[data-join]").forEach(function(b){ b.addEventListener("click",function(){ joinBuy(b.getAttribute("data-join")); }); });
+      box.querySelectorAll("[data-bclose]").forEach(function(b){ b.addEventListener("click",function(){ api("/api/coop/buy/close","POST",{id:b.getAttribute("data-bclose")}).then(loadBuy); }); });
+      box.querySelectorAll("[data-bdel]").forEach(function(b){ b.addEventListener("click",function(){ delBuy(b.getAttribute("data-bdel"),b); }); });
+    }
+    async function joinBuy(id){
+      var qe=$("qty_"+id), msg=$("jmsg_"+id); var qty=Number(qe?qe.value:0); if(msg){ msg.style.color=""; msg.textContent=""; }
+      if(!isFinite(qty)||qty<0){ if(msg){ msg.style.color="var(--bad)"; msg.textContent="Quantité invalide."; } return; }
+      var r=await api("/api/coop/buy/join","POST",{ buyId:id, qty:qty });
+      if(!r.ok){ if(msg){ msg.style.color="var(--bad)"; msg.textContent=(r.d&&r.d.error)||"Impossible."; } return; }
+      loadBuy();
+    }
+    async function delBuy(id,btn){
+      if(btn && btn.getAttribute("data-armed")!=="1"){ btn.setAttribute("data-armed","1"); var t=btn.textContent; btn.textContent="Confirmer ?"; setTimeout(function(){ btn.setAttribute("data-armed",""); btn.textContent=t; },3000); return; }
+      var r=await api("/api/coop/buy/delete","POST",{ id:id }); if(r.ok) loadBuy();
     }
 
     function wireLeave(){
