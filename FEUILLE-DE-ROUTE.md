@@ -30,13 +30,13 @@ Ces éléments ne demandent **aucun équipement** : juste du développement. On 
 - **Achats groupés** : regrouper les besoins en intrants (semences, engrais, etc.) pour peser dans la négociation et acheter moins cher.
 - *Faisable intégralement en logiciel.* **→ Prochaine construction.**
 
-### 2.2 Débouchés / « vendre ensemble » (version réaliste)
-- **Faisable maintenant** : un tableau où les membres déclarent ce qu'ils ont à vendre (culture, quantité, période), et où l'animateur note des **fourchettes de prix indicatives** saisies à la main. Objectif : regrouper l'offre et vendre ensemble.
-- **Ce qui est reporté** (voir §3) : les **prix de marché en direct et automatiques** — ils demandent une source de données fiable.
+### 2.2 Débouchés / « vendre ensemble » — REPORTÉ (voir §3)
+- Décision : reporté, car même la version « fourchettes de prix saisies à la main » n'a de valeur que reliée à de vraies informations de marché (acheteurs, prix). On le reprendra quand on aura une source de données ou des contacts d'acheteurs.
 
-### 2.3 Consolidation (au fil de l'eau)
-- Fiabilité : quota Earth Engine, maîtrise du coût d'IA (limites par utilisateur déjà en place), réveil du serveur Render (offre gratuite qui s'endort).
-- **Guide de test terrain** pour un animateur (comment faire tester l'app à de vrais cultivateurs et remonter les retours).
+### 2.3 Consolidation — FAIT ✅
+- **Point de contrôle de santé** `/healthz` ajouté : à brancher sur un moniteur gratuit (UptimeRobot) pour prévenir les pannes et éviter la mise en veille du serveur Render gratuit.
+- Coût d'IA déjà maîtrisé par des limites par personne et par jour.
+- **Guide de test terrain** produit (PDF imprimable, avec fiche de retour par cultivateur) : `Terravive-Guide-Test-Terrain.pdf`.
 
 ---
 
@@ -51,6 +51,7 @@ Ces éléments ne demandent **aucun équipement** : juste du développement. On 
 | **Prix de marché en direct** | Savoir où et à combien vendre, automatiquement | **Source de données fiable** : partenariat avec un marché/observatoire des prix, ou une API. Sans ça, on reste sur des fourchettes saisies à la main (§2.2). |
 | **SMS / USSD** pour les cultivateurs **sans smartphone** | Toucher ceux qui n'ont qu'un téléphone simple, directement | **Passerelle SMS** (opérateur local ou service type Twilio) = abonnement payant. En attendant, le **relais humain** (l'animateur) joue ce rôle. |
 | **Voix en langues locales** (dioula, baoulé…) de vraie qualité | Accessibilité pour les non-lecteurs | **Moteurs vocaux** pour ces langues (inexistants sur les téléphones aujourd'hui). En attendant : voix française fiable + relais humain. |
+| **Débouchés / prix de marché en direct** | Savoir où et à combien vendre ; regrouper l'offre | **Source de données fiable** (observatoire des prix, API) ou des **contacts d'acheteurs**. La coopérative + les cultures agrégées posent déjà la base. |
 | **Financement / microcrédit intégré** | Accès au crédit via la coopérative | **Partenariat** avec une institution de microfinance + cadre réglementaire. La coopérative pose déjà la base (groupe, confiance). |
 | **Paiement / cotisations en ligne** (mobile money) | Gérer les achats groupés et cotisations | **Intégration mobile money** (Orange/MTN/Moov) + conformité. |
 

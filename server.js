@@ -1259,6 +1259,8 @@ function serveStatic(req, res) {
 // ---------- Routeur ----------
 const server = http.createServer((req, res) => {
   const url = (req.url || "").split("?")[0];
+  // Point de contrôle de santé (pour un moniteur d'uptime : garde le service éveillé et signale les pannes).
+  if (req.method === "GET" && (url === "/healthz" || url === "/api/health")) return sendJson(res, 200, { ok: true, service: "terravive", time: new Date().toISOString(), uptime_s: Math.round(process.uptime()), db: USE_DB ? "supabase" : "local" });
   if (req.method === "POST" && url === "/api/auth/register") return handleRegister(req, res);
   if (req.method === "POST" && url === "/api/auth/login") return handleLogin(req, res);
   if (req.method === "POST" && url === "/api/auth/logout") return handleLogout(req, res);
