@@ -83,3 +83,32 @@ create table if not exists trv_questions (
   created_at timestamptz default now()
 );
 create index if not exists trv_questions_idx on trv_questions (created_at desc);
+
+-- Parcelles enregistrées (limites de la zone dessinée, pour revisualiser plus tard)
+create table if not exists trv_parcels (
+  id text primary key,
+  user_id text,
+  name text,
+  geom text,                  -- zone en JSON : {"bbox":[o,s,e,n]} ou {"polygon":[[lng,lat],...]}
+  created_at timestamptz default now()
+);
+create index if not exists trv_parcels_user_idx on trv_parcels (user_id, created_at desc);
+
+-- Coopératives (relais humain + base achats groupés / mise en marché)
+create table if not exists trv_coops (
+  id text primary key,
+  name text,
+  region text,
+  code text unique,           -- code d'invitation à partager
+  owner_id text,              -- créateur (animateur)
+  created_at timestamptz default now()
+);
+create table if not exists trv_coop_members (
+  id text primary key,
+  coop_id text,
+  user_id text,
+  role text,                  -- 'animateur' ou 'membre'
+  joined_at timestamptz default now()
+);
+create index if not exists trv_coop_members_coop_idx on trv_coop_members (coop_id);
+create index if not exists trv_coop_members_user_idx on trv_coop_members (user_id);

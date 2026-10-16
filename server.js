@@ -73,7 +73,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [] }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, coops: {}, coopMembers: [] }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -169,6 +169,69 @@ function themeCounts(rows) {
   const c = Q_THEMES.map((t) => ({ label: t.label, count: 0 }));
   (rows || []).forEach((r) => { const q = String(r.question || ""); Q_THEMES.forEach((t, i) => { if (t.rx.test(q)) c[i].count++; }); });
   return c.filter((x) => x.count > 0).sort((a, b) => b.count - a.count);
+}
+
+// ---------- Parcelles enregistrées (limites de la zone, revisualisables) ----------
+async function saveParcel(rec) {
+  if (USE_DB) { try { await sb(`/trv_parcels?on_conflict=id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("saveParcel:", e.message); } return; }
+  const s = loadStore(); s.parcels[rec.id] = rec; saveStore(s);
+}
+async function listParcelsForUser(userId) {
+  if (USE_DB) { try { return (await sb(`/trv_parcels?user_id=eq.${encodeURIComponent(userId)}&select=id,name,geom,created_at&order=created_at.desc`)) || []; } catch (e) { return []; } }
+  return Object.values(loadStore().parcels).filter((p) => p.user_id === userId).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+}
+async function deleteParcel(userId, id) {
+  if (USE_DB) { try { await sb(`/trv_parcels?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); } catch (e) {} return; }
+  const s = loadStore(); const p = s.parcels[id]; if (p && p.user_id === userId) { delete s.parcels[id]; saveStore(s); }
+}
+// Garde-fou : une « zone » valide = { bbox:[o,s,e,n] } OU { polygon:[[lng,lat],...] }.
+function cleanZone(z) {
+  if (!z || typeof z !== "object") return null;
+  if (Array.isArray(z.bbox) && z.bbox.length === 4 && z.bbox.every((n) => typeof n === "number" && isFinite(n))) return { bbox: z.bbox.map(Number) };
+  if (Array.isArray(z.polygon) && z.polygon.length >= 3 && z.polygon.length <= 500 && z.polygon.every((pt) => Array.isArray(pt) && pt.length === 2 && isFinite(pt[0]) && isFinite(pt[1]))) return { polygon: z.polygon.map((pt) => [Number(pt[0]), Number(pt[1])]) };
+  return null;
+}
+
+// ---------- Coopératives (relais humain + base achats groupés / mise en marché) ----------
+function coopCode() { const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let c = ""; for (let i = 0; i < 6; i++) c += A[Math.floor(Math.random() * A.length)]; return c; }
+async function createCoop(rec) {
+  if (USE_DB) { try { await sb(`/trv_coops`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("createCoop:", e.message); } return; }
+  const s = loadStore(); s.coops[rec.id] = rec; saveStore(s);
+}
+async function getCoopById(id) {
+  if (!id) return null;
+  if (USE_DB) { try { const r = await sb(`/trv_coops?id=eq.${encodeURIComponent(id)}&select=*`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return loadStore().coops[id] || null;
+}
+async function getCoopByCode(code) {
+  const c = String(code || "").trim().toUpperCase(); if (!c) return null;
+  if (USE_DB) { try { const r = await sb(`/trv_coops?code=eq.${encodeURIComponent(c)}&select=*`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return Object.values(loadStore().coops).find((x) => x.code === c) || null;
+}
+async function getMembership(userId) {
+  if (USE_DB) { try { const r = await sb(`/trv_coop_members?user_id=eq.${encodeURIComponent(userId)}&select=*&limit=1`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return (loadStore().coopMembers || []).find((m) => m.user_id === userId) || null;
+}
+async function listCoopMembers(coopId) {
+  if (USE_DB) { try { return (await sb(`/trv_coop_members?coop_id=eq.${encodeURIComponent(coopId)}&select=*&order=joined_at.asc`)) || []; } catch (e) { return []; } }
+  return (loadStore().coopMembers || []).filter((m) => m.coop_id === coopId).sort((a, b) => String(a.joined_at).localeCompare(String(b.joined_at)));
+}
+async function addMembership(rec) {
+  if (USE_DB) { try { await sb(`/trv_coop_members`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("addMembership:", e.message); } return; }
+  const s = loadStore(); s.coopMembers.push(rec); saveStore(s);
+}
+async function removeMembership(userId) {
+  if (USE_DB) { try { await sb(`/trv_coop_members?user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); } catch (e) {} return; }
+  const s = loadStore(); s.coopMembers = (s.coopMembers || []).filter((m) => m.user_id !== userId); saveStore(s);
+}
+// Statistiques d'un membre pour la vue animateur (relais humain).
+async function memberStats(userId) {
+  let plans = [], parcels = [];
+  try { plans = await listPlansForUser(userId); } catch (e) {}
+  try { parcels = await listParcelsForUser(userId); } catch (e) {}
+  const crops = {}; let lastCrop = null;
+  (plans || []).forEach((p, i) => { const c = (p.crop || "").trim(); if (c) { crops[c.toLowerCase()] = (crops[c.toLowerCase()] || 0) + 1; if (i === 0) lastCrop = c; } });
+  return { plans: (plans || []).length, parcels: (parcels || []).length, lastCrop, crops: Object.keys(crops) };
 }
 
 // ---------- Bibliothèque partagée : réutilisation par CULTURE + SECTEUR ----------
@@ -600,6 +663,90 @@ async function handlePlanGet(req, res) {
   if (!plan || plan.user_id !== user.id) return sendJson(res, 404, { error: "Plan introuvable." });
   sendJson(res, 200, { plan });
 }
+// --- Parcelles enregistrées ---
+async function handleParcelsList(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const rows = await listParcelsForUser(user.id);
+  // Normalise geom (texte JSON en base, objet en local) pour renvoyer toujours un objet zone.
+  const parcels = (rows || []).map((p) => { let z = p.geom; if (typeof z === "string") { try { z = JSON.parse(z); } catch (e) { z = null; } } return { id: p.id, name: p.name, zone: cleanZone(z), created_at: p.created_at }; }).filter((p) => p.zone);
+  sendJson(res, 200, { parcels });
+}
+async function handleParcelSave(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Connectez-vous pour enregistrer une parcelle." });
+  if (!rateOk("parcel:" + user.id, 60, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Trop d'enregistrements aujourd'hui." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const zone = cleanZone(p.zone);
+  if (!zone) return sendJson(res, 400, { error: "Dessinez d'abord une parcelle valide sur la carte." });
+  const name = (String(p.name || "").trim().slice(0, 80)) || ("Parcelle " + new Date().toLocaleDateString("fr-FR"));
+  const rec = { id: newId(), user_id: user.id, name, geom: JSON.stringify(zone), created_at: new Date().toISOString() };
+  await saveParcel(rec);
+  sendJson(res, 200, { parcel: { id: rec.id, name, zone, created_at: rec.created_at } });
+}
+async function handleParcelDelete(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  if (!p.id) return sendJson(res, 400, { error: "Parcelle manquante." });
+  await deleteParcel(user.id, String(p.id));
+  sendJson(res, 200, { ok: true });
+}
+// --- Coopérative ---
+async function coopPublic(coop) { return coop ? { id: coop.id, name: coop.name, region: coop.region || null, code: coop.code, created_at: coop.created_at } : null; }
+async function handleCoopMe(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const m = await getMembership(user.id);
+  if (!m) return sendJson(res, 200, { coop: null });
+  const coop = await getCoopById(m.coop_id);
+  if (!coop) { await removeMembership(user.id); return sendJson(res, 200, { coop: null }); }
+  const members = await listCoopMembers(coop.id);
+  let animateur = null; try { const a = members.find((x) => x.role === "animateur"); if (a) { const au = await getUserById(a.user_id); animateur = au ? (au.name || au.email) : null; } } catch (e) {}
+  sendJson(res, 200, { coop: await coopPublic(coop), role: m.role, membersCount: members.length, animateur, isAnimateur: m.role === "animateur" });
+}
+async function handleCoopCreate(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Connectez-vous pour créer une coopérative." });
+  if (await getMembership(user.id)) return sendJson(res, 400, { error: "Vous faites déjà partie d'une coopérative. Quittez-la d'abord." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const name = String(p.name || "").trim().slice(0, 100); if (name.length < 2) return sendJson(res, 400, { error: "Donnez un nom à la coopérative." });
+  let code; for (let i = 0; i < 6; i++) { code = coopCode(); if (!(await getCoopByCode(code))) break; }
+  const coop = { id: newId(), name, region: String(p.region || "").trim().slice(0, 100) || null, code, owner_id: user.id, created_at: new Date().toISOString() };
+  await createCoop(coop);
+  await addMembership({ id: newId(), coop_id: coop.id, user_id: user.id, role: "animateur", joined_at: new Date().toISOString() });
+  sendJson(res, 200, { coop: await coopPublic(coop), role: "animateur" });
+}
+async function handleCoopJoin(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Connectez-vous pour rejoindre une coopérative." });
+  if (await getMembership(user.id)) return sendJson(res, 400, { error: "Vous faites déjà partie d'une coopérative." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const coop = await getCoopByCode(p.code);
+  if (!coop) return sendJson(res, 404, { error: "Code de coopérative introuvable. Vérifiez auprès de votre animateur." });
+  await addMembership({ id: newId(), coop_id: coop.id, user_id: user.id, role: "membre", joined_at: new Date().toISOString() });
+  sendJson(res, 200, { coop: await coopPublic(coop), role: "membre" });
+}
+async function handleCoopLeave(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const m = await getMembership(user.id); if (!m) return sendJson(res, 200, { ok: true });
+  const members = await listCoopMembers(m.coop_id);
+  if (m.role === "animateur" && members.length > 1) return sendJson(res, 400, { error: "En tant qu'animateur, vous ne pouvez pas quitter tant qu'il reste des membres. Transférez d'abord ou retirez les membres." });
+  await removeMembership(user.id);
+  if (members.length <= 1) { try { if (USE_DB) await sb(`/trv_coops?id=eq.${encodeURIComponent(m.coop_id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); else { const s = loadStore(); delete s.coops[m.coop_id]; saveStore(s); } } catch (e) {} }
+  sendJson(res, 200, { ok: true });
+}
+async function handleCoopOverview(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const m = await getMembership(user.id); if (!m) return sendJson(res, 404, { error: "Aucune coopérative." });
+  if (m.role !== "animateur") return sendJson(res, 403, { error: "Réservé à l'animateur de la coopérative." });
+  const coop = await getCoopById(m.coop_id);
+  const rows = await listCoopMembers(m.coop_id);
+  const members = []; const cropAgg = {}; let totalParcels = 0;
+  for (const mem of rows) {
+    let u = null; try { u = await getUserById(mem.user_id); } catch (e) {}
+    const st = await memberStats(mem.user_id);
+    totalParcels += st.parcels;
+    st.crops.forEach((c) => { cropAgg[c] = (cropAgg[c] || 0) + 1; });
+    members.push({ name: (u && u.name) || "—", region: (u && u.region) || null, role: mem.role, plans: st.plans, parcels: st.parcels, lastCrop: st.lastCrop, joined_at: mem.joined_at });
+  }
+  const cultures = Object.keys(cropAgg).map((c) => ({ culture: c, membres: cropAgg[c] })).sort((a, b) => b.membres - a.membres);
+  sendJson(res, 200, { coop: await coopPublic(coop), totals: { membres: rows.length, parcelles: totalParcels, cultures: cultures.length }, members, cultures });
+}
 async function handleChat(req, res) {
   if (!API_KEY) return sendJson(res, 500, { error: "Clé IA manquante (ANTHROPIC_API_KEY)." });
   const user = await currentUser(req);
@@ -734,6 +881,7 @@ function serveStatic(req, res) {
   if (urlPath === "/tableau" || urlPath === "/dashboard") urlPath = "/tableau.html";
   if (urlPath === "/comprendre") urlPath = "/comprendre.html";
   if (urlPath === "/conseiller" || urlPath === "/chat") urlPath = "/conseiller.html";
+  if (urlPath === "/cooperative" || urlPath === "/coop") urlPath = "/cooperative.html";
   const safe = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(PUBLIC_DIR, safe);
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end("Accès interdit"); }
@@ -754,6 +902,14 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && url === "/api/plan") return handlePlan(req, res);
   if (req.method === "GET" && url === "/api/plans") return handlePlansList(req, res);
   if (req.method === "GET" && url === "/api/plan") return handlePlanGet(req, res);
+  if (req.method === "GET" && url === "/api/parcels") return handleParcelsList(req, res);
+  if (req.method === "POST" && url === "/api/parcels") return handleParcelSave(req, res);
+  if (req.method === "POST" && url === "/api/parcels/delete") return handleParcelDelete(req, res);
+  if (req.method === "GET" && url === "/api/coop/me") return handleCoopMe(req, res);
+  if (req.method === "POST" && url === "/api/coop/create") return handleCoopCreate(req, res);
+  if (req.method === "POST" && url === "/api/coop/join") return handleCoopJoin(req, res);
+  if (req.method === "POST" && url === "/api/coop/leave") return handleCoopLeave(req, res);
+  if (req.method === "GET" && url === "/api/coop/overview") return handleCoopOverview(req, res);
   if (req.method === "POST" && url === "/api/ingest") return handleIngest(req, res);
   if (req.method === "POST" && url === "/api/readings/clear") return handleReadingsClear(req, res);
   if (req.method === "GET" && url === "/api/station") return handleStation(req, res);

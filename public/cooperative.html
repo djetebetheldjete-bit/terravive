@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terravive — Coopérative</title>
+<meta name="description" content="Regroupez-vous en coopérative : un animateur suit les parcelles et cultures des membres, pour acheter les intrants en gros et vendre ensemble.">
+<style>
+  :root{
+    --leaf:#2E7D46; --deep:#174D2B; --sun:#C58A2A; --line:#dce6da;
+    --bg:#eef4ec; --surface:#ffffff; --surface2:#f4f9f2;
+    --ink:#15251B; --soft:#53625a; --faint:#8a988e;
+    --good:#2E8B6F; --warn:#C58A2A; --bad:#c0392b;
+    --shadow:0 8px 28px rgba(20,50,30,.08); --f-display:Georgia,'Times New Roman',serif;
+  }
+  :root[data-theme="clair"]{ --leaf:#2f855a; --deep:#276749; --sun:#b7791f; --line:#e6e9ec; --bg:#f3f5f7; --surface:#ffffff; --surface2:#f7f9fb; --ink:#1a2430; --soft:#5a6675; --faint:#95a0ae; --shadow:0 8px 28px rgba(30,40,60,.07); }
+  :root[data-theme="sombre"]{ --leaf:#5bbf84; --deep:#8fd6a9; --sun:#e0b25a; --line:#223228; --bg:#0e1712; --surface:#15241b; --surface2:#1a2c21; --ink:#e7f1ea; --soft:#a6b7ad; --faint:#7c8d83; --shadow:0 10px 30px rgba(0,0,0,.35); }
+  :root[data-theme="terre"]{ --leaf:#7a6a3a; --deep:#5c4a22; --sun:#c7892f; --line:#e6ddcb; --bg:#f4efe3; --surface:#fffdf8; --surface2:#f7f1e5; --ink:#2a2416; --soft:#6b6150; --faint:#9a8f78; --shadow:0 8px 28px rgba(80,60,20,.1); }
+
+  *{ box-sizing:border-box; } html,body{ margin:0; }
+  body{ font-family:"Segoe UI",system-ui,Arial,sans-serif; color:var(--ink); background:var(--bg); line-height:1.55; }
+  a{ color:var(--leaf); text-decoration:none; font-weight:600; }
+  .top{ position:sticky; top:0; z-index:10; background:var(--surface); border-bottom:1px solid var(--line); }
+  .topin{ max-width:900px; margin:0 auto; padding:12px 18px; display:flex; align-items:center; gap:12px; }
+  .brand{ display:flex; align-items:center; gap:9px; font-family:var(--f-display); font-weight:700; font-size:18px; color:var(--deep); }
+  .brand .em{ width:30px; height:30px; } .spacer{ flex:1; }
+  select.sel,input.sel{ padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); font:inherit; }
+  .btn{ padding:9px 14px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); font:inherit; font-weight:600; cursor:pointer; }
+  .btn.primary{ background:var(--leaf); color:#fff; border-color:var(--leaf); }
+  .btn:disabled{ opacity:.6; cursor:default; }
+  main{ max-width:900px; margin:0 auto; padding:22px 18px 50px; }
+  h1{ font-family:var(--f-display); font-size:1.8rem; color:var(--deep); margin:.1em 0 .1em; }
+  .lead{ color:var(--soft); margin:0 0 16px; }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin:14px 0; box-shadow:var(--shadow); }
+  .card h2{ font-size:1.1rem; color:var(--deep); margin:.1em 0 .5em; }
+  .muted{ color:var(--soft); font-size:.9rem; } .faint{ color:var(--faint); font-size:.82rem; }
+  .row{ display:flex; gap:9px; flex-wrap:wrap; align-items:center; }
+  .stack{ display:flex; flex-direction:column; gap:9px; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; } @media(max-width:680px){ .grid2{ grid-template-columns:1fr; } }
+  .stat{ display:flex; gap:12px; flex-wrap:wrap; }
+  .tile{ flex:1; min-width:110px; border:1px solid var(--line); border-radius:11px; padding:11px 13px; background:var(--surface2); }
+  .tile b{ font-size:1.5rem; color:var(--deep); display:block; } .tile span{ font-size:.78rem; color:var(--faint); }
+  .codebox{ display:inline-flex; align-items:center; gap:10px; background:var(--surface2); border:1px dashed var(--leaf); border-radius:10px; padding:8px 14px; font-weight:800; letter-spacing:3px; font-size:1.2rem; color:var(--deep); }
+  table{ width:100%; border-collapse:collapse; font-size:.9rem; margin-top:6px; }
+  th,td{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); } th{ color:var(--deep); font-size:.82rem; }
+  td .crop{ text-transform:capitalize; }
+  .bar{ height:10px; border-radius:999px; background:var(--surface2); border:1px solid var(--line); overflow:hidden; } .bar>span{ display:block; height:100%; background:var(--leaf); border-radius:999px; }
+  .meter{ margin:7px 0; } .meter .t{ display:flex; justify-content:space-between; font-size:.86rem; margin-bottom:3px; } .meter .t b{ text-transform:capitalize; }
+  .err{ color:var(--bad); font-size:.86rem; margin-top:6px; } .ok{ color:var(--good); font-size:.86rem; margin-top:6px; }
+  .note{ color:var(--faint); font-size:.8rem; }
+</style>
+</head>
+<body>
+  <div class="top"><div class="topin">
+    <span class="brand"><span class="em"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" fill="var(--leaf)" opacity=".14"/><path d="M24 38c0-9 4-15 12-18-2 10-6 15-12 18zM24 38c0-9-4-15-12-18 2 10 6 15 12 18zM24 38V20" stroke="var(--leaf)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Terravive</span>
+    <span class="spacer"></span>
+    <a href="/tableau" class="btn">← Tableau de bord</a>
+    <select class="sel" id="themeSel" title="Thème">
+      <option value="nature">Nature</option><option value="clair">Clair</option><option value="sombre">Sombre</option><option value="terre">Terre</option>
+    </select>
+  </div></div>
+
+  <main>
+    <h1>Ma coopérative</h1>
+    <p class="lead">Se regrouper permet à un <b>animateur</b> (relais) de suivre les parcelles et les cultures des membres — pour <b>acheter les intrants en gros</b>, <b>partager le matériel</b> et <b>vendre la récolte ensemble</b>, à meilleur prix.</p>
+    <div id="view"><div class="card"><div class="muted">Chargement…</div></div></div>
+    <p class="note">Confidentialité : au sein d'une coopérative, l'animateur voit le nom, la région, le nombre de parcelles et les cultures des membres — pas leurs données personnelles détaillées.</p>
+  </main>
+
+  <script>
+    const $=(id)=>document.getElementById(id);
+    function esc(s){ const d=document.createElement("div"); d.textContent=(s==null?"":s); return d.innerHTML; }
+    (function(){ var sel=$("themeSel"); var t="nature"; try{ t=localStorage.getItem("trv-theme")||"nature"; }catch(e){} document.documentElement.setAttribute("data-theme",t); if(sel){ sel.value=t; sel.addEventListener("change",function(){ document.documentElement.setAttribute("data-theme",sel.value); try{ localStorage.setItem("trv-theme",sel.value); }catch(e){} }); } })();
+
+    const view=$("view");
+    function card(html){ return '<div class="card">'+html+'</div>'; }
+
+    async function api(path, method, body){
+      const opt={ method:method||"GET" };
+      if(body){ opt.headers={"content-type":"application/json"}; opt.body=JSON.stringify(body); }
+      const r=await fetch(path, opt); let d={}; try{ d=await r.json(); }catch(e){}
+      return { ok:r.ok, status:r.status, d:d };
+    }
+
+    async function load(){
+      const r=await api("/api/coop/me");
+      if(r.status===401){ view.innerHTML=card('<h2>Connexion requise</h2><div class="muted">Pour créer ou rejoindre une coopérative, <a href="/app">connectez-vous</a> (gratuit).</div>'); return; }
+      if(r.d && r.d.coop){ if(r.d.isAnimateur){ renderAnimateur(r.d); } else { renderMembre(r.d); } }
+      else { renderNoCoop(); }
+    }
+
+    function renderNoCoop(){
+      view.innerHTML =
+        '<div class="grid2">'
+        + card('<h2>Créer une coopérative</h2><div class="muted">Vous devenez l\'<b>animateur</b> : vous recevez un code à partager, et vous suivez les membres.</div>'
+            + '<div class="stack" style="margin-top:12px;"><input class="sel" id="coName" placeholder="Nom (ex. Coopérative des maraîchers de San-Pédro)" maxlength="100"><input class="sel" id="coRegion" placeholder="Région / localité (facultatif)" maxlength="100"><button class="btn primary" id="coCreate" type="button">Créer la coopérative</button><div class="err" id="coErr1"></div></div>')
+        + card('<h2>Rejoindre une coopérative</h2><div class="muted">Entrez le <b>code</b> donné par votre animateur.</div>'
+            + '<div class="stack" style="margin-top:12px;"><input class="sel" id="coCode" placeholder="Code (6 caractères, ex. K7P2QX)" maxlength="12" style="letter-spacing:3px;text-transform:uppercase;"><button class="btn primary" id="coJoin" type="button">Rejoindre</button><div class="err" id="coErr2"></div></div>')
+        + '</div>';
+      $("coCreate").addEventListener("click", async function(){
+        const name=$("coName").value.trim(); const region=$("coRegion").value.trim(); const e=$("coErr1"); e.textContent="";
+        if(name.length<2){ e.textContent="Donnez un nom à la coopérative."; return; }
+        this.disabled=true; const r=await api("/api/coop/create","POST",{name:name,region:region});
+        this.disabled=false; if(!r.ok){ e.textContent=(r.d&&r.d.error)||"Création impossible."; return; } load();
+      });
+      $("coJoin").addEventListener("click", async function(){
+        const code=$("coCode").value.trim(); const e=$("coErr2"); e.textContent="";
+        if(!code){ e.textContent="Entrez le code."; return; }
+        this.disabled=true; const r=await api("/api/coop/join","POST",{code:code});
+        this.disabled=false; if(!r.ok){ e.textContent=(r.d&&r.d.error)||"Code introuvable."; return; } load();
+      });
+    }
+
+    function renderMembre(d){
+      const c=d.coop;
+      view.innerHTML = card(
+        '<h2>'+esc(c.name)+'</h2>'
+        + '<div class="muted">'+(c.region?('Région : '+esc(c.region)+' · '):'')+'Animateur : <b>'+esc(d.animateur||"—")+'</b> · '+esc(d.membersCount)+' membre(s)</div>'
+        + '<div class="ok" style="margin-top:10px;">Vous êtes membre de cette coopérative. Vos itinéraires et parcelles aident l\'animateur à organiser les achats groupés et la vente commune.</div>'
+        + '<div class="row" style="margin-top:14px;"><button class="btn" id="coLeave" type="button" style="border-color:#c0392b;color:#c0392b;">Quitter la coopérative</button></div>'
+        + '<div class="err" id="coErr3"></div>'
+      );
+      wireLeave();
+    }
+
+    function renderAnimateur(d){
+      const c=d.coop;
+      view.innerHTML = card(
+        '<h2>'+esc(c.name)+'</h2>'
+        + '<div class="muted">'+(c.region?('Région : '+esc(c.region)+' · '):'')+'Vous êtes <b>animateur</b>.</div>'
+        + '<div class="row" style="margin-top:12px;align-items:center;"><span class="muted">Code à partager :</span> <span class="codebox" id="coCodeBox">'+esc(c.code)+'</span> <button class="btn" id="coCopy" type="button">Copier</button></div>'
+        + '<div class="faint" style="margin-top:6px;">Donnez ce code aux agriculteurs pour qu\'ils rejoignent la coopérative depuis cette page.</div>'
+      ) + '<div id="coOverview">'+card('<div class="muted">Chargement des membres…</div>')+'</div>'
+        + card('<div class="row"><button class="btn" id="coLeave" type="button" style="border-color:#c0392b;color:#c0392b;">Quitter / supprimer la coopérative</button></div><div class="err" id="coErr3"></div>');
+      $("coCopy").addEventListener("click", function(){ try{ navigator.clipboard && navigator.clipboard.writeText(c.code); }catch(e){} this.textContent="Copié ✓"; const t=this; setTimeout(function(){ t.textContent="Copier"; },1200); });
+      wireLeave();
+      loadOverview();
+    }
+
+    async function loadOverview(){
+      const box=$("coOverview"); const r=await api("/api/coop/overview");
+      if(!r.ok){ box.innerHTML=card('<div class="muted">'+((r.d&&r.d.error)||"Impossible de charger les membres.")+'</div>'); return; }
+      const d=r.d; const t=d.totals||{};
+      let html='<h2>Vue d\'ensemble</h2>'
+        + '<div class="stat" style="margin-top:8px;"><div class="tile"><b>'+t.membres+'</b><span>membres</span></div><div class="tile"><b>'+t.parcelles+'</b><span>parcelles enregistrées</span></div><div class="tile"><b>'+t.cultures+'</b><span>cultures différentes</span></div></div>';
+      // Membres
+      html+='<h2 style="margin-top:16px;">Membres</h2>';
+      if(!d.members||!d.members.length){ html+='<div class="muted">Aucun membre pour l\'instant. Partagez le code.</div>'; }
+      else {
+        html+='<div style="overflow-x:auto;"><table><tr><th>Nom</th><th>Région</th><th>Rôle</th><th>Parcelles</th><th>Itinéraires</th><th>Dernière culture</th></tr>'
+          + d.members.map(function(m){ return '<tr><td>'+esc(m.name)+'</td><td>'+esc(m.region||"—")+'</td><td>'+(m.role==="animateur"?"Animateur":"Membre")+'</td><td>'+m.parcels+'</td><td>'+m.plans+'</td><td class="crop">'+esc(m.lastCrop||"—")+'</td></tr>'; }).join("")
+          + '</table></div>';
+      }
+      // Cultures agrégées → achats groupés / mise en marché
+      html+='<h2 style="margin-top:16px;">Cultures de la coopérative</h2>'
+        + '<div class="muted">Base pour <b>acheter les intrants en gros</b> et <b>vendre ensemble</b> : plus une culture est partagée, plus le groupe pèse pour négocier.</div>';
+      const cult=d.cultures||[];
+      if(!cult.length){ html+='<div class="muted" style="margin-top:8px;">Pas encore de cultures déclarées (les membres créent leurs itinéraires).</div>'; }
+      else {
+        const max=Math.max.apply(null,cult.map(function(x){return x.membres;}))||1;
+        html+='<div style="margin-top:10px;">'+cult.map(function(x){ const w=Math.max(6,Math.round(100*x.membres/max)); return '<div class="meter"><div class="t"><b>'+esc(x.culture)+'</b><span>'+x.membres+' membre'+(x.membres>1?'s':'')+'</span></div><div class="bar"><span style="width:'+w+'%"></span></div></div>'; }).join("")+'</div>';
+      }
+      box.innerHTML=card(html);
+    }
+
+    function wireLeave(){
+      const b=$("coLeave"); if(!b) return;
+      let armed=false;
+      b.addEventListener("click", async function(){
+        const e=$("coErr3"); if(e) e.textContent="";
+        if(!armed){ armed=true; const t=b.textContent; b.textContent="Confirmer ?"; setTimeout(function(){ armed=false; b.textContent=t; },3500); return; }
+        b.disabled=true; const r=await api("/api/coop/leave","POST",{});
+        b.disabled=false; if(!r.ok){ if(e) e.textContent=(r.d&&r.d.error)||"Action impossible."; armed=false; return; } load();
+      });
+    }
+
+    load();
+  </script>
+</body>
+</html>

@@ -160,6 +160,7 @@
       <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V6a2 2 0 0 1 2-2h11l3 3v12.5"/><path d="M8 8h7M8 12h9M8 16h5"/></svg> Itinéraire de culture</a>
       <a href="/arduino"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="9" rx="2"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/><path d="M2 12h2M20 12h2"/></svg> Automatisation</a>
       <a href="/conseiller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.6 8.6 0 0 1-3.9-.9L3 20l1.4-4.1A8.4 8.4 0 0 1 3.5 11.5 8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg> Conseiller</a>
+      <a href="/cooperative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M15 19a4.5 4.5 0 0 1 6 0"/></svg> Coopérative</a>
       <a href="/comprendre"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 5.5V20.5"/><path d="M8 7h8M8 11h6"/></svg> Comprendre</a>
     </nav>
     <div class="foot" id="sideFoot"></div>
@@ -229,6 +230,11 @@
               <button class="btn" id="btnEau" type="button">Besoin en eau</button>
               <button class="btn" id="btnPlant" type="button">Quoi planter&nbsp;?</button>
             </div>
+            <div class="maprow" id="parcelSaveRow" style="display:none;align-items:center;">
+              <input class="sel" id="parcelName" style="flex:1;min-width:150px;" placeholder="Nom de cette parcelle (ex. Champ derrière la maison)" maxlength="80" autocomplete="off">
+              <button class="btn" id="btnSaveParcel" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M5 3h12l2 2v16l-7-4-7 4z"/></svg> Enregistrer la parcelle</button>
+            </div>
+            <div id="parcelList" class="section-gap"></div>
             <div class="muted section-gap" id="vStatus" style="min-height:1em;"></div>
             <div id="vOut"></div>
           </div>
@@ -295,6 +301,7 @@
               <a href="/app"><span>Nouvel itinéraire de culture</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
               <a href="/arduino"><span>Nouveau projet d'automatisation</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
               <a href="/conseiller"><span>Poser une question au conseiller</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
+              <a href="/cooperative"><span>Ma coopérative</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
             </div>
             <div id="recentPlans" class="list section-gap"></div>
           </div>
@@ -453,7 +460,48 @@
   function ymd(dt){ return dt.toISOString().slice(0,10); }
   function daysAgo(n){ const dt=new Date(); dt.setDate(dt.getDate()-n); return dt; }
 
-  function showControls(){ $("verteaControls").style.display="flex"; $("mapSub").textContent="Parcelle enregistrée. Lancez une analyse satellite ci-dessous (15–40 s)."; }
+  function showControls(){ $("verteaControls").style.display="flex"; var r=$("parcelSaveRow"); if(r) r.style.display="flex"; $("mapSub").textContent="Parcelle prête. Enregistrez-la pour la revoir plus tard, et lancez une analyse satellite (15–40 s)."; }
+
+  // ===== Parcelles enregistrées (limites sauvegardées sur le compte) =====
+  let myParcels=[];
+  async function loadParcels(){
+    try{ const r=await fetch("/api/parcels"); const d=await r.json(); if(r.ok){ myParcels=d.parcels||[]; renderParcels(); } }catch(e){}
+  }
+  function renderParcels(){
+    const box=$("parcelList"); if(!box) return;
+    if(!myParcels.length){ box.innerHTML='<div class="muted" style="font-size:.84rem;">Aucune parcelle enregistrée. Dessinez votre champ puis « Enregistrer la parcelle » pour le retrouver ici.</div>'; return; }
+    box.innerHTML='<div style="font-weight:700;color:var(--leaf);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Mes parcelles enregistrées</div>'
+      + '<div style="display:flex;flex-direction:column;gap:6px;">'
+      + myParcels.map(function(p){ const when=p.created_at?(" · "+new Date(p.created_at).toLocaleDateString("fr-FR")):""; const kind=p.zone&&p.zone.polygon?"polygone":"rectangle"; return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--surface2);"><span style="flex:1;font-weight:600;min-width:120px;">'+esc(p.name)+'<span class="muted" style="font-weight:400;font-size:.8rem;"> · '+kind+when+'</span></span><button class="btn" type="button" data-view="'+esc(p.id)+'">Voir sur la carte</button><button class="btn" type="button" data-del="'+esc(p.id)+'" title="Supprimer" style="border-color:#c0392b;color:#c0392b;">Supprimer</button></div>'; }).join("")
+      + '</div>';
+    box.querySelectorAll("[data-view]").forEach(function(b){ b.addEventListener("click", function(){ const p=myParcels.find(function(x){return x.id===b.getAttribute("data-view");}); if(p&&p.zone) viewParcel(p.zone); }); });
+    box.querySelectorAll("[data-del]").forEach(function(b){ b.addEventListener("click", function(){ delParcel(b.getAttribute("data-del"), b); }); });
+  }
+  function viewParcel(zone){
+    if(!MAP){ return; }
+    if(drawGroup) drawGroup.clearLayers();
+    if(ndviLayer){ MAP.removeLayer(ndviLayer); ndviLayer=null; }
+    restoreZone(zone);
+    try{ localStorage.setItem("trv-parcelle", JSON.stringify(zone)); }catch(e){}
+    $("vStatus").textContent="Parcelle rechargée. Vous pouvez relancer une analyse satellite.";
+  }
+  async function saveParcelNow(){
+    if(!zoneActive){ $("vStatus").textContent="Dessinez d'abord une parcelle."; return; }
+    const name=($("parcelName").value||"").trim();
+    const btn=$("btnSaveParcel"); btn.disabled=true;
+    try{
+      const r=await fetch("/api/parcels",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ name:name, zone:zoneActive })});
+      const d=await r.json();
+      if(!r.ok){ $("vStatus").textContent="Erreur : "+(d.error||"enregistrement impossible."); }
+      else { $("parcelName").value=""; $("vStatus").textContent="Parcelle « "+((d.parcel&&d.parcel.name)||"")+" » enregistrée."; await loadParcels(); }
+    }catch(e){ $("vStatus").textContent="Serveur injoignable."; }
+    btn.disabled=false;
+  }
+  async function delParcel(id, btn){
+    if(btn && btn.dataset.armed!=="1"){ btn.dataset.armed="1"; const t=btn.textContent; btn.textContent="Confirmer ?"; setTimeout(function(){ btn.dataset.armed=""; btn.textContent=t; },3500); return; }
+    try{ await fetch("/api/parcels/delete",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ id:id })}); }catch(e){}
+    await loadParcels();
+  }
   function setZoneFromLayer(layer){
     if(layer instanceof L.Rectangle){ const b=layer.getBounds(); zoneActive={ bbox:[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()] }; }
     else if(layer.getLatLngs){ zoneActive={ polygon: layer.getLatLngs()[0].map(p=>[p.lng,p.lat]) }; }
@@ -481,7 +529,7 @@
       });
       MAP.addControl(dc);
       MAP.on(L.Draw.Event.CREATED, (e)=>{ drawGroup.clearLayers(); if(ndviLayer){MAP.removeLayer(ndviLayer);ndviLayer=null;} drawGroup.addLayer(e.layer); setZoneFromLayer(e.layer); });
-      MAP.on(L.Draw.Event.DELETED, ()=>{ zoneActive=null; try{localStorage.removeItem("trv-parcelle");}catch(e){} $("verteaControls").style.display="none"; $("vOut").innerHTML=""; $("mapSub").textContent="Dessinez votre parcelle sur la carte, puis lancez une analyse satellite."; });
+      MAP.on(L.Draw.Event.DELETED, ()=>{ zoneActive=null; try{localStorage.removeItem("trv-parcelle");}catch(e){} $("verteaControls").style.display="none"; var r=$("parcelSaveRow"); if(r) r.style.display="none"; $("vOut").innerHTML=""; $("mapSub").textContent="Dessinez votre parcelle sur la carte, puis lancez une analyse satellite."; });
     }
     if(sv){ restoreZone(sv); }
     setTimeout(()=>{ try{ MAP.invalidateSize(); }catch(e){} }, 300);
@@ -692,6 +740,7 @@ void loop() {
     // Actualisation automatique des mesures du capteur (toutes les 60 s) :
     // dès qu'une vraie carte envoie des données, elles apparaissent sans recharger la page.
     setInterval(refresh, 60000);
+    loadParcels();
     if(me && me.isAdmin){ loadAdminQuestions(); }
   }
   // Formateur : ce que les cultivateurs demandent au conseiller.
@@ -721,6 +770,7 @@ void loop() {
 
   $("themeSel").addEventListener("change", (e)=>applyTheme(e.target.value));
   (function syncThemeSel(){ let t="nature"; try{ t=localStorage.getItem("trv-theme")||"nature"; }catch(e){} $("themeSel").value=t; })();
+  { const b=$("btnSaveParcel"); if(b) b.addEventListener("click", saveParcelNow); }
   $("btnNdvi").addEventListener("click", runNdvi);
   $("btnEau").addEventListener("click", runIrrigation);
   $("btnPlant").addEventListener("click", runPlantation);
