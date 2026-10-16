@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terravive — Diagnostic par photo</title>
+<meta name="description" content="Prenez en photo une plante malade : Terravive propose une cause probable et des solutions durables, adaptées à la Côte d'Ivoire.">
+<style>
+  :root{
+    --leaf:#2E7D46; --deep:#174D2B; --sun:#C58A2A; --line:#dce6da;
+    --bg:#eef4ec; --surface:#ffffff; --surface2:#f4f9f2;
+    --ink:#15251B; --soft:#53625a; --faint:#8a988e;
+    --good:#2E8B6F; --warn:#C58A2A; --bad:#c0392b;
+    --shadow:0 8px 28px rgba(20,50,30,.08); --f-display:Georgia,'Times New Roman',serif;
+  }
+  :root[data-theme="clair"]{ --leaf:#2f855a; --deep:#276749; --sun:#b7791f; --line:#e6e9ec; --bg:#f3f5f7; --surface:#ffffff; --surface2:#f7f9fb; --ink:#1a2430; --soft:#5a6675; --faint:#95a0ae; --shadow:0 8px 28px rgba(30,40,60,.07); }
+  :root[data-theme="sombre"]{ --leaf:#5bbf84; --deep:#8fd6a9; --sun:#e0b25a; --line:#223228; --bg:#0e1712; --surface:#15241b; --surface2:#1a2c21; --ink:#e7f1ea; --soft:#a6b7ad; --faint:#7c8d83; --shadow:0 10px 30px rgba(0,0,0,.35); }
+  :root[data-theme="terre"]{ --leaf:#7a6a3a; --deep:#5c4a22; --sun:#c7892f; --line:#e6ddcb; --bg:#f4efe3; --surface:#fffdf8; --surface2:#f7f1e5; --ink:#2a2416; --soft:#6b6150; --faint:#9a8f78; --shadow:0 8px 28px rgba(80,60,20,.1); }
+
+  *{ box-sizing:border-box; } html,body{ margin:0; }
+  body{ font-family:"Segoe UI",system-ui,Arial,sans-serif; color:var(--ink); background:var(--bg); line-height:1.55; }
+  a{ color:var(--leaf); text-decoration:none; font-weight:600; }
+  .top{ position:sticky; top:0; z-index:10; background:var(--surface); border-bottom:1px solid var(--line); }
+  .topin{ max-width:820px; margin:0 auto; padding:12px 18px; display:flex; align-items:center; gap:12px; }
+  .brand{ display:flex; align-items:center; gap:9px; font-family:var(--f-display); font-weight:700; font-size:18px; color:var(--deep); }
+  .brand .em{ width:30px; height:30px; } .spacer{ flex:1; }
+  select.sel{ padding:7px 10px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); font:inherit; }
+  .btn{ padding:9px 15px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font:inherit; font-weight:600; cursor:pointer; }
+  .btn.primary{ background:var(--leaf); color:#fff; border-color:var(--leaf); }
+  .btn:disabled{ opacity:.55; cursor:default; }
+  main{ max-width:820px; margin:0 auto; padding:20px 18px 34px; }
+  h1{ font-family:var(--f-display); font-size:1.7rem; color:var(--deep); margin:.1em 0 .1em; }
+  .lead{ color:var(--soft); margin:0 0 16px; }
+
+  .panel{ background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:16px; margin-bottom:16px; }
+  .panel h2{ font-size:1.02rem; margin:0 0 10px; color:var(--deep); }
+
+  /* Zone photo */
+  .drop{ border:2px dashed var(--line); border-radius:14px; background:var(--surface2); padding:26px 16px; text-align:center; cursor:pointer; transition:border-color .15s; }
+  .drop:hover{ border-color:var(--leaf); }
+  .drop .big{ font-size:2.2rem; line-height:1; }
+  .drop .t{ font-weight:700; color:var(--deep); margin:8px 0 3px; }
+  .drop .s{ color:var(--faint); font-size:.86rem; }
+  .preview{ display:none; text-align:center; }
+  .preview img{ max-width:100%; max-height:46vh; border-radius:12px; border:1px solid var(--line); }
+  .pvactions{ display:flex; gap:9px; justify-content:center; flex-wrap:wrap; margin-top:12px; }
+
+  .field{ margin-top:12px; }
+  .field label{ display:block; font-size:.86rem; font-weight:600; color:var(--soft); margin-bottom:5px; }
+  .field input, .field textarea{ width:100%; padding:11px 13px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font:inherit; }
+  .field textarea{ min-height:70px; resize:vertical; }
+  .go{ margin-top:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+  .res{ display:none; }
+  .doc{ background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:4px 18px 16px; }
+  .doc h3{ font-family:var(--f-display); color:var(--deep); font-size:1.12rem; margin:16px 0 4px; padding-top:12px; border-top:1px solid var(--line); }
+  .doc h3:first-of-type{ border-top:0; padding-top:4px; }
+  .doc p{ margin:.4em 0; } .doc ul{ margin:.4em 0 .4em 18px; } .doc li{ margin:.2em 0; } .doc b{ color:var(--deep); }
+  .resbar{ display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin:0 0 10px; }
+  .err{ background:color-mix(in srgb,var(--bad) 12%,var(--surface)); border:1px solid var(--bad); color:var(--bad); padding:11px 13px; border-radius:11px; }
+  .typing{ color:var(--faint); font-size:.92rem; padding:10px 2px; }
+  .note{ color:var(--faint); font-size:.8rem; margin-top:12px; }
+  .warn{ background:color-mix(in srgb,var(--sun) 14%,var(--surface)); border:1px solid var(--sun); color:var(--ink); padding:11px 13px; border-radius:11px; font-size:.88rem; }
+  .hidden{ display:none !important; }
+</style>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2E7D46">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<script src="/pwa.js" defer></script>
+<script src="/voice.js"></script>
+</head>
+<body>
+  <div class="top"><div class="topin">
+    <span class="brand"><span class="em"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" fill="var(--leaf)" opacity=".14"/><path d="M24 38c0-9 4-15 12-18-2 10-6 15-12 18zM24 38c0-9-4-15-12-18 2 10 6 15 12 18zM24 38V20" stroke="var(--leaf)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Terravive</span>
+    <span class="spacer"></span>
+    <a href="/conseiller" class="btn">Conseiller</a>
+    <a href="/tableau" class="btn">← Tableau de bord</a>
+    <select class="sel" id="themeSel" title="Thème">
+      <option value="nature">Nature</option><option value="clair">Clair</option><option value="sombre">Sombre</option><option value="terre">Terre</option>
+    </select>
+  </div></div>
+
+  <main>
+    <h1>Diagnostic par photo</h1>
+    <p class="lead">Une plante malade, des taches, des trous, un jaunissement ? Prenez-la en photo : Terravive propose une <b>cause probable</b> et des <b>solutions durables</b> à portée de main. Une photo a ses limites — en cas de doute, demandez aussi l'avis d'un technicien.</p>
+
+    <div class="note warn" id="loginNote" style="display:none;">Pour utiliser le diagnostic, <a href="/app">connectez-vous</a> (gratuit). Vos photos servent uniquement à l'analyse et ne sont pas publiées.</div>
+
+    <div class="panel" id="capturePanel">
+      <h2>1. La photo</h2>
+      <input type="file" id="fileInput" accept="image/*" capture="environment" class="hidden">
+      <div class="drop" id="drop">
+        <div class="big">📷</div>
+        <div class="t">Prendre une photo ou choisir une image</div>
+        <div class="s">Visez la partie atteinte de près, à la lumière du jour. Le dessus et le dessous de la feuille aident.</div>
+      </div>
+      <div class="preview" id="preview">
+        <img id="previewImg" alt="Aperçu de la photo">
+        <div class="pvactions">
+          <button class="btn" type="button" id="retakeBtn">Changer de photo</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="cropInput">Quelle culture ? (facultatif, mais ça aide)</label>
+        <input id="cropInput" placeholder="ex. tomate, cacao, maïs, manioc…" maxlength="80" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="descInput">Ce que vous observez (facultatif)</label>
+        <textarea id="descInput" placeholder="ex. depuis 3 jours, les feuilles du bas ont des taches brunes et se dessèchent" maxlength="500"></textarea>
+      </div>
+
+      <div class="go">
+        <button class="btn primary" type="button" id="analyzeBtn" disabled>Analyser la photo</button>
+        <span class="note" id="sizeNote"></span>
+      </div>
+    </div>
+
+    <div class="res" id="res">
+      <div class="resbar">
+        <h2 style="margin:0;color:var(--deep);">Diagnostic</h2>
+        <span class="spacer"></span>
+        <button class="btn" type="button" id="speakBtn" title="Lire à voix haute">🔊 Écouter</button>
+        <button class="btn" type="button" id="againBtn">Nouvelle photo</button>
+      </div>
+      <div id="resBody"></div>
+    </div>
+
+    <p class="note">Les conseils sont à visée pédagogique et durable. Pour un problème grave, une forte propagation ou un doute, confrontez le diagnostic à un agent agricole local ou à l'animateur de votre coopérative.</p>
+  </main>
+
+  <script>
+    const $=(id)=>document.getElementById(id);
+    function esc(s){ const d=document.createElement("div"); d.textContent=(s==null?"":s); return d.innerHTML; }
+
+    // Thème partagé
+    (function(){ var sel=$("themeSel"); var t="nature"; try{ t=localStorage.getItem("trv-theme")||"nature"; }catch(e){} document.documentElement.setAttribute("data-theme",t); if(sel){ sel.value=t; sel.addEventListener("change",function(){ document.documentElement.setAttribute("data-theme",sel.value); try{ localStorage.setItem("trv-theme",sel.value); }catch(e){} }); } })();
+
+    // Rendu Markdown léger : ## titres, **gras**, listes, paragraphes
+    function renderMd(t){
+      const lines = String(t||"").split(/\r?\n/); let out=""; let inList=false;
+      function close(){ if(inList){ out+="</ul>"; inList=false; } }
+      for(let ln of lines){
+        if(/^\s*#{2,3}\s+/.test(ln)){ close(); out+="<h3>"+esc(ln.replace(/^\s*#{2,3}\s+/,""))+"</h3>"; continue; }
+        if(/^\s*[-*]\s+/.test(ln)){ if(!inList){ out+="<ul>"; inList=true; } out+="<li>"+esc(ln.replace(/^\s*[-*]\s+/,"")).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>")+"</li>"; continue; }
+        close();
+        if(ln.trim()!=="") out+="<p>"+esc(ln).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>")+"</p>";
+      }
+      close();
+      return out || ("<p>"+esc(t)+"</p>");
+    }
+
+    let imgData=null;       // data URL JPEG réduite, prête à envoyer
+    let lastText="";        // texte du diagnostic (pour la lecture)
+    let speaking=false;
+
+    // Réduit l'image côté navigateur (max 1280 px, JPEG ~0.82) : léger, rapide, économe en données
+    function loadAndShrink(file){
+      if(!file || !/^image\//.test(file.type)){ alert("Choisissez une image."); return; }
+      const reader=new FileReader();
+      reader.onload=function(){
+        const img=new Image();
+        img.onload=function(){
+          const max=1280; let w=img.width, h=img.height;
+          if(w>max||h>max){ if(w>=h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } }
+          const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+          cv.getContext("2d").drawImage(img,0,0,w,h);
+          let out; try{ out=cv.toDataURL("image/jpeg",0.82); }catch(e){ out=reader.result; }
+          imgData=out;
+          $("previewImg").src=out;
+          $("drop").style.display="none";
+          $("preview").style.display="block";
+          $("analyzeBtn").disabled=false;
+          const kb=Math.round((out.length*3/4)/1024);
+          $("sizeNote").textContent="Photo prête ("+kb+" Ko) — légère pour une connexion faible.";
+        };
+        img.onerror=function(){ alert("Impossible de lire cette image."); };
+        img.src=reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    $("drop").addEventListener("click",function(){ $("fileInput").click(); });
+    $("retakeBtn").addEventListener("click",function(){ $("fileInput").value=""; $("fileInput").click(); });
+    $("fileInput").addEventListener("change",function(e){ const f=e.target.files&&e.target.files[0]; if(f) loadAndShrink(f); });
+
+    function showError(msg){
+      $("res").style.display="block";
+      $("resBody").innerHTML='<div class="err">'+esc(msg)+'</div>';
+      $("speakBtn").style.display="none";
+      $("res").scrollIntoView({behavior:"smooth",block:"start"});
+    }
+
+    async function analyze(){
+      if(!imgData){ return; }
+      $("analyzeBtn").disabled=true;
+      $("res").style.display="block";
+      $("speakBtn").style.display="none";
+      $("resBody").innerHTML='<div class="typing">Analyse de la photo en cours… cela prend quelques secondes.</div>';
+      $("res").scrollIntoView({behavior:"smooth",block:"start"});
+      try{
+        const r=await fetch("/api/diagnostic",{ method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({ image:imgData, crop:$("cropInput").value.trim(), description:$("descInput").value.trim() }) });
+        const data=await r.json().catch(function(){ return {}; });
+        if(!r.ok){
+          if(r.status===401){ showError("Connectez-vous pour utiliser le diagnostic."); $("loginNote").style.display="block"; }
+          else showError(data.error || "Le diagnostic a échoué. Réessayez.");
+          return;
+        }
+        lastText=data.diagnosis||"";
+        $("resBody").innerHTML='<div class="doc">'+renderMd(lastText)+'</div>';
+        $("speakBtn").style.display = (window.trvCanSpeak && window.trvCanSpeak()) ? "inline-block" : "none";
+      }catch(e){
+        showError("Pas de connexion ou serveur indisponible. Réessayez quand le réseau revient.");
+      }finally{
+        $("analyzeBtn").disabled=false;
+      }
+    }
+    $("analyzeBtn").addEventListener("click",analyze);
+
+    // Lecture à voix haute (français fiable)
+    $("speakBtn").addEventListener("click",function(){
+      if(!window.trvSpeak) return;
+      if(speaking){ window.trvStop&&window.trvStop(); speaking=false; $("speakBtn").textContent="🔊 Écouter"; return; }
+      const plain=lastText.replace(/[#*]/g," ").replace(/\s+/g," ").trim();
+      speaking=true; $("speakBtn").textContent="⏹ Arrêter";
+      window.trvSpeak(plain,function(){ speaking=false; $("speakBtn").textContent="🔊 Écouter"; },"fr");
+    });
+
+    // Nouvelle photo : réinitialise
+    function reset(){
+      imgData=null; lastText=""; if(speaking){ window.trvStop&&window.trvStop(); speaking=false; }
+      $("fileInput").value=""; $("previewImg").src="";
+      $("preview").style.display="none"; $("drop").style.display="block";
+      $("analyzeBtn").disabled=true; $("sizeNote").textContent="";
+      $("res").style.display="none"; $("resBody").innerHTML="";
+      window.scrollTo({top:0,behavior:"smooth"});
+    }
+    $("againBtn").addEventListener("click",reset);
+
+    // Vérifie la connexion pour afficher le rappel de connexion
+    (async function(){
+      try{ const r=await fetch("/api/auth/me"); const d=await r.json(); if(!d || !d.user){ $("loginNote").style.display="block"; } }catch(e){}
+    })();
+  </script>
+</body>
+</html>

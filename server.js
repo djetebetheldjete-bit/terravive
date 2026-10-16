@@ -820,6 +820,67 @@ async function handleChat(req, res) {
     logQuestion({ id: newId(), user_id: user.id, question: q.slice(0, 400), crop: (plan && plan.crop) || String(p.crop || "").slice(0, 80) || null, created_at: new Date().toISOString() });
   } catch (e) { sendJson(res, e.status || 500, { error: e.message || "La réponse a échoué." }); }
 }
+// ---------- Diagnostic des maladies par photo ----------
+function diagnosticSystem() {
+  return DURABLE_CONTEXT + `
+
+TÂCHE : un cultivateur t'envoie une PHOTO d'une plante (feuille, tige, fruit, racine…) qui semble malade, carencée ou attaquée, parfois avec le nom de la culture et une courte description. Tu es un APPUI au diagnostic, PAS un remplaçant d'un technicien agricole.
+
+Règles d'honnêteté, très importantes :
+- Si l'image n'est pas une plante, est trop floue, trop sombre ou insuffisante pour te prononcer, dis-le simplement et explique quelle photo reprendre (ex. une feuille atteinte de près, à la lumière du jour, le dessus ET le dessous).
+- Ne donne JAMAIS un diagnostic certain à partir d'une seule photo. Parle de cause PROBABLE, et propose au plus les 1 à 3 hypothèses les plus vraisemblables.
+- Reste dans le contexte tropical ouest-africain / Côte d'Ivoire.
+- N'invente pas de certitude et ne donne aucun conseil dangereux pour la santé ou l'environnement.
+
+Réponds en français simple, au format Markdown, avec EXACTEMENT ces sections (titres en ##), dans cet ordre :
+
+## Ce que je vois
+Décris les symptômes visibles sur la photo (taches, couleur, trous, flétrissement, insectes, moisissure…). Si la photo ne permet pas de voir, dis-le ici et demande une meilleure photo, puis arrête-toi.
+
+## Cause probable
+La ou les hypothèses les plus vraisemblables (maladie fongique, bactérienne, virale, carence, ravageur, stress hydrique…). Indique ton degré de confiance en mots simples (ex. « assez probable », « à confirmer »).
+
+## Gravité et urgence
+Est-ce bénin ou cela peut-il se propager vite au reste de la parcelle ? Faut-il agir aujourd'hui ?
+
+## Que faire maintenant
+Les gestes concrets, en commençant TOUJOURS par les solutions durables et à portée de main (retirer et brûler/enterrer les parties atteintes, préparations naturelles, assainissement, espacement, gestion de l'eau). Ne propose un produit chimique qu'en DERNIER recours, sans nom de marque — seulement la matière active, avec un rappel de lire la notice, de respecter le dosage et le délai avant récolte.
+
+## Éviter que ça revienne
+2 à 4 conseils de prévention simples (rotation, variétés, drainage, propreté des outils…).
+
+## À confirmer sur place
+Rappelle gentiment qu'une photo a ses limites et conseille de confronter le diagnostic à un agent agricole ou à l'animateur de la coopérative en cas de doute ou si cela s'aggrave.`;
+}
+async function handleDiagnostic(req, res) {
+  if (!API_KEY) return sendJson(res, 500, { error: "Clé IA manquante (ANTHROPIC_API_KEY)." });
+  const user = await currentUser(req);
+  if (!user) return sendJson(res, 401, { error: "Connectez-vous pour utiliser le diagnostic." });
+  if (!rateOk("diag:" + user.id, 40, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Beaucoup de diagnostics aujourd'hui — reprenez un peu plus tard." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  let img = String(p.image || "");
+  let media = "image/jpeg";
+  const m = img.match(/^data:(image\/(?:jpeg|png|webp));base64,(.*)$/i);
+  if (m) { media = m[1].toLowerCase(); img = m[2]; }
+  img = img.replace(/\s/g, "");
+  if (!img || img.length < 100) return sendJson(res, 400, { error: "Ajoutez une photo de la plante." });
+  if (img.length > 5.4e6) return sendJson(res, 413, { error: "Photo trop lourde — reprenez-la (elle est normalement réduite automatiquement)." });
+  const crop = String(p.crop || "").trim().slice(0, 80);
+  const desc = String(p.description || "").trim().slice(0, 500);
+  let intro = "Voici une photo d'une plante qui semble malade ou attaquée.";
+  if (crop) intro += " Culture : " + crop + ".";
+  if (desc) intro += " Observation du cultivateur : " + desc + ".";
+  intro += "\n\nQue vois-tu, et que me conseilles-tu ?";
+  const content = [
+    { type: "image", source: { type: "base64", media_type: media, data: img } },
+    { type: "text", text: intro }
+  ];
+  try {
+    const diagnosis = await callClaude(diagnosticSystem(), [{ role: "user", content }], null, 2000);
+    sendJson(res, 200, { diagnosis });
+    logQuestion({ id: newId(), user_id: user.id, question: "[photo] " + (crop || "plante") + (desc ? " — " + desc.slice(0, 120) : ""), crop: crop || null, created_at: new Date().toISOString() });
+  } catch (e) { sendJson(res, e.status || 500, { error: e.message || "Le diagnostic a échoué." }); }
+}
 // GET /api/admin/questions : journal des questions (réservé formateur).
 async function handleAdminQuestions(req, res) {
   const u = await currentUser(req); if (!isAdmin(u)) return sendJson(res, 403, { error: "Réservé à l'administrateur." });
@@ -939,6 +1000,7 @@ function serveStatic(req, res) {
   if (urlPath === "/comprendre") urlPath = "/comprendre.html";
   if (urlPath === "/conseiller" || urlPath === "/chat") urlPath = "/conseiller.html";
   if (urlPath === "/cooperative" || urlPath === "/coop") urlPath = "/cooperative.html";
+  if (urlPath === "/diagnostic" || urlPath === "/diagnostic.html") urlPath = "/diagnostic.html";
   const safe = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(PUBLIC_DIR, safe);
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end("Accès interdit"); }
@@ -979,6 +1041,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && url === "/api/devices") return handleDevicesList(req, res);
   if (req.method === "GET" && url === "/api/device") return handleDeviceGet(req, res);
   if (req.method === "POST" && url === "/api/chat") return handleChat(req, res);
+  if (req.method === "POST" && url === "/api/diagnostic") return handleDiagnostic(req, res);
   if (req.method === "GET" && url === "/api/admin/users") return handleAdminUsers(req, res);
   if (req.method === "GET" && url === "/api/admin/questions") return handleAdminQuestions(req, res);
   if (req.method === "GET") return serveStatic(req, res);
