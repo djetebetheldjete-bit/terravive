@@ -193,6 +193,83 @@
         </div>
       </div>
 
+      <div class="card" id="budgetCard" style="display:none;">
+        <h2 class="sec">Calculateur de budget</h2>
+        <p class="hint">Entrez vos postes, quantités et prix (en F CFA). Les totaux, le chiffre d'affaires et la marge sont <b>calculés par l'application</b>, pas par l'IA.</p>
+        <div id="budLines"></div>
+        <button class="btn" id="budAdd" type="button" style="margin-top:4px;">+ Ajouter un poste</button>
+        <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;">
+          <div style="flex:1;min-width:170px;">
+            <label>Rendement commercialisable (quantité à vendre)</label>
+            <input id="budYield" type="text" inputmode="decimal" placeholder="ex. 1500 (kg)">
+          </div>
+          <div style="flex:1;min-width:170px;">
+            <label>Prix de vente (par kg ou unité)</label>
+            <input id="budPrice" type="text" inputmode="decimal" placeholder="ex. 400 (F CFA)">
+          </div>
+        </div>
+        <div id="budTotals" style="margin-top:16px;"></div>
+        <p class="hint" style="margin-top:12px;">La <b>marge prévisionnelle</b> n'est pas le <b>bénéfice réel</b> : elle ne déduit ni la main-d'œuvre familiale, ni l'amortissement du matériel, ni les pertes après récolte. Les <b>investissements</b> (matériel durable) sont comptés à part et ne sont pas retirés de la marge du cycle. Les prix sont les vôtres — l'application n'en invente aucun.</p>
+      </div>
+      <script>
+      (function(){
+        var fmt = new Intl.NumberFormat('fr-FR');
+        function bnum(v){ if(v==null) return NaN; var s=String(v).replace(/\s/g,"").replace(/,/g,"."); var m=s.match(/-?\d+(\.\d+)?/); return m?parseFloat(m[0]):NaN; }
+        function money(n){ return isFinite(n) ? fmt.format(Math.round(n))+" F" : "—"; }
+        var container = document.getElementById("budLines");
+        var totalsEl = document.getElementById("budTotals");
+        if(!container || !totalsEl) return;
+        var DEFAULTS = ["Semences ou plants","Fertilisation et amendements","Protection phytosanitaire","Irrigation","Main-d'œuvre","Transport","Emballage et commercialisation"];
+        function rowHtml(nom){
+          return '<div class="budline" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--surface2);">'
+            + '<div style="flex:2;min-width:150px;"><label>Poste</label><input class="b-nom" type="text" maxlength="60" value="'+(nom||"").replace(/"/g,"&quot;")+'"></div>'
+            + '<div style="flex:1;min-width:85px;"><label>Quantité</label><input class="b-qte" type="text" inputmode="decimal" placeholder="0"></div>'
+            + '<div style="flex:1;min-width:70px;"><label>Unité</label><input class="b-unite" type="text" maxlength="12" placeholder="kg, sac…"></div>'
+            + '<div style="flex:1;min-width:95px;"><label>Prix unitaire</label><input class="b-prix" type="text" inputmode="decimal" placeholder="0"></div>'
+            + '<div style="flex:1;min-width:120px;"><label>Type</label><select class="b-type"><option value="charge">Charge du cycle</option><option value="invest">Investissement</option></select></div>'
+            + '<div style="flex:1;min-width:95px;"><label>Coût total</label><div class="b-total" style="padding:10px 2px;font-weight:700;color:var(--deep);">—</div></div>'
+            + '<button class="btn b-del" type="button" style="padding:9px 11px;">Retirer</button>'
+            + '</div>';
+        }
+        function addRow(nom){ container.insertAdjacentHTML("beforeend", rowHtml(nom)); recompute(); }
+        function recompute(){
+          var charges = 0, invest = 0, anyCharge = false;
+          var lines = container.querySelectorAll(".budline");
+          lines.forEach(function(ln){
+            var q = bnum(ln.querySelector(".b-qte").value);
+            var p = bnum(ln.querySelector(".b-prix").value);
+            var t = (isFinite(q) && isFinite(p)) ? q*p : NaN;
+            ln.querySelector(".b-total").textContent = money(t);
+            if(isFinite(t)){
+              if(ln.querySelector(".b-type").value === "invest") invest += t;
+              else { charges += t; anyCharge = true; }
+            }
+          });
+          var y = bnum(document.getElementById("budYield").value);
+          var pr = bnum(document.getElementById("budPrice").value);
+          var ca = (isFinite(y) && isFinite(pr)) ? y*pr : NaN;
+          var marge = (isFinite(ca) && anyCharge) ? ca - charges : (isFinite(ca) ? ca - charges : NaN);
+          var html = '';
+          html += '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid var(--line);"><span>Total des charges du cycle</span><b>'+money(charges)+'</b></div>';
+          if(invest>0) html += '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;"><span>Investissements (matériel durable, à part)</span><b>'+money(invest)+'</b></div>';
+          html += '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;"><span>Chiffre d\'affaires brut (rendement × prix)</span><b>'+money(ca)+'</b></div>';
+          var margeOk = isFinite(marge);
+          html += '<div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px;margin-top:8px;border-radius:10px;background:var(--surface2);border:1px solid var(--line);">'
+               + '<span><b>Marge prévisionnelle</b><br><span style="font-size:.78rem;color:var(--soft);">CA − charges du cycle — pas le bénéfice réel</span></span>'
+               + '<b style="font-size:1.1rem;color:'+(margeOk?(marge>=0?'var(--good)':'var(--bad)'):'var(--soft)')+';">'+money(marge)+'</b></div>';
+          if(!margeOk) html += '<p class="hint" style="margin:8px 0 0;">Entrez le rendement et le prix de vente pour calculer la marge.</p>';
+          totalsEl.innerHTML = html;
+        }
+        container.addEventListener("input", recompute);
+        container.addEventListener("change", recompute);
+        container.addEventListener("click", function(e){ if(e.target && e.target.classList.contains("b-del")){ var ln=e.target.closest(".budline"); if(ln){ ln.remove(); recompute(); } } });
+        document.getElementById("budAdd").addEventListener("click", function(){ addRow(""); });
+        document.getElementById("budYield").addEventListener("input", recompute);
+        document.getElementById("budPrice").addEventListener("input", recompute);
+        DEFAULTS.forEach(function(n){ addRow(n); });
+      })();
+      </script>
+
       <div class="card chat" id="chatCard" style="display:none;">
         <h2 class="sec">Conseiller Terravive</h2>
         <p class="hint" id="chatHint">Une question sur votre culture ? Un problème (feuilles jaunes, insectes) ? Demandez ici — réponses tournées vers l'agriculture durable. <a href="/conseiller" style="color:var(--leaf);font-weight:600;">Conseiller général</a></p>
@@ -349,7 +426,7 @@
     $("planPills").innerHTML = pills.map(x=>'<span class="pill">'+x[0]+' : <b>'+esc(x[1])+'</b></span>').join("");
     $("planDoc").innerHTML = renderMd(plan.content);
     { const lb=$("listenBtn"); if(lb){ if(window.trvCanSpeak && window.trvCanSpeak()){ lb.style.display="inline-block"; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; } else { lb.style.display="none"; } try{ if(window.trvStop) window.trvStop(); }catch(e){} } }
-    $("chatCard").style.display="block"; $("thread").innerHTML="";
+    $("chatCard").style.display="block"; { var _b=document.getElementById("budgetCard"); if(_b) _b.style.display="block"; } $("thread").innerHTML="";
     $("chatHint").innerHTML='Une question sur votre culture de <b>'+esc(plan.crop)+'</b> ? Un problème observé ? Demandez ici.';
     window.scrollTo({top:0,behavior:"smooth"});
   }
@@ -451,7 +528,7 @@
       .replace(/[#*_`>-]/g," ")                   // symboles markdown
       .replace(/\s+/g," ").trim(); }
   { const lb=$("listenBtn"); if(lb){ let on=false; lb.addEventListener("click", function(){ if(on){ if(window.trvStop) trvStop(); on=false; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; return; } if(!currentPlan) return; on=true; lb.innerHTML=ICON_STOP+"Arrêter la lecture"; trvSpeak(planToSpeech(currentPlan.content), function(){ on=false; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; }); }); } }
-  $("newBtn").addEventListener("click", ()=>{ try{ if(window.trvStop) trvStop(); }catch(e){} $("planContent").style.display="none"; $("planPlaceholder").style.display="block"; $("chatCard").style.display="none"; window.scrollTo({top:0,behavior:"smooth"}); });
+  $("newBtn").addEventListener("click", ()=>{ try{ if(window.trvStop) trvStop(); }catch(e){} $("planContent").style.display="none"; $("planPlaceholder").style.display="block"; $("chatCard").style.display="none"; { var _b=document.getElementById("budgetCard"); if(_b) _b.style.display="none"; } window.scrollTo({top:0,behavior:"smooth"}); });
 
   loadMe();
 
