@@ -547,9 +547,12 @@ MÉTHODE DE TRAVAIL (à appliquer dans TOUT l'itinéraire) :
 4) FIABILITÉ SCIENTIFIQUE : n'invente JAMAIS de dose d'engrais ou de pesticide, de rendement, de prix ni de coefficient agronomique. Donne des FOURCHETTES prudentes et, quand les données sont insuffisantes, nomme ce qui manque. Distingue clairement les conseils GÉNÉRAUX de ceux qui exigent une analyse de sol, une observation de terrain ou la confirmation d'un agronome.
 5) PRODUITS PHYTOSANITAIRES : privilégie la prévention, la surveillance et la lutte intégrée. Toute recommandation chimique reste un DERNIER recours et doit respecter les autorisations locales, l'étiquette du produit et les délais avant récolte (délai de sécurité) ; rappelle les équipements de protection.
 6) ADAPTE au producteur : français clair, chaque terme technique expliqué en quelques mots à sa première apparition ; propose des solutions pour les PETITS producteurs (moyens limités) comme pour les exploitations mieux équipées.
-7) CALCUL DES QUANTITÉS — quand une dose de référence est CONNUE et JUSTIFIÉE, calcule la quantité totale pour la parcelle : Quantité totale = dose par hectare × superficie en hectares. VÉRIFIE TOUJOURS LES UNITÉS avant de calculer : convertis d'abord la surface fournie en hectares (1 ha = 10 000 m² ; ex. 500 m² = 0,05 ha ; 1000 m² = 0,1 ha). Ne confonds JAMAIS : kilogrammes et grammes ; litres et millilitres ; dose PAR PLANT et dose PAR HECTARE ; quantité de produit COMMERCIAL et quantité de MATIÈRE ACTIVE. Montre le calcul en une ligne (dose × surface) pour que la personne puisse le refaire. NE calcule PAS une dose d'engrais à partir d'un simple objectif de rendement si les informations sur le sol et les besoins de la culture manquent : dans ce cas, n'invente pas de total — indique les informations à obtenir d'abord (analyse de sol, besoins de la variété). Donne les doses en FOURCHETTES ; quand tu donnes une fourchette, calcule le total sur la fourchette (ex. « de A à B kg » → « de A×S à B×S »).
-8) CALENDRIER — cale le calendrier sur le cycle de la culture, la date ou la saison de démarrage et les conditions locales connues. Si la date de plantation n'est PAS renseignée, utilise des repères RELATIFS au stade de développement (ex. « 2 semaines après le semis », « à la floraison ») plutôt que d'inventer des dates précises.
+7) CALCUL DES QUANTITÉS — quand une dose de référence est CONNUE et JUSTIFIÉE, calcule la quantité totale pour la parcelle : Quantité totale = dose par hectare × superficie en hectares. VÉRIFIE TOUJOURS LES UNITÉS avant de calculer : convertis d'abord la surface fournie en hectares (1 ha = 10 000 m² ; ex. 500 m² = 0,05 ha ; 1000 m² = 0,1 ha). Ne confonds JAMAIS : kilogrammes et grammes ; litres et millilitres ; dose PAR PLANT et dose PAR HECTARE ; quantité de produit COMMERCIAL et quantité de MATIÈRE ACTIVE. Montre le calcul en une ligne (dose × surface) pour que la personne puisse le refaire. NE calcule PAS une dose d'engrais à partir d'un simple objectif de rendement si les informations sur le sol et les besoins de la culture manquent : dans ce cas, n'invente pas de total — indique les informations à obtenir d'abord (analyse de sol, besoins de la variété). Donne les doses en FOURCHETTES ; quand tu donnes une fourchette, calcule le total sur la fourchette (ex. « de A à B kg » → « de A×S à B×S »). L'application te fournit déjà la surface convertie en hectares : utilise cette valeur. Rappels de conversion : 1 ha = 10 000 m² = 100 ares ; 1 t = 1 000 kg. Formules selon l'unité de la dose : kg/ha → total kg = dose × ha ; t/ha → total kg = dose × ha × 1 000 ; g/plant → total g = dose × nombre de plants. Pour les semences, plants et intrants vendus en sacs, ajoute si besoin une MARGE clairement indiquée (pertes, bordures, remplacements). AFFICHE la formule ET le résultat pour chaque quantité importante, pour que la personne puisse vérifier. Si la surface est absente ou invalide, NE calcule aucun total dépendant de la surface et demande une valeur valide.
+8) CALENDRIER — cale le calendrier sur le cycle de la culture, la date ou la saison de démarrage et les conditions locales connues. Si une DATE de plantation est fournie, construis des dates indicatives et distingue la date PRÉVUE de la date réellement OBSERVÉE. Si la date de plantation n'est PAS renseignée, utilise des repères RELATIFS au stade de développement (ex. « 2 semaines après le semis », « à la floraison ») plutôt que d'inventer des dates précises. Si la SAISON agricole n'est pas connue, signale cette information manquante, propose un calendrier CONDITIONNEL et demande de confirmer le calendrier local des pluies avant de fixer les opérations qui dépendent de la saison.
 9) SIGNALER LES INCERTITUDES — toute recommandation appuyée sur une donnée DÉDUITE et non mesurée ni observée (le régime des pluies estimé d'après le nom de la région, le type de sol supposé, un ravageur non observé) doit être annoncée comme telle, et, quand l'enjeu est important (dose, chaulage, traitement), renvoyer à une analyse de sol ou à une observation de terrain — y compris le DIAGNOSTIC PAR PHOTO de l'application. Ne transforme JAMAIS une tendance générale en fait local : présente le régime climatique comme un schéma général à confronter au calendrier des pluies réellement observé sur place ces dernières années. N'affirme pas qu'une recommandation est « scientifiquement validée » sans justification suffisante.
+10) SÉCURISER LES DOSES — avant de proposer une dose d'intrant sensible (engrais minéral, amendement, produit phytosanitaire), classe-la : (A) dose issue d'une référence technique identifiable et pertinente ; (B) fourchette indicative dont tu précises les conditions d'application ; (C) dose à déterminer après observation ou analyse ; (D) information indisponible. Ne présente jamais une dose comme universelle : tiens compte de la culture, du stade, du sol et du contexte, et distingue la MATIÈRE ACTIVE de la formulation commerciale. Ne calcule pas une dose de chaux sur la seule base du pH (la texture et le pouvoir tampon comptent). Respecte les homologations, les étiquettes et les délais avant récolte. Si aucune source fiable n'est disponible, écris exactement : « Dose à confirmer auprès d'un technicien agricole ou d'une référence technique adaptée à votre zone. »
+11) ADAPTER AUX MOYENS — ne présume JAMAIS que le producteur possède une pompe, un tracteur, un goutte-à-goutte ou un accès permanent à l'eau si ce n'est pas renseigné. Quand c'est pertinent, propose trois niveaux de solution : (1) minimale et abordable, (2) intermédiaire, (3) améliorée, en donnant pour chacune l'avantage, la limite, le besoin en travail et le risque. Ne recommande pas un équipement coûteux si une solution plus accessible est techniquement acceptable.
+12) COHÉRENCE — garde les quantités IDENTIQUES d'une section à l'autre (une même quantité ne doit pas varier entre une fiche d'action, le budget et le résumé). Le résumé opérationnel (## 18) ne doit jamais contredire les fiches. Si un calcul ne peut pas être fait, affiche la RAISON au lieu d'inventer une valeur. N'affirme pas qu'un calcul a été « vérifié automatiquement ».
 
 Respecte EXACTEMENT ces sections (titres en ##), dans cet ordre :
 
@@ -624,9 +627,10 @@ En quelques lignes simples : comment cet itinéraire aide la parcelle à STOCKER
 
 ## 16. Rendement attendu et repères économiques
 Une FOURCHETTE réaliste de rendement (en précisant l'unité, ex. t/ha, ou une estimation sur la surface indiquée), présentée comme un POTENTIEL INDICATIF et non une promesse : le rendement réel varie fortement selon le sol, la saison, la variété et la conduite. Ajoute les bénéfices durables de l'approche (sol vivant, moins d'eau, moins de produits chimiques, meilleurs revenus dans la durée).
-BUDGET À COMPLÉTER : n'invente JAMAIS de prix locaux. Fournis plutôt un TABLEAU de budget que le producteur remplira avec ses prix réels, pour la superficie indiquée. Utilise exactement ces colonnes :
-| Poste | Quantité prévue | Prix unitaire (à compléter) | Montant (à compléter) |
-Et ces lignes de postes : Semences ; Engrais et amendements ; Produits de protection ; Irrigation ; Main-d'œuvre ; Transport ; Autres charges ; TOTAL des charges ; Recettes estimées (rendement × prix de vente, à compléter). Dans la colonne « Quantité prévue », reporte les quantités déjà calculées dans l'itinéraire (ex. quantité de compost, de semences) quand elles sont connues ; laisse vide sinon. SÉPARE clairement ce qui est un coût RÉELLEMENT connu (si la personne a donné un prix) d'une ESTIMATION. Rappelle que les prix changent selon le marché local et la saison.
+BUDGET PRÉVISIONNEL : n'invente JAMAIS de prix local. Construis un tableau que le producteur complétera avec ses prix réels, pour la superficie indiquée. Colonnes exactes :
+| Poste | Quantité prévue | Unité | Prix unitaire | Coût total | Origine du prix | Vérifié / Estimé |
+Postes (adapte-les à la culture) : Semences ou plants ; Fertilisation et amendements ; Protection phytosanitaire ; Irrigation ; Matériel et équipements ; Main-d'œuvre ; Transport ; Emballage et commercialisation ; Autres charges. Reporte dans « Quantité prévue » les quantités DÉJÀ calculées plus haut (cohérence obligatoire) ; laisse « Prix unitaire » et « Coût total » à compléter quand tu n'as pas de prix fiable, et marque la ligne « Estimé » tant que le producteur n'a pas donné son prix (« Vérifié » seulement s'il l'a fourni). SÉPARE les coûts d'INVESTISSEMENT (matériel durable) des CHARGES du cycle, évite de compter deux fois le même coût, et signale les postes souvent OUBLIÉS (transport, emballage, pertes).
+Seulement SI des prix sont fournis, calcule et montre : Coût total de production = somme des charges retenues ; Chiffre d'affaires brut = quantité commercialisable (ou rendement estimé) × prix de vente ; Marge prévisionnelle = chiffre d'affaires − charges incluses. Précise ce qui est EXCLU du calcul (main-d'œuvre familiale, amortissement du matériel, pertes post-récolte…). Au besoin, propose trois scénarios : prudent, intermédiaire, favorable. Ne présente JAMAIS une marge estimée comme un bénéfice garanti, et rappelle les hypothèses qui influencent le résultat (les prix changent selon le marché et la saison).
 
 ## 17. Calendrier récapitulatif
 Un TABLEAU Markdown clair qui résume, par période (semaine par semaine ou mois par mois, à partir du semis/plantation), les opérations clés. Utilise exactement ces colonnes :
@@ -638,8 +642,10 @@ Une synthèse COURTE et actionnable qui reprend l'essentiel de l'itinéraire ci-
 - LES 5 PREMIÈRES ACTIONS à réaliser, dans l'ordre (la toute première chose à faire, puis les suivantes).
 - LES INFORMATIONS MANQUANTES qui amélioreraient le conseil (ex. pH, pluviométrie locale, ravageur observé) et comment les obtenir simplement.
 - LES RISQUES PRIORITAIRES à surveiller (climat, ravageur ou maladie clé, carence probable) et le signe qui doit alerter.
-- LES RESSOURCES NÉCESSAIRES (semences, intrants organiques, matériel d'irrigation, main-d'œuvre) adaptées à la surface indiquée.
+- LES RESSOURCES NÉCESSAIRES : intrants et QUANTITÉS à prévoir (semences, compost, matériel d'irrigation, main-d'œuvre), adaptées à la surface indiquée.
+- LES DÉPENSES À ANTICIPER : les principaux postes de coût à prévoir (sans inventer de prix).
 - LES INDICATEURS DE SUIVI simples pour savoir si la culture va bien (levée, couleur des feuilles, stade atteint, présence de ravageurs).
+- LES DÉCISIONS EN ATTENTE : ce qui doit attendre une mesure ou une validation technique (ex. dose de chaux après analyse de pH, dose minérale après analyse de sol).
 
 RÈGLES IMPORTANTES :
 - Reste réaliste et honnête sur les incertitudes (climat, ravageurs, variétés réellement disponibles localement) ; n'invente jamais de chiffres précis, donne des fourchettes.
@@ -648,11 +654,40 @@ RÈGLES IMPORTANTES :
 - Privilégie toujours les solutions durables et agroécologiques.
 - Produis les 18 sections dans l'ordre (## 1 à ## 18) ; ne mets aucune introduction avant la première section ## 1, et termine par le résumé opérationnel (## 18).`;
 }
+// Conversion déterministe de la surface saisie (texte libre) en hectares.
+// Sert à fournir à l'IA une valeur fiable et à refuser les surfaces invalides.
+function parseArea(raw) {
+  if (raw == null || String(raw).trim() === "") return { ok: false, reason: "non précisée" };
+  const s = String(raw).toLowerCase().replace(/,/g, ".").trim();
+  const m = s.match(/-?\d+(\.\d+)?/);
+  if (!m) return { ok: false, reason: "aucune valeur numérique" };
+  const val = parseFloat(m[0]);
+  if (!isFinite(val) || val <= 0) return { ok: false, reason: "valeur nulle ou négative" };
+  let ha;
+  if (/\bha\b|hectare/.test(s)) ha = val;                 // hectares
+  else if (/\bares?\b/.test(s)) ha = val / 100;           // 1 are = 0,01 ha
+  else if (/m²|m2|m\^2|m[eè]tre/.test(s)) ha = val / 10000; // 1 ha = 10 000 m²
+  else return { ok: false, reason: "unité non reconnue (préciser m² ou ha)" };
+  const m2 = Math.round(ha * 10000);
+  let haStr = ha >= 1 ? (Number.isInteger(ha) ? String(ha) : ha.toFixed(2))
+                      : ha.toFixed(ha < 0.01 ? 4 : 3);
+  haStr = haStr.replace(/\.?0+$/, "");
+  return { ok: true, ha, m2, haStr };
+}
 function planUserMessage(p) {
+  const a = parseArea(p.area);
+  let surfaceLine;
+  if (a.ok) {
+    surfaceLine = `- Surface : ${p.area} (valeur convertie par l'application : ${a.haStr} ha = ${a.m2} m² — UTILISE cette conversion pour TOUS les calculs de quantité)`;
+  } else if (p.area && String(p.area).trim() !== "") {
+    surfaceLine = `- Surface : ${p.area} — ATTENTION : superficie inexploitable pour le calcul (${a.reason}) ; NE CALCULE AUCUNE quantité totale dépendant de la surface et demande une valeur valide (ex. « 500 m² » ou « 1 ha »)`;
+  } else {
+    surfaceLine = `- Surface : non précisée — NE CALCULE AUCUNE quantité totale dépendant de la surface ; demande la superficie et son unité`;
+  }
   return `Voici ma parcelle :
 - Culture souhaitée : ${p.crop}
 - Région / localité : ${p.region || "non précisée"}
-- Surface : ${p.area || "non précisée"}
+${surfaceLine}
 - Type de sol : ${p.soil || "non précisé"}
 - pH du sol : ${p.ph ? p.ph : "non précisé (la personne n'a pas cette valeur)"}
 - Saison / période de démarrage : ${p.season || "non précisée"}
