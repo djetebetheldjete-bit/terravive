@@ -116,7 +116,15 @@
           <div><label>Type de sol</label>
             <select id="soil">
               <option value="">— je ne sais pas —</option>
-              <option>Sableux</option><option>Argileux</option><option>Limoneux</option><option>Latéritique</option><option>Riche / humifère</option><option>Pauvre / dégradé</option>
+              <optgroup label="Textures simples">
+                <option>Sableux</option><option>Limoneux</option><option>Argileux</option>
+              </optgroup>
+              <optgroup label="Textures composées">
+                <option>Sablo-limoneux</option><option>Limono-sableux</option><option>Sablo-argileux</option><option>Argilo-sableux</option><option>Limono-argileux</option><option>Argilo-limoneux</option><option>Argilo-limono-sableux (terre franche)</option>
+              </optgroup>
+              <optgroup label="Autres / particularités">
+                <option>Latéritique / gravillonnaire</option><option>Riche / humifère</option><option>Pauvre / dégradé</option>
+              </optgroup>
             </select>
           </div>
           <div><label>Saison / démarrage</label>

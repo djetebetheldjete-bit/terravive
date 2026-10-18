@@ -7,10 +7,10 @@
  *  - Les requêtes POST (générer un plan, chat, enregistrer…) ne sont jamais mises en cache :
  *    hors-ligne elles échouent proprement (l'app affiche déjà un message).
  */
-const VERSION = "terravive-v1";
+const VERSION = "terravive-v2";
 const SHELL = [
-  "/accueil", "/app", "/tableau", "/arduino", "/comprendre", "/conseiller", "/cooperative",
-  "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/pwa.js"
+  "/accueil", "/app", "/tableau", "/arduino", "/comprendre", "/conseiller", "/cooperative", "/diagnostic",
+  "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/logo.png", "/favicon-32.png", "/pwa.js"
 ];
 
 self.addEventListener("install", (e) => {
