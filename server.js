@@ -35,9 +35,10 @@ const API_KEYS = (function () {
 const API_KEY = API_KEYS[0];
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 // Longueur max (tokens) pour la génération du plan — l'itinéraire complet (18 sections,
-// fiches d'action chiffrées, budget, résumé) est long : 8000 coupait le plan vers la
-// section 13. Relevé à 16000 pour laisser l'itinéraire se terminer (section 18 incluse).
-const PLAN_MAX_TOKENS = parseInt(process.env.PLAN_MAX_TOKENS, 10) || 16000;
+// fiches d'action chiffrées, budget, résumé) est long : 8000 coupait vers la section 13,
+// 16000 vers la section 17. Relevé à 24000 (le modèle accepte cette longueur) et le prompt
+// demande en plus de TOUJOURS finir le résumé (## 18) de façon concise.
+const PLAN_MAX_TOKENS = parseInt(process.env.PLAN_MAX_TOKENS, 10) || 24000;
 // Longueur max pour un projet Arduino (le sketch commenté + le guide peuvent être longs).
 const ARDUINO_MAX_TOKENS = parseInt(process.env.ARDUINO_MAX_TOKENS, 10) || 9000;
 const PORT = process.env.PORT || 3000;
@@ -662,7 +663,8 @@ RÈGLES IMPORTANTES :
 - Adapte TOUT aux moyens locaux (Côte d'Ivoire, matériaux et intrants disponibles sur place).
 - Langage simple et accessible, sans jargon inutile ; quand tu emploies un terme technique, explique-le en quelques mots.
 - Privilégie toujours les solutions durables et agroécologiques.
-- Produis les 18 sections dans l'ordre (## 1 à ## 18) ; ne mets aucune introduction avant la première section ## 1, et termine par le résumé opérationnel (## 18).`;
+- Produis les 18 sections dans l'ordre (## 1 à ## 18) ; ne mets aucune introduction avant la première section ## 1, et termine par le résumé opérationnel (## 18).
+- COMPLÉTUDE OBLIGATOIRE : l'itinéraire doit TOUJOURS être rendu ENTIER, du ## 1 jusqu'au résumé ## 18 inclus. Sois complet mais CONCIS : phrases courtes, pas de redites entre sections (renvoie à une autre section plutôt que de répéter). Garde de la place pour la fin : si une section s'allonge, resserre-la pour être certain de toujours terminer le calendrier (## 17) ET le résumé opérationnel (## 18). Ne t'arrête jamais en milieu de section ou de tableau.`;
 }
 // Conversion déterministe de la surface saisie (texte libre) en hectares.
 // Sert à fournir à l'IA une valeur fiable et à refuser les surfaces invalides.
