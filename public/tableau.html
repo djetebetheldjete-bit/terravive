@@ -575,9 +575,36 @@
       if(ndviLayer) MAP.removeLayer(ndviLayer);
       if(d.tile_url){ ndviLayer=L.tileLayer(d.tile_url,{opacity:0.85}); ndviLayer.addTo(MAP); }
       const ac=alertClass(d.pct_faible,d.pct_moyen);
-      const txt = ac==="bad" ? ("Alerte : "+d.pct_faible+"% de la parcelle montre une végétation faible — vérifiez le sol ou l'irrigation sur ces zones.")
-                : ac==="warn" ? "À surveiller : une partie de la parcelle n'est pas en pleine vigueur."
-                : "Parcelle en bonne santé : la végétation est majoritairement vigoureuse.";
+      // Qualité d'observation — champs déjà renvoyés par Vertea ; s'ils manquent (ancienne réponse), ils sont simplement ignorés.
+      const nImg = (typeof d.images_utilisees==="number") ? d.images_utilisees : null;
+      const petite = (typeof d.surface_ha==="number" && d.surface_ha>0 && d.surface_ha<0.1);
+      let qual = "Analyse Sentinel-2 (~10 m)";
+      if(nImg!=null){ qual += " — "+nImg+" image"+(nImg>1?"s":"")+" nette"+(nImg>1?"s":""); }
+      if(d.periode_depuis){ qual += " depuis le "+esc(d.periode_depuis); }
+      qual += ".";
+      const faibleObs = (nImg!=null && nImg<3) || petite;
+      if(faibleObs){
+        const raisons=[ (nImg!=null && nImg<3)?"peu d'images nettes (nuages ?)":null, petite?"parcelle proche de la taille d'un pixel":null ].filter(Boolean).join(" ; ");
+        qual += " Fiabilité réduite ("+raisons+") — à confirmer sur le terrain.";
+      }
+      // Interprétation prudente : un NDVI faible n'est JAMAIS présenté comme « parcelle malade ».
+      let txt, hyp="";
+      if(ac==="bad" || ac==="warn"){
+        txt = (ac==="bad"
+              ? ("Végétation moins développée que prévu sur "+(d.pct_faible??"?")+"% de la parcelle.")
+              : "Une partie de la parcelle n'est pas en pleine vigueur.")
+            + " Plusieurs causes sont possibles — un NDVI faible ne veut pas dire « parcelle malade ».";
+        hyp = '<ul style="margin:8px 0 0;padding-left:18px;font-size:.86rem;line-height:1.5">'
+            + '<li>Manque d\'eau possible (déficit hydrique)</li>'
+            + '<li>Excès d\'eau possible (sol engorgé)</li>'
+            + '<li>Problème de nutrition possible (carence)</li>'
+            + '<li>Dégâts phytosanitaires possibles (ravageur ou maladie)</li>'
+            + '<li>Variation normale selon le stade (culture jeune, après récolte…)</li>'
+            + '</ul>'
+            + '<div style="margin-top:8px;font-size:.84rem;color:var(--soft,#5b6b5f)">À vérifier sur le terrain avant toute intervention : l\'humidité du sol, l\'état des feuilles, et la <b>répartition des symptômes</b> (repérez les zones rouges sur la carte). En cas de doute, le <a href="/diagnostic" style="color:var(--leaf);font-weight:600">diagnostic par photo</a> peut aider.</div>';
+      } else {
+        txt = "Végétation majoritairement vigoureuse sur la période observée. Poursuivez la surveillance régulière.";
+      }
       $("vOut").innerHTML =
         '<div class="vchips">'
         +'<div class="vchip"><div class="l">NDVI moyen</div><div class="v">'+(d.ndvi_moyen??"—")+'</div></div>'
@@ -585,7 +612,9 @@
         +'<div class="vchip"><div class="l">Saine</div><div class="v">'+(d.pct_sain??"—")+'%</div></div>'
         +'<div class="vchip"><div class="l">À surveiller</div><div class="v">'+(d.pct_moyen??"—")+'%</div></div>'
         +'<div class="vchip"><div class="l">Faible</div><div class="v">'+(d.pct_faible??"—")+'%</div></div>'
-        +'</div><div class="valert '+ac+'">'+txt+'</div>';
+        +'</div>'
+        +'<div style="font-size:.8rem;color:var(--soft,#5b6b5f);margin:8px 0 2px">'+qual+'</div>'
+        +'<div class="valert '+ac+'">'+txt+hyp+'</div>';
       vSetBusy(false, "Analyse de santé terminée. La carte NDVI est affichée sur la parcelle.");
     }catch(e){ vSetBusy(false, "Impossible de joindre Vertea. Le service se réveille peut-être (réessayez dans ~30 s)."); }
   }
@@ -602,19 +631,24 @@
       const litres = Math.round((d.besoin_irrigation_mm_j||0)*10000);
       const ac = (d.besoin_irrigation_mm_j<=0) ? "ok" : "warn";
       const msg = (d.besoin_irrigation_mm_j<=0)
-        ? "La pluie couvre les besoins actuels : aucune irrigation nécessaire sur cette période."
-        : "Apport conseillé : environ "+d.besoin_irrigation_mm_j+" mm/jour, soit ~"+litres.toLocaleString("fr-FR")+" litres par hectare et par jour.";
+        ? "Sur la période analysée, la pluie efficace couvre le besoin théorique : pas d'irrigation d'appoint estimée nécessaire."
+        : "Besoin théorique estimé : environ "+d.besoin_irrigation_mm_j+" mm/jour (~"+litres.toLocaleString("fr-FR")+" litres/ha/jour) sur la période analysée.";
+      // Un besoin THÉORIQUE n'est pas une consigne d'arrosage : on explique la chaîne de calcul et on invite à vérifier le terrain.
+      const expl = '<div style="margin-top:8px;font-size:.84rem;color:var(--soft,#5b6b5f);line-height:1.5">'
+        + 'Comment lire ces chiffres : <b>ET₀</b> = évapotranspiration de référence (climat, ERA5) ; <b>ETc</b> = ET₀ × Kc, besoin de la culture à son stade ; <b>pluie efficace</b> = part de la pluie (CHIRPS) réellement utile ; <b>besoin = ETc − pluie efficace</b>. '
+        + 'C\'est une <b>estimation théorique (FAO-56) sur une période passée</b>, pas une consigne d\'arrosage : avant d\'arroser, vérifiez l\'<b>humidité réelle du sol</b> et la <b>pluie récente</b>. Sur une petite parcelle ou près de la côte, ces moyennes climatiques sont moins précises.'
+        + '</div>';
       const genNote = d.coefficients_generiques
         ? '<div class="valert" style="margin-top:6px">Culture non répertoriée : estimation avec des coefficients culturaux FAO-56 génériques (valeur indicative).</div>'
         : '';
       $("vOut").innerHTML =
         '<div class="vchips">'
-        +'<div class="vchip"><div class="l">Besoin</div><div class="v">'+d.besoin_irrigation_mm_j+' mm/j</div></div>'
+        +'<div class="vchip"><div class="l">Besoin théorique</div><div class="v">'+d.besoin_irrigation_mm_j+' mm/j</div></div>'
         +'<div class="vchip"><div class="l">ET₀</div><div class="v">'+d.et0_mm_j+'</div></div>'
         +'<div class="vchip"><div class="l">ETc</div><div class="v">'+d.etc_mm_j+'</div></div>'
         +'<div class="vchip"><div class="l">Kc ('+esc(d.stade||"")+')</div><div class="v">'+d.kc+'</div></div>'
         +'<div class="vchip"><div class="l">Pluie efficace</div><div class="v">'+d.pluie_efficace_mm_j+'</div></div>'
-        +'</div><div class="valert '+ac+'">'+msg+'</div>'+genNote;
+        +'</div><div class="valert '+ac+'">'+msg+'</div>'+expl+genNote;
       vSetBusy(false, "Besoin en eau calculé pour « "+esc(d.culture)+" ».");
     }catch(e){ vSetBusy(false, "Impossible de joindre Vertea. Le service se réveille peut-être (réessayez dans ~30 s)."); }
   }
