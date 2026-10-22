@@ -83,6 +83,25 @@
   .modal p{ color:var(--soft); font-size:.86rem; margin:0 0 12px; }
   .modal .switch{ text-align:center; font-size:.82rem; color:var(--soft); margin-top:12px; }
   .modal .link{ background:none; border:none; color:var(--leaf); font-weight:600; cursor:pointer; }
+  /* Aide « modes de conduite » */
+  .modehelp{ display:inline-flex; align-items:center; gap:5px; margin-top:5px; background:none; border:none; padding:2px 0; color:var(--leaf); font-family:inherit; font-weight:600; font-size:.8rem; cursor:pointer; text-decoration:underline; }
+  .modehelp:hover{ color:var(--deep); }
+  .modal.wide{ max-width:760px; max-height:88vh; overflow-y:auto; }
+  .modegrid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:640px){ .modegrid{ grid-template-columns:1fr; } .modal.wide{ padding:16px; } }
+  .modecard{ border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--surface2); display:flex; flex-direction:column; }
+  .modecard h4{ margin:0 0 6px; font-size:1rem; color:var(--deep); font-family:var(--f-display); }
+  .modecard .def{ font-size:.86rem; color:var(--ink); margin:0 0 8px; line-height:1.45; }
+  .modecard .ex{ font-size:.82rem; color:var(--soft); margin:0 0 8px; line-height:1.4; }
+  .modecard ul{ margin:0 0 8px; padding-left:18px; }
+  .modecard li{ font-size:.82rem; color:var(--ink); margin:3px 0; line-height:1.35; }
+  .modecard li::marker{ color:var(--leaf); }
+  .modecard .warn{ font-size:.8rem; color:#6b4410; background:#fdf4e3; border:1px solid #f0e2c2; border-radius:8px; padding:7px 9px; margin:0 0 10px; line-height:1.35; }
+  .modecard .actions{ margin-top:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .modecard .pick{ border:none; background:var(--leaf); color:#fff; border-radius:9px; padding:9px 14px; font-family:inherit; font-weight:600; font-size:.84rem; cursor:pointer; min-height:40px; }
+  .modecard .pick:hover{ background:var(--deep); }
+  .modecard .more{ color:var(--leaf); font-weight:600; font-size:.82rem; text-decoration:underline; }
+  .modecard :focus-visible, .modehelp:focus-visible, #modeClose:focus-visible{ outline:2px solid var(--leaf); outline-offset:2px; border-radius:6px; }
   .spin{ display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.5); border-top-color:#fff; border-radius:50%; animation:sp .7s linear infinite; vertical-align:-3px; }
   @keyframes sp{ to{ transform:rotate(360deg); } }
 </style>
@@ -143,7 +162,10 @@
               <option value="Agriculture de conservation (non-labour, couverture)">Agriculture de conservation</option>
               <option value="Conventionnel raisonné">Conventionnel raisonné</option>
             </select>
-            <small style="display:block;color:var(--faint);font-size:.74rem;margin-top:4px;line-height:1.4;">Agroécologie : santé du sol et diversité. Biologique : sans chimie de synthèse. Conservation : sol peu travaillé et couvert en permanence. Conventionnel raisonné : intrants justifiés, suivis et raisonnés.</small>
+            <button type="button" class="modehelp" id="modeInfoBtn" aria-haspopup="dialog" aria-controls="modeModal">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+              Comprendre les 4 modes
+            </button>
           </div>
           <div><label>Structure de culture</label>
             <select id="structure" title="Comment la parcelle est organisée">
@@ -285,6 +307,99 @@
   </div>
 
   <!-- Modale connexion / inscription -->
+  <!-- Aide : comprendre les 4 modes de conduite (n'altère pas la valeur interne du champ #mode) -->
+  <div class="modal-bg" id="modeModal" role="dialog" aria-modal="true" aria-labelledby="modeModalTitle">
+    <div class="modal wide">
+      <h3 id="modeModalTitle">Choisir un mode de conduite</h3>
+      <p>Le mode oriente tout l'itinéraire. Lisez les quatre options, puis touchez « Choisir ce mode ».</p>
+      <div class="modegrid">
+
+        <div class="modecard">
+          <h4>Agroécologie / régénératif</h4>
+          <p class="def">Produire en prenant soin du sol : on le nourrit avec de la matière organique, on le garde couvert et on favorise la vie et la diversité (plantes et insectes utiles).</p>
+          <p class="ex"><b>Exemple (maraîchage) :</b> sur des tomates, on apporte du compost, on paille le sol et on associe œillet d'Inde et basilic pour éloigner les ravageurs.</p>
+          <ul><li>Un sol plus vivant et fertile saison après saison.</li><li>Moins de dépenses en intrants achetés.</li></ul>
+          <p class="warn"><b>À savoir :</b> les bénéfices s'installent progressivement, et toutes les pratiques ne conviennent pas à chaque parcelle.</p>
+          <div class="actions">
+            <button type="button" class="pick" data-mode="Agroécologie / régénératif">Choisir ce mode</button>
+            <a class="more" href="/comprendre">En savoir plus</a>
+          </div>
+        </div>
+
+        <div class="modecard">
+          <h4>Biologique (sans chimie de synthèse)</h4>
+          <p class="def">On suit un cahier des charges qui interdit les produits chimiques de synthèse. Attention : tous les produits « naturels » ne sont pas automatiquement autorisés.</p>
+          <p class="ex"><b>Exemple (maraîchage) :</b> sur des tomates, fertilisation au compost et au fumier, lutte avec savon noir ou neem — après avoir vérifié qu'ils sont admis.</p>
+          <ul><li>Des produits sans résidus chimiques de synthèse.</li><li>Valorisation possible sur un marché « bio ».</li></ul>
+          <p class="warn"><b>À savoir :</b> la mention « bio certifié » exige le respect de règles précises et un contrôle ; sans cela, on parle de « pratique inspirée du bio ».</p>
+          <div class="actions">
+            <button type="button" class="pick" data-mode="Agriculture biologique">Choisir ce mode</button>
+            <a class="more" href="/comprendre">En savoir plus</a>
+          </div>
+        </div>
+
+        <div class="modecard">
+          <h4>Agriculture de conservation</h4>
+          <p class="def">On travaille le sol le moins possible, on le garde couvert en permanence et on diversifie les cultures (rotations) pour le protéger et l'enrichir.</p>
+          <p class="ex"><b>Exemple (maraîchage) :</b> on plante les tomates sans labourer toute la parcelle (trous de plantation), on couvre le sol de paille, puis on alterne avec une légumineuse la saison suivante.</p>
+          <ul><li>Un sol protégé de l'érosion, qui retient mieux l'eau.</li><li>Moins de travail du sol.</li></ul>
+          <p class="warn"><b>À savoir :</b> le semis direct demande parfois du matériel adapté ; à introduire progressivement si vous n'avez pas l'équipement.</p>
+          <div class="actions">
+            <button type="button" class="pick" data-mode="Agriculture de conservation (non-labour, couverture)">Choisir ce mode</button>
+            <a class="more" href="/comprendre">En savoir plus</a>
+          </div>
+        </div>
+
+        <div class="modecard">
+          <h4>Conventionnel raisonné</h4>
+          <p class="def">On peut utiliser des engrais minéraux et des produits phytosanitaires, mais seulement quand c'est justifié, à la bonne dose et dans le respect de la réglementation.</p>
+          <p class="ex"><b>Exemple (maraîchage) :</b> sur des tomates, un engrais NPK est apporté en plusieurs petites fois selon les besoins, et un traitement n'est fait qu'après avoir observé un vrai problème.</p>
+          <ul><li>Réponse rapide en cas de carence ou d'attaque.</li><li>Des apports ajustés aux besoins réels.</li></ul>
+          <p class="warn"><b>À savoir :</b> ce n'est pas un usage systématique de produits chimiques ; respectez les doses, les homologations et les délais avant récolte.</p>
+          <div class="actions">
+            <button type="button" class="pick" data-mode="Conventionnel raisonné">Choisir ce mode</button>
+            <a class="more" href="/comprendre">En savoir plus</a>
+          </div>
+        </div>
+
+      </div>
+      <div style="margin-top:16px;text-align:right;"><button type="button" class="btn" id="modeClose">Fermer</button></div>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var modal = document.getElementById("modeModal");
+    var openBtn = document.getElementById("modeInfoBtn");
+    var sel = document.getElementById("mode");
+    if(!modal || !openBtn || !sel) return;
+    var lastFocus = null;
+    function focusables(){ return Array.prototype.slice.call(modal.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])')).filter(function(el){ return el.offsetParent !== null; }); }
+    function onKey(e){
+      if(e.key === "Escape"){ e.preventDefault(); close(); return; }
+      if(e.key === "Tab"){
+        var f = focusables(); if(!f.length) return;
+        var first = f[0], last = f[f.length - 1];
+        if(e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+      }
+    }
+    function open(){ lastFocus = document.activeElement; modal.classList.add("show"); var f = focusables(); if(f.length) f[0].focus(); document.addEventListener("keydown", onKey); }
+    function close(){ modal.classList.remove("show"); document.removeEventListener("keydown", onKey); if(lastFocus && lastFocus.focus){ try{ lastFocus.focus(); }catch(e){} } }
+    openBtn.addEventListener("click", open);
+    var closeBtn = document.getElementById("modeClose");
+    if(closeBtn) closeBtn.addEventListener("click", close);
+    modal.addEventListener("click", function(e){ if(e.target === modal) close(); });
+    Array.prototype.forEach.call(modal.querySelectorAll(".pick"), function(b){
+      b.addEventListener("click", function(){
+        sel.value = b.getAttribute("data-mode");
+        try{ sel.dispatchEvent(new Event("change", { bubbles: true })); }catch(e){}
+        close();
+        try{ sel.focus(); }catch(e){}
+      });
+    });
+  })();
+  </script>
+
   <div class="modal-bg" id="authModal">
     <div class="modal">
       <h3 id="authTitle">Créer mon compte</h3>
