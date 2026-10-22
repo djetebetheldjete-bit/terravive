@@ -34,8 +34,10 @@ const API_KEYS = (function () {
 })();
 const API_KEY = API_KEYS[0];
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
-// Longueur max (tokens) pour la génération du plan — l'itinéraire complet est long.
-const PLAN_MAX_TOKENS = parseInt(process.env.PLAN_MAX_TOKENS, 10) || 8000;
+// Longueur max (tokens) pour la génération du plan — l'itinéraire complet (18 sections,
+// fiches d'action chiffrées, budget, résumé) est long : 8000 coupait le plan vers la
+// section 13. Relevé à 16000 pour laisser l'itinéraire se terminer (section 18 incluse).
+const PLAN_MAX_TOKENS = parseInt(process.env.PLAN_MAX_TOKENS, 10) || 16000;
 // Longueur max pour un projet Arduino (le sketch commenté + le guide peuvent être longs).
 const ARDUINO_MAX_TOKENS = parseInt(process.env.ARDUINO_MAX_TOKENS, 10) || 9000;
 const PORT = process.env.PORT || 3000;
