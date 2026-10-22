@@ -64,6 +64,17 @@ function run() {
     T.contains(s, "CONVENTIONNEL RAISONNÉ", "mode conventionnel");
   });
 
+  // ---------- 2bis) planSystem : corrections agronomiques Prompt 8 ----------
+  T.test("planSystem — corrections agronomiques (Prompt 8) présentes", () => {
+    const s = api.planSystem();
+    T.contains(s, "PRESSION DES MALADIES", "fenêtre de plantation vs pression maladies (§5)");
+    T.contains(s, "COHÉRENTE avec l'écartement", "cohérence densité ↔ écartement (§5)");
+    T.contains(s, "MATURITÉ et de la QUALITÉ", "dose organique liée à la qualité du compost (§4)");
+    T.contains(s, "l'ortie et la consoude sont des plantes tempérées", "purins : ressources réellement locales (§7)");
+    T.contains(s, "vers le BAS de la fourchette", "rendement réaliste selon contraintes (§16)");
+    T.contains(s, "ne regroupe pas sous l'étiquette", "variété reliée aux conditions précises (§2)");
+  });
+
   // ---------- 3) Par scénario : contenu transmis + garde-fous ciblés ----------
   const system = api.planSystem();
   for (const sc of scenarios) {
