@@ -78,9 +78,16 @@ function run() {
   // ---------- 2ter) planSystem : affinages Prompt 9 ----------
   T.test("planSystem — affinages (Prompt 9) présents", () => {
     const s = api.planSystem();
-    T.contains(s, "ABAISSE alors le PLANCHER de la fourchette", "rendement : abaisser le plancher, pas gonfler le plafond (§16)");
-    T.contains(s, "NE fais PAS monter le haut de la fourchette", "rendement : plafond prudent (§16)");
-    T.contains(s, "ne retiens pas par défaut l'écartement le plus serré", "écartement plus large en zone humide (§5)");
+    // Rendement : 3 scénarios + signaler le manque de références locales (§16)
+    T.contains(s, "TROIS SCÉNARIOS — PRUDENT, INTERMÉDIAIRE, FAVORABLE", "rendement en 3 scénarios (§16)");
+    T.contains(s, "RÉFÉRENCES LOCALES fiables pour chiffrer", "signaler l'absence de références locales (§16)");
+    T.contains(s, "ne remplace pas une fourchette par une autre sans base", "pas de fourchette imposée sans base (§16)");
+    // Densité : justifier, ne pas imposer une distance unique (§5)
+    T.contains(s, "JUSTIFIE l'écartement et la densité retenus selon la VARIÉTÉ", "densité justifiée par variété/tuteurage/conduite/risque (§5)");
+    T.contains(s, "n'IMPOSE PAS une distance unique", "pas de distance unique imposée (§5)");
+    // Compost : adapter à la quantité réellement disponible (§4)
+    T.contains(s, "quantité de compost RÉELLEMENT DISPONIBLE", "compost adapté aux ressources réelles (§4)");
+    T.contains(s, "PRIORISE les apports", "prioriser les apports si ressource limitée (§4)");
   });
 
   // ---------- 3) Par scénario : contenu transmis + garde-fous ciblés ----------
