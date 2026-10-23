@@ -90,6 +90,17 @@ function run() {
     T.contains(s, "PRIORISE les apports", "prioriser les apports si ressource limitée (§4)");
   });
 
+  // ---------- 2quater) planSystem : carences prudentes Prompt 10 (§10) ----------
+  T.test("planSystem — interprétation prudente des carences (Prompt 10) présente", () => {
+    const s = api.planSystem();
+    T.contains(s, "INDICES À CONFIRMER", "symptômes présentés comme indices, pas diagnostic (§10)");
+    T.contains(s, "PLUSIEURS CAUSES", "plusieurs causes possibles pour un même symptôme (§10)");
+    T.contains(s, "ce qu'il faut OBSERVER pour les distinguer", "observations pour distinguer les causes (§10)");
+    T.contains(s, "pH ÉLEVÉ qui BLOQUE l'assimilation", "fer : blocage par pH, vérifier avant apport (§10)");
+    T.contains(s, "du STADE de la culture, du TYPE DE SOL et de l'HISTORIQUE", "tenir compte stade/sol/historique (§10)");
+    T.contains(s, "N'IMPOSE PAS une dose corrective précise", "pas de dose corrective sans données (§10)");
+  });
+
   // ---------- 3) Par scénario : contenu transmis + garde-fous ciblés ----------
   const system = api.planSystem();
   for (const sc of scenarios) {
