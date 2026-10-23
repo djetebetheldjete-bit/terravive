@@ -795,7 +795,18 @@ void loop() {
     // dès qu'une vraie carte envoie des données, elles apparaissent sans recharger la page.
     setInterval(refresh, 60000);
     loadParcels();
-    if(me && me.isAdmin){ loadAdminQuestions(); initAdminAnimators(); }
+    if(me && me.isAdmin){
+      loadAdminQuestions(); initAdminAnimators();
+      // Quality Guard apparaît uniquement dans le menu des administrateurs.
+      const menu=document.querySelector('.side .menu');
+      if(menu && !document.getElementById('qualityGuardNav')){
+        const link=document.createElement('a');
+        link.id='qualityGuardNav'; link.href='/quality';
+        link.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg> Quality Guard';
+        link.style.marginTop='8px'; link.style.borderTop='1px solid rgba(255,255,255,.18)'; link.style.paddingTop='14px';
+        menu.appendChild(link);
+      }
+    }
   }
   // Propriétaire : désigner / retirer les animateurs.
   function initAdminAnimators(){
