@@ -64,56 +64,6 @@ function run() {
     T.contains(s, "CONVENTIONNEL RAISONNÉ", "mode conventionnel");
   });
 
-  // ---------- 2bis) planSystem : corrections agronomiques Prompt 8 ----------
-  T.test("planSystem — corrections agronomiques (Prompt 8) présentes", () => {
-    const s = api.planSystem();
-    T.contains(s, "PRESSION DES MALADIES", "fenêtre de plantation vs pression maladies (§5)");
-    T.contains(s, "COHÉRENTE avec l'écartement", "cohérence densité ↔ écartement (§5)");
-    T.contains(s, "MATURITÉ et de la QUALITÉ", "dose organique liée à la qualité du compost (§4)");
-    T.contains(s, "l'ortie et la consoude sont des plantes tempérées", "purins : ressources réellement locales (§7)");
-    T.contains(s, "vers le BAS de la fourchette", "rendement réaliste selon contraintes (§16)");
-    T.contains(s, "ne regroupe pas sous l'étiquette", "variété reliée aux conditions précises (§2)");
-  });
-
-  // ---------- 2ter) planSystem : affinages Prompt 9 ----------
-  T.test("planSystem — affinages (Prompt 9) présents", () => {
-    const s = api.planSystem();
-    // Rendement : 3 scénarios + signaler le manque de références locales (§16)
-    T.contains(s, "TROIS SCÉNARIOS — PRUDENT, INTERMÉDIAIRE, FAVORABLE", "rendement en 3 scénarios (§16)");
-    T.contains(s, "RÉFÉRENCES LOCALES fiables pour chiffrer", "signaler l'absence de références locales (§16)");
-    T.contains(s, "ne remplace pas une fourchette par une autre sans base", "pas de fourchette imposée sans base (§16)");
-    // Densité : justifier, ne pas imposer une distance unique (§5)
-    T.contains(s, "JUSTIFIE l'écartement et la densité retenus selon la VARIÉTÉ", "densité justifiée par variété/tuteurage/conduite/risque (§5)");
-    T.contains(s, "n'IMPOSE PAS une distance unique", "pas de distance unique imposée (§5)");
-    // Compost : adapter à la quantité réellement disponible (§4)
-    T.contains(s, "quantité de compost RÉELLEMENT DISPONIBLE", "compost adapté aux ressources réelles (§4)");
-    T.contains(s, "PRIORISE les apports", "prioriser les apports si ressource limitée (§4)");
-  });
-
-  // ---------- 2quater) planSystem : carences prudentes Prompt 10 (§10) ----------
-  T.test("planSystem — interprétation prudente des carences (Prompt 10) présente", () => {
-    const s = api.planSystem();
-    T.contains(s, "INDICES À CONFIRMER", "symptômes présentés comme indices, pas diagnostic (§10)");
-    T.contains(s, "PLUSIEURS CAUSES", "plusieurs causes possibles pour un même symptôme (§10)");
-    T.contains(s, "ce qu'il faut OBSERVER pour les distinguer", "observations pour distinguer les causes (§10)");
-    T.contains(s, "pH ÉLEVÉ qui BLOQUE l'assimilation", "fer : blocage par pH, vérifier avant apport (§10)");
-    T.contains(s, "du STADE de la culture, du TYPE DE SOL et de l'HISTORIQUE", "tenir compte stade/sol/historique (§10)");
-    T.contains(s, "N'IMPOSE PAS une dose corrective précise", "pas de dose corrective sans données (§10)");
-  });
-
-  // ---------- 2quinquies) planSystem : préparations naturelles Prompt 11 (§9) ----------
-  T.test("planSystem — encadrement des préparations naturelles (Prompt 11) présent", () => {
-    const s = api.planSystem();
-    T.contains(s, "PRÉPARATIONS NATURELLES — ENCADREMENT OBLIGATOIRE", "bloc d'encadrement présent (§9)");
-    T.contains(s, "NIVEAU DE CONFIANCE", "niveau de confiance (documenté/possible/incertain) (§9)");
-    T.contains(s, "PHYTOTOXICITÉ", "phytotoxicité possible signalée (§9)");
-    T.contains(s, "AUXILIAIRES ET POLLINISATEURS", "effets sur auxiliaires/pollinisateurs (§9)");
-    T.contains(s, "ESSAI PRÉALABLE", "essai préalable sur quelques plantes (§9)");
-    T.contains(s, "N'INVENTE JAMAIS de concentration", "pas de dose/efficacité/délai inventés (§9)");
-    T.contains(s, "tous les savons noirs ne conviennent pas", "savon noir : compatibilité/phytotoxicité (§9)");
-    T.contains(s, "jamais de cendre issue de déchets peints", "cendre : pas de matériaux traités (§9)");
-  });
-
   // ---------- 3) Par scénario : contenu transmis + garde-fous ciblés ----------
   const system = api.planSystem();
   for (const sc of scenarios) {

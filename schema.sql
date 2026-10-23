@@ -184,3 +184,21 @@ create table if not exists trv_anim_requests (
 );
 create index if not exists trv_anim_requests_status_idx on trv_anim_requests (status, created_at desc);
 create index if not exists trv_anim_requests_user_idx on trv_anim_requests (user_id);
+
+-- Historique Quality Guard (audit indicatif, sans modification automatique des itinéraires)
+create table if not exists trv_quality_audits (
+  id text primary key,
+  plan_id text,
+  plan_title text,
+  kind text,
+  status text,
+  score integer,
+  issues jsonb default '[]'::jsonb,
+  deterministic jsonb,
+  ai jsonb,
+  model text,
+  created_at timestamptz default now(),
+  created_by text,
+  details jsonb
+);
+create index if not exists trv_quality_audits_created_idx on trv_quality_audits (created_at desc);

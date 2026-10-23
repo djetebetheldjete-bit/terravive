@@ -9,16 +9,18 @@
  */
 const det = require("./test-deterministic");
 const sim = require("./test-sim-ai");
+const quality = require("./test-quality");
 
 async function main() {
   console.log("Terravive — suite de tests (Node natif, zéro dépendance, sans clé API).");
   const r1 = det.run();
   const r2 = await sim.run();
+  const r3 = quality.run();
 
-  const tests = r1.total + r2.total;
-  const failed = r1.failed + r2.failed;
-  const checks = r1.totalChecks + r2.totalChecks;
-  const failedChecks = r1.failedChecks + r2.failedChecks;
+  const tests = r1.total + r2.total + r3.total;
+  const failed = r1.failed + r2.failed + r3.failed;
+  const checks = r1.totalChecks + r2.totalChecks + r3.total;
+  const failedChecks = r1.failedChecks + r2.failedChecks + r3.failed;
 
   console.log("\n================ BILAN GLOBAL ================");
   console.log(`  Tests exécutés : ${tests}`);

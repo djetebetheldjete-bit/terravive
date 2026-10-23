@@ -4,7 +4,8 @@
   "description": "Terravive — l'agriculture durable accompagnée par l'intelligence artificielle.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node test/run.js"
   },
   "engines": {
     "node": ">=18"
