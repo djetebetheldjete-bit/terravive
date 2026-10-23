@@ -13,7 +13,6 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const qualityGuard = require("./quality");
 
 // ---------- Configuration ----------
 function loadEnv(file) {
@@ -168,55 +167,6 @@ async function getPlan(id) {
 async function listPlansForUser(userId) {
   if (USE_DB) { try { return (await sb(`/trv_plans?user_id=eq.${encodeURIComponent(userId)}&select=id,title,crop,region,created_at&order=created_at.desc`)) || []; } catch (e) { return []; } }
   return Object.values(loadStore().plans).filter((p) => p.user_id === userId).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-}
-async function listPlansForQuality(limit = 60) {
-  limit = Math.max(1, Math.min(100, Number(limit) || 60));
-  if (USE_DB) { try { return (await sb(`/trv_plans?select=id,user_id,title,crop,region,area,soil,season,goal,notes,content,created_at&order=created_at.desc&limit=${limit}`)) || []; } catch (e) { throw new Error("Lecture des itinéraires Supabase impossible : " + e.message); } }
-  return Object.values(loadStore().plans).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,limit);
-}
-async function saveQualityAudit(rec) {
-  if (USE_DB) { await sb(`/trv_quality_audits`, {method:"POST", headers:{Prefer:"return=minimal"}, body:JSON.stringify([rec])}); return; }
-  const st=loadStore(); if(!Array.isArray(st.qualityAudits)) st.qualityAudits=[]; st.qualityAudits.unshift(rec); st.qualityAudits=st.qualityAudits.slice(0,500); saveStore(st);
-}
-async function listQualityAudits(limit=50) {
-  limit=Math.max(1,Math.min(100,Number(limit)||50));
-  if(USE_DB) return (await sb(`/trv_quality_audits?select=id,plan_id,plan_title,kind,status,score,issues,created_at,model&order=created_at.desc&limit=${limit}`))||[];
-  const st=loadStore(); return (st.qualityAudits||[]).slice(0,limit);
-}
-async function handleQualityPlans(req,res) {
-  const u=await currentUser(req); if(!isAdmin(u)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
-  try { const plans=await listPlansForQuality(60); const rows=plans.map(p=>({id:p.id,title:p.title||p.crop||"Itinéraire",crop:p.crop||null,region:p.region||null,area:p.area||null,soil:p.soil||null,created_at:p.created_at||null,contentLength:String(p.content||"").length,deterministic:qualityGuard.deterministicAudit(p)})); return sendJson(res,200,{plans:rows,storage:USE_DB?"supabase":"local",count:rows.length}); }
-  catch(e){return sendJson(res,500,{error:e.message||"Lecture impossible."});}
-}
-async function handleQualityAudit(req,res) {
-  const u=await currentUser(req); if(!isAdmin(u)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
-  if(!rateOk("quality-audit:"+u.id,10,60*60*1000)) return sendJson(res,429,{error:"Limite d'audits atteinte : maximum 10 par heure."});
-  let body={}; try{body=JSON.parse((await readBody(req))||"{}");}catch(e){return sendJson(res,400,{error:"JSON invalide."});}
-  if(!body.planId) return sendJson(res,400,{error:"planId obligatoire."});
-  try {
-    const plans=await listPlansForQuality(100); const plan=plans.find(p=>p.id===String(body.planId));
-    if(!plan) return sendJson(res,404,{error:"Itinéraire introuvable dans les 100 derniers itinéraires."});
-    const deterministic=qualityGuard.deterministicAudit(plan); let ai={executed:false,status:"NON EXÉCUTÉ",error:null};
-    if(body.includeAI===true) { try { ai=await qualityGuard.aiAudit(plan,API_KEY,MODEL); } catch(e) { ai={executed:true,status:"ERREUR D'AUDIT",error:e.message}; } }
-    const issues=[...deterministic.issues,...(Array.isArray(ai.issues)?ai.issues:[])];
-    const statuses=[deterministic.status,ai.status];
-    const status=statuses.includes("BLOQUÉ")?"BLOQUÉ":statuses.includes("À CORRIGER")?"À CORRIGER":statuses.includes("AVERTISSEMENT")?"AVERTISSEMENT":deterministic.status;
-    const rec={id:newId(),plan_id:plan.id,plan_title:plan.title||plan.crop||"Itinéraire",kind:body.includeAI===true?"technique+IA":"technique",status,score:deterministic.score,issues,deterministic,ai,model:ai.model||null,created_at:new Date().toISOString(),created_by:u.id};
-    try { await saveQualityAudit(rec); } catch(e) { rec.persistenceWarning="Audit effectué mais historique non sauvegardé : vérifiez le schéma Supabase trv_quality_audits."; }
-    return sendJson(res,200,{audit:rec});
-  } catch(e){return sendJson(res,500,{error:e.message||"Audit impossible."});}
-}
-async function handleQualityHistory(req,res) {
-  const u=await currentUser(req); if(!isAdmin(u)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
-  try{return sendJson(res,200,{audits:await listQualityAudits(60)});}catch(e){return sendJson(res,500,{error:e.message||"Historique indisponible."});}
-}
-async function handleQualityTests(req,res) {
-  const u=await currentUser(req); if(!isAdmin(u)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
-  if(!rateOk("quality-tests:"+u.id,6,60*60*1000)) return sendJson(res,429,{error:"Maximum 6 exécutions de la suite par heure."});
-  const result=qualityGuard.runExistingTests(__dirname);
-  const rec={id:newId(),plan_id:null,plan_title:"Suite automatisée Terravive",kind:"tests",status:result.passed?"CONTRÔLES RÉUSSIS":"ÉCHEC",score:null,issues:[],created_at:new Date().toISOString(),created_by:u.id,details:{executed:result.executed,exitCode:result.exitCode,passed:result.passed,output:result.output.slice(-18000),error:result.error}};
-  try{await saveQualityAudit(rec);}catch(e){rec.persistenceWarning="Résultat non enregistré dans l'historique : vérifiez le schéma Supabase.";}
-  return sendJson(res,result.passed?200:500,{result:rec.details,audit:rec});
 }
 
 // ---------- Journal des questions posées au conseiller ----------
@@ -624,7 +574,7 @@ TYPOLOGIE DE L'AGROSYSTÈME : tiens compte du MODE de conduite indiqué (convent
 FACTEURS À PESER dans ce diagnostic : le climat et la saison ; les caractéristiques connues du sol ; la disponibilité en eau ; le matériel disponible et les moyens financiers du producteur (souvent décrits dans « Moyens / contraintes ») ; les principaux ravageurs et maladies de la culture dans la zone ; et les objectifs de rendement et de commercialisation. Pour chacun, précise s'il s'agit d'une donnée FOURNIE par la personne, d'une donnée GÉNÉRALE connue pour la culture et la zone, ou d'une HYPOTHÈSE — et n'avance jamais une hypothèse comme un fait mesuré.
 
 ## 2. Choix de la variété et des semences
-Type de variété adapté au climat local et à l'objectif (résistance aux maladies, cycle court ou long, tolérance à la chaleur ou à la sécheresse), qualité des semences (semences saines, taux de germination), et préparation éventuelle (pré-germination, traitement — en privilégiant les solutions naturelles). Si tu cites des noms de variétés, présente-les comme des EXEMPLES courants et ajoute « Disponibilité locale à confirmer auprès d'un fournisseur ou d'un technicien agricole de votre zone. » — n'affirme jamais qu'une variété précise est disponible dans la localité sans preuve, et n'invente ni prix ni fournisseur.
+Type de variété adapté au climat local et à l'objectif (résistance aux maladies, cycle court ou long, tolérance à la chaleur ou à la sécheresse), qualité des semences (semences saines, taux de germination), et préparation éventuelle (pré-germination, traitement — en privilégiant les solutions naturelles). Si tu cites des noms de variétés, présente-les comme des EXEMPLES courants et ajoute « Disponibilité locale à confirmer auprès d'un fournisseur ou d'un technicien agricole de votre zone. » — n'affirme jamais qu'une variété précise est disponible dans la localité sans preuve, et n'invente ni prix ni fournisseur. Relie CHAQUE variété citée aux conditions PRÉCISES (climat humide ou sec, pression des maladies, longueur du cycle) : ne regroupe pas sous l'étiquette « tolérante à la chaleur humide » (ou similaire) une variété qui ne l'est pas réellement pour ce contexte ; si une variété convient surtout à une zone moins humide, dis-le.
 
 ## 3. Préparation du sol
 Défrichage et nettoyage de la parcelle, travail du sol (labour, hersage, planage) et forme de culture (à plat, en billons, en buttes ou en planches) choisie selon le sol et le besoin de drainage. Rappelle l'intérêt d'un travail du sol limité et de la matière organique pour préserver un sol vivant, quand c'est possible.
@@ -634,16 +584,17 @@ Apports organiques avant plantation (compost, fumier bien décomposé) et leur e
 Gestion du pH : si le pH du sol est FOURNI, utilise-le — sol acide (pH inférieur à ~6) : conseille un chaulage léger (chaux agricole ou cendre de bois) pour le remonter ; sol alcalin (pH supérieur à ~7,5) : évite le chaulage et mise sur la matière organique ; pH proche de 6–7 : rien à corriger, c'est idéal. Donne les apports en FOURCHETTES, et précise que la dose exacte de chaux dépend aussi de la TEXTURE et du pouvoir tampon du sol (un sol léger/sableux demande moins de chaux qu'un sol argileux) : pour une dose sûre, une analyse de sol reste préférable.
 Si le pH N'EST PAS fourni (c'est souvent le cas, et c'est NORMAL), ne bloque pas et ne l'invente pas : rappelle simplement que beaucoup de sols tropicaux sont légèrement acides, propose des moyens SIMPLES et peu coûteux de l'ESTIMER si la personne le souhaite — en étant honnête sur leurs LIMITES : les bandelettes de pH bon marché ou une petite analyse sont les plus fiables ; le test maison au vinaigre et au bicarbonate ne donne qu'une indication très grossière (il révèle surtout un sol calcaire par l'effervescence au vinaigre) et NE fournit PAS une valeur de pH ; les plantes indicatrices sont peu fiables sous les tropiques. NE chiffre JAMAIS une dose de chaux à partir d'un test maison : un chaulage dosé exige un pH réellement mesuré et la texture du sol. En attendant, avance avec une approche prudente qui marche dans tous les cas : beaucoup de matière organique (elle corrige doucement l'acidité) et observation de la culture.
 Donne des ordres de grandeur réalistes sous forme de FOURCHETTES, jamais de chiffres inventés précis.
+La valeur fertilisante réelle d'un apport organique dépend fortement de la MATURITÉ et de la QUALITÉ du compost ou du fumier (un compost jeune ou pauvre nourrit beaucoup moins) : relie la dose à cette qualité et à l'observation de la culture, plutôt qu'à un chiffre fixe, et commence plutôt vers le bas de la fourchette quand la qualité est incertaine. ADAPTE le plan de fumure à la quantité de compost RÉELLEMENT DISPONIBLE et aux moyens déclarés : ne présente pas plusieurs tonnes comme si leur approvisionnement était garanti. Si la ressource est limitée (petit budget), demande ou estime d'abord la quantité disponible, PRIORISE les apports (concentrer au pied et aux stades clés plutôt que couvrir toute la surface) et propose de PRODUIRE le compost sur place ; dimensionne le tonnage en conséquence au lieu d'un chiffre théorique.
 
 ## 5. Semis / plantation
-Date de semis conseillée selon le régime des pluies de la région ; pépinière puis repiquage si la culture s'y prête (durée en pépinière) ; DENSITÉ et ÉCARTEMENT (distance entre les lignes et sur la ligne) ; profondeur de semis ; et un nombre indicatif de plants ou de graines pour la surface donnée.
+Date de semis conseillée selon le régime des pluies de la région ; pour une culture SENSIBLE AUX MALADIES en climat humide (ex. tomate en zone forestière), raisonne la fenêtre de plantation aussi en fonction de la PRESSION DES MALADIES — viser si possible une période moins humide, ou renforcer la protection (planches surélevées, variété tolérante, aération, prophylaxie) — sans inventer de dates locales ; pépinière puis repiquage si la culture s'y prête (durée en pépinière) ; DENSITÉ et ÉCARTEMENT (distance entre les lignes et sur la ligne) ; profondeur de semis ; et un nombre indicatif de plants ou de graines pour la surface donnée. VÉRIFIE que la densité annoncée est COHÉRENTE avec l'écartement donné (densité à l'hectare ≈ 10 000 ÷ (interligne en m × distance sur la ligne en m)) et ne te contredis pas entre l'écartement et le nombre de plants ; pour une culture sensible aux maladies, privilégie un interligne suffisant pour l'aération ; JUSTIFIE l'écartement et la densité retenus selon la VARIÉTÉ, le TUTEURAGE, la CONDUITE et le RISQUE SANITAIRE, et n'IMPOSE PAS une distance unique : explique le compromis (en climat humide, un interligne plus large améliore l'aération et réduit les maladies, mais abaisse la densité) et laisse la personne arbitrer selon son contexte.
 
 ## 6. Entretien de la culture
 Démariage / éclaircissage, désherbage (sarclage manuel, paillage pour limiter les mauvaises herbes et garder l'humidité), buttage, tuteurage si nécessaire. Précise les périodes (nombre de semaines après le semis).
 
 ## 7. Fertilisation d'entretien (fertilisation raisonnée)
 Raisonne la fertilisation : la BONNE dose, au BON moment, adaptée au sol, à la saison et à la variété (une même culture n'a pas les mêmes besoins sur sol pauvre ou riche, ni en saison humide ou sèche). Privilégie toujours les fumures organiques.
-Si un apport minéral est nécessaire, FRACTIONNE-le (plusieurs petits apports plutôt qu'un seul gros) et relie chaque apport à un stade (reprise, pleine croissance, floraison, fructification). Pour l'AZOTE, qui est très mobile et facilement perdu : ne le mets jamais tout d'un coup, apporte-le pendant la phase de croissance, sur une parcelle PROPRE (désherbée juste avant), bien réparti, et si possible juste avant une pluie ou un arrosage pour limiter les pertes. Donne les apports en FOURCHETTES et rappelle de ne pas sur-fertiliser (gaspillage, pollution, et parfois baisse de rendement ou maladies).
+Si un apport minéral est nécessaire, FRACTIONNE-le (plusieurs petits apports plutôt qu'un seul gros) et relie chaque apport à un stade (reprise, pleine croissance, floraison, fructification). Pour l'AZOTE, qui est très mobile et facilement perdu : ne le mets jamais tout d'un coup, apporte-le pendant la phase de croissance, sur une parcelle PROPRE (désherbée juste avant), bien réparti, et si possible juste avant une pluie ou un arrosage pour limiter les pertes. Donne les apports en FOURCHETTES et rappelle de ne pas sur-fertiliser (gaspillage, pollution, et parfois baisse de rendement ou maladies). Pour les engrais liquides naturels (purins, thés de compost ou de fiente), propose des ressources réellement DISPONIBLES LOCALEMENT dans la zone : ne cite pas comme locale une plante qui ne l'est pas (par exemple, l'ortie et la consoude sont des plantes tempérées peu présentes en zone tropicale ; privilégie des plantes communes sur place). Quand tu n'es pas sûr de la disponibilité, dis-le et laisse le choix à la personne.
 Si la personne irrigue au goutte-à-goutte, propose la FERTIGATION : dissoudre un engrais soluble dans l'eau d'irrigation et l'apporter en petites quantités fréquentes, directement près des racines — c'est plus efficace et ça gaspille beaucoup moins d'engrais.
 
 ## 8. Gestion de l'eau et irrigation
@@ -657,10 +608,16 @@ Recommande EN PRIORITÉ la solution la plus réaliste au vu de ses moyens et de 
 
 ## 9. Protection phytosanitaire (lutte intégrée)
 Principaux ravageurs et maladies de cette culture dans la région, et les signes à surveiller. Présente-les avec le BON niveau de certitude, en distinguant : un RISQUE GÉNÉRAL associé à la culture ; un risque PLAUSIBLE selon les conditions locales (saison, humidité, zone) ; un problème EFFECTIVEMENT OBSERVÉ sur la parcelle ; un DIAGNOSTIC CONFIRMÉ par des éléments suffisants. Ne présente jamais une maladie comme présente sur la parcelle au seul motif qu'elle est connue sur cette culture — utilise « risque à surveiller », « problème possible selon les conditions locales », « diagnostic à confirmer par l'observation ou une analyse adaptée ». Un diagnostic ferme demande une OBSERVATION de terrain : invite la personne à confirmer en observant les symptômes, et renvoie au DIAGNOSTIC PAR PHOTO de l'application en cas de doute. Ne présente pas un produit comme « autorisé localement » sans vérification. Présente la protection dans CET ORDRE : d'abord la PRÉVENTION (rotation des cultures, variétés résistantes, hygiène de la parcelle, associations de cultures) ; ensuite la lutte BIOLOGIQUE et les préparations NATURELLES (ex. savon noir, extrait de neem, cendre, plantes répulsives, auxiliaires) ; et seulement EN DERNIER RECOURS un produit chimique, à dose prudente et avec les précautions d'usage. Ne donne jamais de conseil dangereux pour la santé ou l'environnement.
+PRÉPARATIONS NATURELLES — ENCADREMENT OBLIGATOIRE : ne présente JAMAIS une préparation naturelle (neem, savon noir, ail, piment, cendre…) comme universellement efficace, inoffensive parce que « naturelle », ou utilisable sans précaution. Pour CHAQUE préparation proposée, précise : (a) le PROBLÈME CIBLÉ (ravageur ou symptôme précis — une préparation ne vaut pas contre « tout ») ; (b) le NIVEAU DE CONFIANCE en distinguant usage traditionnel, effet possible, et efficacité réellement établie, et dis-le clairement quand les preuves sont insuffisantes ou incertaines ; (c) les LIMITES et la PHYTOTOXICITÉ possible (une préparation peut brûler les feuilles ou nuire à la culture selon sa composition, sa concentration et les conditions d'application) ; (d) les effets possibles sur les AUXILIAIRES ET POLLINISATEURS, même pour une préparation naturelle — éviter les pulvérisations sur les fleurs ouvertes et pendant l'activité des pollinisateurs ; (e) un ESSAI PRÉALABLE sur quelques plantes, hors forte chaleur et plein soleil, à observer avant toute extension, et NE PAS étendre si des dégâts apparaissent ; (f) la PROTECTION de l'utilisateur adaptée au risque d'irritation (surtout ail et piment : yeux, peau, ne pas inhaler les aérosols), sans prétendre qu'un équipement garantit une sécurité absolue. N'INVENTE JAMAIS de concentration, de dose « universelle », de fréquence, de délai avant récolte, de taux d'efficacité, de résultat d'essai, de référence scientifique ni d'homologation ; quand une donnée manque (ex. délai avant récolte), signale-le et renvoie aux règles applicables au produit réellement utilisé. Points spécifiques : NEEM — l'effet dépend du produit, de sa composition, de sa préparation et du ravageur ciblé ; pas « sans danger » parce que végétal ; attention aux pollinisateurs ; pour un produit commercial, suivre l'étiquette et les règles locales. SAVON NOIR — tous les savons noirs ne conviennent pas aux plantes (composition et additifs variables, risque de phytotoxicité) ; vérifier la compatibilité avec la culture, tester sur quelques plants d'abord, ne pas appliquer sur toute la parcelle si des dégâts apparaissent. AIL ET PIMENT — efficacité variable, ne remplacent pas un diagnostic du problème ; risque d'irritation (yeux, peau) et de brûlure du feuillage, effets possibles sur des organismes non ciblés. CENDRE — pas un insecticide universel ni une solution systématique contre les maladies ; composition variable selon le matériau brûlé ; modifie le pH du sol et apporte des sels/éléments minéraux en quantités variables → sur un sol au pH INCONNU, pas d'apport important ou répété sans vérification ; jamais de cendre issue de déchets peints, traités, plastifiés ou de matériaux d'origine inconnue. Dans tous les cas : d'abord le DIAGNOSTIC (identifier le ravageur/symptôme, sinon demander une observation plus précise ou un diagnostic complémentaire) puis la PRÉVENTION ; ne conseille pas de mélanges improvisés sans compatibilité démontrée ; et pour un produit phytosanitaire commercial, privilégie un produit autorisé pour la culture et l'usage ciblés, en respectant l'étiquette et les règles locales.
 
 ## 10. Suivi des stades et reconnaître les carences
 Les grands stades de la culture (levée, croissance végétative, floraison, fructification/remplissage, maturité) avec, pour chacun, un repère de durée indicatif, pour que la personne sache toujours où elle en est dans le cycle.
-Apprends-lui aussi à LIRE les feuilles pour repérer tôt un manque et réagir : feuilles entièrement jaunes (limbe ET nervures), sur l'ensemble de la plante → manque d'AZOTE ; plante rabougrie, feuilles vert très foncé ou violacées → manque de PHOSPHORE ; jeunes feuilles jaunes mais nervures restées vertes → manque de FER ; taches ou plages jaunes par endroits sur les vieilles feuilles → manque de CALCIUM. Invite à corriger par un apport adapté (organique de préférence) et à continuer de surveiller.
+Apprends-lui aussi à OBSERVER les feuilles pour repérer tôt un problème — mais présente ces signes comme des INDICES À CONFIRMER, JAMAIS comme un diagnostic certain : un même symptôme peut avoir PLUSIEURS CAUSES (carence réelle, mais aussi excès ou manque d'eau, maladie, ravageur, stade de la plante, pH qui bloque l'assimilation, lessivage sur sol sableux). Pour CHAQUE signe, donne la ou les causes POSSIBLES et dis ce qu'il faut OBSERVER pour les distinguer :
+- feuilles entièrement jaunes (limbe et nervures), surtout sur les vieilles feuilles du bas, plante peu vigoureuse : évoque un manque d'AZOTE, mais aussi un engorgement, un lessivage (fortes pluies sur sol sableux) ou des racines abîmées ; à distinguer en regardant l'humidité du sol, la répartition (bas ou haut de la plante) et la vigueur d'ensemble ;
+- plante rabougrie, feuilles vert très foncé ou teintées de violet : évoque un manque de PHOSPHORE, mais le froid, un sol compact ou un enracinement limité donnent des signes proches ; à confronter au stade et aux conditions ;
+- jeunes feuilles jaunes mais nervures restées vertes : évoque un manque de FER (ou d'un autre oligo-élément), souvent lié à un pH ÉLEVÉ qui BLOQUE l'assimilation plutôt qu'à une absence réelle dans le sol → vérifier le pH avant tout apport ;
+- taches ou plages jaunes/nécrosées sur les vieilles feuilles, ou nécrose au bout des fruits : évoque un manque de CALCIUM (fréquent sur sol sableux), mais le plus souvent dû à des à-coups d'arrosage plutôt qu'à une absence de calcium dans le sol → régulariser l'eau d'abord.
+Tiens compte du STADE de la culture, du TYPE DE SOL et de l'HISTORIQUE des apports avant de conclure. N'IMPOSE PAS une dose corrective précise sur la seule foi d'un symptôme : commence par l'observation (et, si besoin, la mesure du pH ou une petite analyse) ; si un apport se justifie, privilégie une correction organique prudente et renvoie, pour un intrant minéral ciblé, à une analyse ou à un technicien. Invite à utiliser le DIAGNOSTIC PAR PHOTO de l'application en cas de doute et à surveiller l'évolution sur quelques jours avant d'agir davantage.
 
 ## 11. Récolte
 Les signes de maturité à reconnaître, la période indicative et la méthode de récolte pour préserver la qualité et limiter les pertes.
@@ -688,7 +645,7 @@ Section OBLIGATOIRE, dans l'esprit des agrosystèmes durables. Traite concrètem
 En quelques lignes simples : comment cet itinéraire aide la parcelle à STOCKER du carbone dans le sol et la biomasse (matière organique, compost, couverture végétale, non-brûlage des résidus, agroforesterie) et à mieux RÉSISTER au changement climatique (sécheresses, pluies violentes). Indique, en ordre de grandeur et en restant prudent (fourchette, jamais de chiffre inventé précis), que les pratiques agroécologiques peuvent séquestrer du carbone et réduire les émissions par rapport à une conduite avec brûlage et beaucoup d'intrants chimiques. Relie cela à un bénéfice concret pour la personne (sol plus fertile et plus vivant, qui retient mieux l'eau).
 
 ## 16. Rendement attendu et repères économiques
-Une FOURCHETTE réaliste de rendement (en précisant l'unité, ex. t/ha, ou une estimation sur la surface indiquée), présentée comme un POTENTIEL INDICATIF et non une promesse : le rendement réel varie fortement selon le sol, la saison, la variété et la conduite. Ajoute les bénéfices durables de l'approche (sol vivant, moins d'eau, moins de produits chimiques, meilleurs revenus dans la durée).
+Une FOURCHETTE réaliste de rendement (en précisant l'unité, ex. t/ha, ou une estimation sur la surface indiquée), présentée comme un POTENTIEL INDICATIF et non une promesse : le rendement réel varie fortement selon le sol, la saison, la variété et la conduite. Tiens compte des CONTRAINTES réelles déclarées (culture pluviale, sol pauvre, petits moyens, arrosage manuel, forte pression de maladies) qui tirent souvent le rendement vers le BAS de la fourchette : présente alors le rendement en TROIS SCÉNARIOS — PRUDENT, INTERMÉDIAIRE, FAVORABLE — en explicitant pour CHACUN les HYPOTHÈSES qui le portent (pression sanitaire, eau réellement disponible, moyens techniques, fertilité, variété). En conditions contraintes (pluvial, sol pauvre, petits moyens), le scénario PRUDENT doit servir de repère principal, et le scénario favorable rester une exception à ne PAS présenter comme attendue (ne gonfle pas le plafond). Si tu ne disposes pas de RÉFÉRENCES LOCALES fiables pour chiffrer solidement, DIS-LE explicitement et donne des ordres de grandeur prudents au lieu d'imposer une fourchette ; n'invente aucun chiffre précis et ne remplace pas une fourchette par une autre sans base. Ajoute les bénéfices durables de l'approche (sol vivant, moins d'eau, moins de produits chimiques, meilleurs revenus dans la durée).
 BUDGET PRÉVISIONNEL : n'invente JAMAIS de prix local. Construis un tableau que le producteur complétera avec ses prix réels, pour la superficie indiquée. Colonnes exactes :
 | Poste | Quantité prévue | Unité | Prix unitaire | Coût total | Origine du prix | Vérifié / Estimé |
 Postes (adapte-les à la culture) : Semences ou plants ; Fertilisation et amendements ; Protection phytosanitaire ; Irrigation ; Matériel et équipements ; Main-d'œuvre ; Transport ; Emballage et commercialisation ; Autres charges. Reporte dans « Quantité prévue » les quantités DÉJÀ calculées plus haut (cohérence obligatoire) ; laisse « Prix unitaire » et « Coût total » à compléter quand tu n'as pas de prix fiable, et marque la ligne « Estimé » tant que le producteur n'a pas donné son prix (« Vérifié » seulement s'il l'a fourni). SÉPARE les coûts d'INVESTISSEMENT (matériel durable) des CHARGES du cycle, évite de compter deux fois le même coût, et signale les postes souvent OUBLIÉS (transport, emballage, pertes).
@@ -1365,11 +1322,11 @@ function serveStatic(req, res) {
   if (urlPath === "/accueil") urlPath = "/accueil.html";
   if (urlPath === "/arduino") urlPath = "/arduino.html";
   if (urlPath === "/tableau" || urlPath === "/dashboard") urlPath = "/tableau.html";
+  if (urlPath === "/quality") urlPath = "/quality.html";
   if (urlPath === "/comprendre") urlPath = "/comprendre.html";
   if (urlPath === "/conseiller" || urlPath === "/chat") urlPath = "/conseiller.html";
   if (urlPath === "/cooperative" || urlPath === "/coop") urlPath = "/cooperative.html";
   if (urlPath === "/diagnostic" || urlPath === "/diagnostic.html") urlPath = "/diagnostic.html";
-  if (urlPath === "/quality") urlPath = "/quality.html";
   const safe = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(PUBLIC_DIR, safe);
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end("Accès interdit"); }
@@ -1378,6 +1335,84 @@ function serveStatic(req, res) {
     res.writeHead(200, { "content-type": MIME[path.extname(filePath)] || "application/octet-stream" });
     res.end(content);
   });
+}
+
+
+// ---------- Quality Guard (contrôles déterministes, sans modification automatique) ----------
+function qualityAnalyzePlan(plan) {
+  const content = String((plan && (plan.content || plan.notes)) || "");
+  const headings = (content.match(/^#{1,3}\s*(?:\d{1,2}\s*[\.\-:)]|section\s+\d{1,2})/gim) || []).length;
+  const alerts = [];
+  if (!content.trim()) alerts.push({ severity: "high", message: "Contenu du plan absent ou vide." });
+  if (content.trim() && headings < 18) alerts.push({ severity: "medium", message: `Seulement ${headings} titres de sections numérotés détectés ; vérifier la présence des 18 sections.` });
+  if (/chaulage|chaux/i.test(content) && /pH\s*(?:inconnu|non précisé|non mesuré)/i.test(content) && /(?:\d+(?:[.,]\d+)?\s*(?:kg|g|t|tonne)[^.\n]{0,35}(?:chaux|chaulage)|(?:chaux|chaulage)[^.\n]{0,35}\d+(?:[.,]\d+)?\s*(?:kg|g|t|tonne))/i.test(content)) {
+    alerts.push({ severity: "high", message: "Dose de chaux potentiellement chiffrée alors que le pH est inconnu : vérifier manuellement." });
+  }
+  if (/\b(?:garanti|sans aucun risque|sans danger|efficacité garantie)\b/i.test(content)) alerts.push({ severity: "medium", message: "Formulation absolue détectée ; vérifier l'incertitude et les précautions." });
+  if (/\b(?:prix|coût|FCFA|XOF)\b/i.test(content) && /(?:à compléter|à vérifier localement|non vérifié)/i.test(content)) {
+    // Cette combinaison peut être légitime : avertissement seulement, jamais une erreur bloquante.
+    alerts.push({ severity: "low", message: "Présence d'estimations économiques à vérifier localement." });
+  }
+  return { headings, alerts, status: alerts.some(a => a.severity === "high") ? "error" : alerts.length ? "warn" : "ok" };
+}
+async function qualityListPlans() {
+  if (USE_DB) return (await sb("/trv_plans?select=id,title,crop,region,content,notes,created_at&order=created_at.desc&limit=50")) || [];
+  return Object.values(loadStore().plans || {}).sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||""))).slice(0,50);
+}
+async function qualityListAudits() {
+  if (USE_DB) {
+    try { return (await sb("/trv_quality_audits?select=id,plan_id,title,status,alert_count,alerts,created_at&order=created_at.desc&limit=50")) || []; }
+    catch (e) { console.warn("Quality Guard history unavailable:", e.message); return []; }
+  }
+  const st = loadStore(); return (st.qualityAudits || []).slice().reverse().slice(0,50);
+}
+async function handleQualityOverview(req,res) {
+  const user = await currentUser(req);
+  if (!user) return sendJson(res,401,{error:"Non connecté."});
+  if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
+  try {
+    const plans = await qualityListPlans();
+    const audits = await qualityListAudits();
+    sendJson(res,200,{user:{name:user.name||"administrateur",email:user.email},source:USE_DB?"supabase":"local",plans:plans.map(p=>{const q=qualityAnalyzePlan(p);return {id:p.id,title:p.title,crop:p.crop,region:p.region,created_at:p.created_at,sections:q.headings,status:q.status};}),audits});
+  } catch(e) { sendJson(res,500,{error:"Impossible de charger les données Quality Guard."}); }
+}
+async function handleQualityAudit(req,res) {
+  const user = await currentUser(req);
+  if (!user) return sendJson(res,401,{error:"Non connecté."});
+  if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
+  try {
+    const body = JSON.parse(await readBody(req) || "{}");
+    if (!body.id || typeof body.id !== "string") return sendJson(res,400,{error:"Identifiant de plan manquant."});
+    let plan = null;
+    if (USE_DB) { const rows = await sb(`/trv_plans?id=eq.${encodeURIComponent(body.id)}&select=id,title,crop,region,content,notes,created_at&limit=1`); plan = rows && rows[0]; }
+    else plan = (loadStore().plans || {})[body.id] || null;
+    if (!plan) return sendJson(res,404,{error:"Itinéraire introuvable."});
+    const q = qualityAnalyzePlan(plan);
+    const audit = {id:crypto.randomBytes(12).toString("hex"),plan_id:plan.id,title:plan.title||plan.crop||"Itinéraire",status:q.status,alert_count:q.alerts.length,alerts:q.alerts,created_at:new Date().toISOString(),created_by:user.email};
+    if (USE_DB) {
+      await sb("/trv_quality_audits",{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify([{id:audit.id,plan_id:audit.plan_id,title:audit.title,status:audit.status,alert_count:audit.alert_count,alerts:audit.alerts,created_at:audit.created_at,created_by:audit.created_by}])});
+    } else {
+      const st=loadStore(); if(!Array.isArray(st.qualityAudits))st.qualityAudits=[];st.qualityAudits.push(audit);if(st.qualityAudits.length>500)st.qualityAudits=st.qualityAudits.slice(-500);saveStore(st);
+    }
+    sendJson(res,200,{ok:true,status:q.status,alerts:q.alerts,sections:q.headings});
+  } catch(e) { console.error("Quality audit:",e.message);sendJson(res,500,{error:"Échec du contrôle. Vérifie la configuration de la base de données."}); }
+}
+async function handleQualityTests(req,res) {
+  const user = await currentUser(req);
+  if (!user) return sendJson(res,401,{error:"Non connecté."});
+  if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
+  const sampleGood = {content:Array.from({length:18},(_,i)=>`## ${i+1}. Section test`).join("\n")};
+  const sampleMissing = {content:"## 1. Diagnostic\nTexte de test."};
+  const sampleUnknownPh = {content:"Le pH est inconnu. Ne pas appliquer de chaux sans mesure."};
+  const cases = [
+    {name:"Contenu vide détecté",fn:()=>qualityAnalyzePlan({content:""}).alerts.some(a=>a.severity==="high")},
+    {name:"18 sections numérotées détectées",fn:()=>qualityAnalyzePlan(sampleGood).headings===18},
+    {name:"Sections manquantes signalées",fn:()=>qualityAnalyzePlan(sampleMissing).alerts.some(a=>/18 sections/.test(a.message))},
+    {name:"Absence de dose de chaux avec pH inconnu",fn:()=>!qualityAnalyzePlan(sampleUnknownPh).alerts.some(a=>/chaux potentiellement chiffrée/.test(a.message))},
+    {name:"Formulations absolues signalées",fn:()=>qualityAnalyzePlan({content:"Cette solution est garantie sans aucun risque."}).alerts.some(a=>/Formulation absolue/.test(a.message))}
+  ];
+  const results=cases.map(c=>{try{const ok=!!c.fn();return{name:c.name,ok,detail:ok?"Contrôle réussi":"Résultat inattendu"};}catch(e){return{name:c.name,ok:false,detail:e.message};}});
+  sendJson(res,200,{total:results.length,passed:results.filter(x=>x.ok).length,failed:results.filter(x=>!x.ok).length,results});
 }
 
 // ---------- Routeur ----------
@@ -1423,10 +1458,6 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && url === "/api/device") return handleDeviceGet(req, res);
   if (req.method === "POST" && url === "/api/chat") return handleChat(req, res);
   if (req.method === "POST" && url === "/api/diagnostic") return handleDiagnostic(req, res);
-  if (req.method === "GET" && url === "/api/admin/quality/plans") return handleQualityPlans(req, res);
-  if (req.method === "GET" && url === "/api/admin/quality/history") return handleQualityHistory(req, res);
-  if (req.method === "POST" && url === "/api/admin/quality/audit") return handleQualityAudit(req, res);
-  if (req.method === "POST" && url === "/api/admin/quality/tests") return handleQualityTests(req, res);
   if (req.method === "GET" && url === "/api/admin/users") return handleAdminUsers(req, res);
   if (req.method === "GET" && url === "/api/admin/questions") return handleAdminQuestions(req, res);
   if (req.method === "POST" && url === "/api/admin/animator") return handleAdminSetAnimator(req, res);
@@ -1434,6 +1465,9 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && url === "/api/admin/animator-requests/decide") return handleAdminAnimDecide(req, res);
   if (req.method === "GET" && url === "/api/animator/request") return handleAnimRequestGet(req, res);
   if (req.method === "POST" && url === "/api/animator/request") return handleAnimRequestCreate(req, res);
+  if (req.method === "GET" && url === "/api/quality/overview") return handleQualityOverview(req, res);
+  if (req.method === "POST" && url === "/api/quality/audit") return handleQualityAudit(req, res);
+  if (req.method === "POST" && url === "/api/quality/tests") return handleQualityTests(req, res);
   if (req.method === "GET") return serveStatic(req, res);
   res.writeHead(405); res.end("Méthode non autorisée");
 });
