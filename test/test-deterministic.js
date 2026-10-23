@@ -75,6 +75,14 @@ function run() {
     T.contains(s, "ne regroupe pas sous l'étiquette", "variété reliée aux conditions précises (§2)");
   });
 
+  // ---------- 2ter) planSystem : affinages Prompt 9 ----------
+  T.test("planSystem — affinages (Prompt 9) présents", () => {
+    const s = api.planSystem();
+    T.contains(s, "ABAISSE alors le PLANCHER de la fourchette", "rendement : abaisser le plancher, pas gonfler le plafond (§16)");
+    T.contains(s, "NE fais PAS monter le haut de la fourchette", "rendement : plafond prudent (§16)");
+    T.contains(s, "ne retiens pas par défaut l'écartement le plus serré", "écartement plus large en zone humide (§5)");
+  });
+
   // ---------- 3) Par scénario : contenu transmis + garde-fous ciblés ----------
   const system = api.planSystem();
   for (const sc of scenarios) {
