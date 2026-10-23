@@ -101,6 +101,19 @@ function run() {
     T.contains(s, "N'IMPOSE PAS une dose corrective précise", "pas de dose corrective sans données (§10)");
   });
 
+  // ---------- 2quinquies) planSystem : préparations naturelles Prompt 11 (§9) ----------
+  T.test("planSystem — encadrement des préparations naturelles (Prompt 11) présent", () => {
+    const s = api.planSystem();
+    T.contains(s, "PRÉPARATIONS NATURELLES — ENCADREMENT OBLIGATOIRE", "bloc d'encadrement présent (§9)");
+    T.contains(s, "NIVEAU DE CONFIANCE", "niveau de confiance (documenté/possible/incertain) (§9)");
+    T.contains(s, "PHYTOTOXICITÉ", "phytotoxicité possible signalée (§9)");
+    T.contains(s, "AUXILIAIRES ET POLLINISATEURS", "effets sur auxiliaires/pollinisateurs (§9)");
+    T.contains(s, "ESSAI PRÉALABLE", "essai préalable sur quelques plantes (§9)");
+    T.contains(s, "N'INVENTE JAMAIS de concentration", "pas de dose/efficacité/délai inventés (§9)");
+    T.contains(s, "tous les savons noirs ne conviennent pas", "savon noir : compatibilité/phytotoxicité (§9)");
+    T.contains(s, "jamais de cendre issue de déchets peints", "cendre : pas de matériaux traités (§9)");
+  });
+
   // ---------- 3) Par scénario : contenu transmis + garde-fous ciblés ----------
   const system = api.planSystem();
   for (const sc of scenarios) {
