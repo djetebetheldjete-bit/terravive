@@ -1389,13 +1389,24 @@ async function handleQualityAudit(req,res) {
     if (!plan) return sendJson(res,404,{error:"Itinéraire introuvable."});
     const q = qualityAnalyzePlan(plan);
     const audit = {id:crypto.randomBytes(12).toString("hex"),plan_id:plan.id,title:plan.title||plan.crop||"Itinéraire",status:q.status,alert_count:q.alerts.length,alerts:q.alerts,created_at:new Date().toISOString(),created_by:user.email};
+    let saved = true;
+    let saveWarning = null;
     if (USE_DB) {
-      await sb("/trv_quality_audits",{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify([{id:audit.id,plan_id:audit.plan_id,title:audit.title,status:audit.status,alert_count:audit.alert_count,alerts:audit.alerts,created_at:audit.created_at,created_by:audit.created_by}])});
+      try {
+        await sb("/trv_quality_audits",{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify([{id:audit.id,plan_id:audit.plan_id,title:audit.title,status:audit.status,alert_count:audit.alert_count,alerts:audit.alerts,created_at:audit.created_at,created_by:audit.created_by}])});
+      } catch (dbError) {
+        // Le contrôle du contenu reste utile même si l'historique Supabase n'est pas encore configuré.
+        saved = false;
+        saveWarning = "Contrôle effectué, mais l'historique n'a pas pu être enregistré dans Supabase. Vérifie la table trv_quality_audits et ses permissions. Détail technique : " + dbError.message;
+        console.error("Quality Guard audit history save failed:", dbError.message);
+      }
     } else {
-      const st=loadStore(); if(!Array.isArray(st.qualityAudits))st.qualityAudits=[];st.qualityAudits.push(audit);if(st.qualityAudits.length>500)st.qualityAudits=st.qualityAudits.slice(-500);saveStore(st);
+      try {
+        const st=loadStore(); if(!Array.isArray(st.qualityAudits))st.qualityAudits=[];st.qualityAudits.push(audit);if(st.qualityAudits.length>500)st.qualityAudits=st.qualityAudits.slice(-500);saveStore(st);
+      } catch (localError) { saved = false; saveWarning = "Contrôle effectué, mais l'historique local n'a pas pu être enregistré."; }
     }
-    sendJson(res,200,{ok:true,status:q.status,alerts:q.alerts,sections:q.headings});
-  } catch(e) { console.error("Quality audit:",e.message);sendJson(res,500,{error:"Échec du contrôle. Vérifie la configuration de la base de données."}); }
+    sendJson(res,200,{ok:true,status:q.status,alerts:q.alerts,sections:q.headings,auditId:audit.id,saved,warning:saveWarning});
+  } catch(e) { console.error("Quality audit:",e.message);sendJson(res,500,{error:"Le contrôle n'a pas pu être exécuté. Vérifie les journaux Render pour le détail technique."}); }
 }
 async function handleQualityTests(req,res) {
   const user = await currentUser(req);

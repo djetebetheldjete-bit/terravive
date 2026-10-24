@@ -27,3 +27,8 @@ Cette version ajoute une page `/quality` en reprenant les couleurs, variables CS
 
 ## Vérifications locales
 `node --check server.js` vérifie la syntaxe du serveur. Aucun appel Anthropic n'est effectué par les tests du Quality Guard.
+
+
+## Correction v0.6 — exécution du contrôle et historique
+
+Le contrôle d’un itinéraire renvoie désormais son résultat même si l’enregistrement de l’historique Supabase échoue. Dans ce cas, l’interface affiche un avertissement clair et le contrôle n’est pas présenté comme enregistré. Pour conserver l’historique, exécuter le bloc SQL de création de `trv_quality_audits` et vérifier les permissions Supabase. La typographie suit les règles du tableau de bord Terravive : Segoe UI pour le texte et Georgia pour les titres.
