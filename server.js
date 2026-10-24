@@ -1351,25 +1351,25 @@ function qualityAnalyzePlan(plan) {
   const content = String((plan && (plan.content || plan.notes)) || "");
   const headings = (content.match(/^#{1,3}\s*(?:\d{1,2}\s*[\.\-:)]|section\s+\d{1,2})/gim) || []).length;
   const alerts = [];
-  if (!content.trim()) alerts.push({ severity: "high", message: "Contenu du plan absent ou vide." });
-  if (content.trim() && headings < 18) alerts.push({ severity: "medium", message: `Seulement ${headings} titres de sections numérotés détectés ; vérifier la présence des 18 sections.` });
+  if (!content.trim()) alerts.push({ severity: "high", message: "Cet itinéraire est vide : il n'y a aucun texte à contrôler." });
+  if (content.trim() && headings < 18) alerts.push({ severity: "medium", message: `Vous ne retrouvez que ${headings} section(s) numérotée(s) : vérifiez que les 18 sections de l'itinéraire sont bien présentes.` });
   if (/chaulage|chaux/i.test(content) && QG_PH_UNKNOWN.test(content) && QG_LIME_DOSE.test(content)) {
-    alerts.push({ severity: "high", message: "Dose de chaux potentiellement chiffrée alors que le pH est inconnu : vérifier manuellement." });
+    alerts.push({ severity: "high", message: "Une dose de chaux est chiffrée alors que le pH du sol n'est pas connu : à vérifier avant de conseiller un chaulage." });
   }
-  if (/\b(?:garanti|sans aucun risque|sans danger|efficacité garantie)\b/i.test(content)) alerts.push({ severity: "medium", message: "Formulation absolue détectée ; vérifier l'incertitude et les précautions." });
+  if (/\b(?:garanti|sans aucun risque|sans danger|efficacité garantie)\b/i.test(content)) alerts.push({ severity: "medium", message: "Formulation trop catégorique (« garanti », « sans risque »…) : pensez à rappeler l'incertitude et les précautions d'usage." });
   // Prix chiffré en FCFA : les prix doivent venir du producteur, pas du modèle.
-  if (QG_FCFA_AMOUNT.test(content)) alerts.push({ severity: "medium", message: "Montant chiffré en FCFA détecté : vérifier qu'il n'est pas inventé (les prix doivent être saisis par le producteur)." });
+  if (QG_FCFA_AMOUNT.test(content)) alerts.push({ severity: "medium", message: "Un montant en F CFA est chiffré dans l'itinéraire : vérifiez qu'il n'est pas inventé — les prix doivent venir du producteur." });
   // Marge mentionnée sans la distinction « marge ≠ bénéfice réel ».
   if (/\bmarge\b/i.test(content) && !/n['’]est pas\s+(?:le\s+|un\s+)?b[ée]n[ée]fice/i.test(content)) {
-    alerts.push({ severity: "low", message: "La marge est mentionnée sans la distinction « marge ≠ bénéfice réel » : vérifier." });
+    alerts.push({ severity: "low", message: "La « marge » est mentionnée sans rappeler qu'elle n'est pas le bénéfice réel du producteur : à vérifier." });
   }
   // Rendement chiffré (t/ha) sans cadrage prudent (scénarios / indicatif).
   if (/rendement/i.test(content) && /(?:\bt\s*\/\s*ha\b|tonnes?\b)/i.test(content) && !/(prudent|sc[ée]nario|indicatif|repère|ordre de grandeur)/i.test(content)) {
-    alerts.push({ severity: "low", message: "Rendement chiffré détecté sans cadrage prudent (scénarios / indicatif) : vérifier." });
+    alerts.push({ severity: "low", message: "Un rendement chiffré (t/ha) apparaît sans cadrage prudent (scénario, ordre de grandeur, valeur indicative) : à vérifier." });
   }
   if (/\b(?:prix|coût|FCFA|XOF)\b/i.test(content) && /(?:à compléter|à vérifier localement|non vérifié)/i.test(content)) {
     // Cette combinaison peut être légitime : avertissement seulement, jamais une erreur bloquante.
-    alerts.push({ severity: "low", message: "Présence d'estimations économiques à vérifier localement." });
+    alerts.push({ severity: "low", message: "Des estimations économiques sont marquées « à compléter / à vérifier localement » : pensez à les confirmer avec le producteur." });
   }
   return { headings, alerts, status: alerts.some(a => a.severity === "high") ? "error" : alerts.length ? "warn" : "ok" };
 }
@@ -1392,7 +1392,7 @@ async function handleQualityOverview(req,res) {
     const plans = await qualityListPlans();
     const audits = await qualityListAudits();
     sendJson(res,200,{user:{name:user.name||"administrateur",email:user.email},source:USE_DB?"supabase":"local",plans:plans.map(p=>{const q=qualityAnalyzePlan(p);return {id:p.id,title:p.title,crop:p.crop,region:p.region,created_at:p.created_at,sections:q.headings,status:q.status};}),audits});
-  } catch(e) { sendJson(res,500,{error:"Impossible de charger les données Quality Guard."}); }
+  } catch(e) { sendJson(res,500,{error:"Impossible de charger vos données pour le moment. Réessayez dans un instant."}); }
 }
 async function handleQualityAudit(req,res) {
   const user = await currentUser(req);
@@ -1400,7 +1400,7 @@ async function handleQualityAudit(req,res) {
   if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
   try {
     const body = JSON.parse(await readBody(req) || "{}");
-    if (!body.id || typeof body.id !== "string") return sendJson(res,400,{error:"Identifiant de plan manquant."});
+    if (!body.id || typeof body.id !== "string") return sendJson(res,400,{error:"Aucun itinéraire sélectionné."});
     let plan = null;
     if (USE_DB) { const rows = await sb(`/trv_plans?id=eq.${encodeURIComponent(body.id)}&select=id,title,crop,region,content,notes,created_at&limit=1`); plan = rows && rows[0]; }
     else plan = (loadStore().plans || {})[body.id] || null;
@@ -1415,7 +1415,7 @@ async function handleQualityAudit(req,res) {
       } catch (dbError) {
         // Le contrôle du contenu reste utile même si l'historique Supabase n'est pas encore configuré.
         saved = false;
-        saveWarning = "Contrôle effectué, mais l'historique n'a pas pu être enregistré dans Supabase. Vérifie la table trv_quality_audits et ses permissions. Détail technique : " + dbError.message;
+        saveWarning = "Contrôle effectué, mais l'historique n'a pas pu être enregistré dans Supabase. Vérifiez la table trv_quality_audits et ses permissions. Détail technique : " + dbError.message;
         console.error("Quality Guard audit history save failed:", dbError.message);
       }
     } else {
@@ -1424,7 +1424,7 @@ async function handleQualityAudit(req,res) {
       } catch (localError) { saved = false; saveWarning = "Contrôle effectué, mais l'historique local n'a pas pu être enregistré."; }
     }
     sendJson(res,200,{ok:true,status:q.status,alerts:q.alerts,sections:q.headings,auditId:audit.id,saved,warning:saveWarning});
-  } catch(e) { console.error("Quality audit:",e.message);sendJson(res,500,{error:"Le contrôle n'a pas pu être exécuté. Vérifie les journaux Render pour le détail technique."}); }
+  } catch(e) { console.error("Quality audit:",e.message);sendJson(res,500,{error:"Le contrôle n'a pas pu aboutir. Réessayez dans un instant ; en cas de besoin, le détail technique est dans les journaux Render."}); }
 }
 async function handleQualityTests(req,res) {
   const user = await currentUser(req);
@@ -1439,16 +1439,16 @@ async function handleQualityTests(req,res) {
     {name:"Contenu vide détecté",fn:()=>qualityAnalyzePlan({content:""}).alerts.some(a=>a.severity==="high")},
     {name:"18 sections numérotées détectées",fn:()=>qualityAnalyzePlan(sampleGood).headings===18},
     {name:"Sections manquantes signalées",fn:()=>qualityAnalyzePlan(sampleMissing).alerts.some(a=>/18 sections/.test(a.message))},
-    {name:"Absence de dose de chaux avec pH inconnu",fn:()=>!qualityAnalyzePlan(sampleUnknownPh).alerts.some(a=>/chaux potentiellement chiffrée/.test(a.message))},
-    {name:"Dose de chaux chiffrée + pH non précisé signalée",fn:()=>qualityAnalyzePlan(sampleLimeNoPh).alerts.some(a=>a.severity==="high"&&/chaux potentiellement chiffrée/.test(a.message))},
-    {name:"Montant chiffré en FCFA signalé",fn:()=>qualityAnalyzePlan({content:"Coût estimé : 125 000 FCFA par hectare."}).alerts.some(a=>/FCFA/.test(a.message))},
+    {name:"Absence de dose de chaux avec pH inconnu",fn:()=>!qualityAnalyzePlan(sampleUnknownPh).alerts.some(a=>/dose de chaux est chiffrée/.test(a.message))},
+    {name:"Dose de chaux chiffrée + pH non précisé signalée",fn:()=>qualityAnalyzePlan(sampleLimeNoPh).alerts.some(a=>a.severity==="high"&&/dose de chaux est chiffrée/.test(a.message))},
+    {name:"Montant chiffré en F CFA signalé",fn:()=>qualityAnalyzePlan({content:"Coût estimé : 125 000 FCFA par hectare."}).alerts.some(a=>/F ?CFA/.test(a.message))},
     {name:"Marge sans distinction bénéfice signalée",fn:()=>qualityAnalyzePlan({content:"La marge attendue est intéressante pour le producteur."}).alerts.some(a=>/marge/i.test(a.message))},
-    {name:"Marge avec distinction bénéfice non signalée",fn:()=>!qualityAnalyzePlan({content:"La marge n'est pas le bénéfice réel ; elle ignore le travail familial."}).alerts.some(a=>/marge ≠/.test(a.message))},
-    {name:"Rendement t/ha sans cadrage prudent signalé",fn:()=>qualityAnalyzePlan({content:"Le rendement visé est de 25 t/ha."}).alerts.some(a=>/Rendement chiffré/.test(a.message))},
-    {name:"Rendement t/ha avec cadrage prudent non signalé",fn:()=>!qualityAnalyzePlan({content:"Scénario prudent : rendement indicatif de 25 t/ha, à confirmer localement."}).alerts.some(a=>/Rendement chiffré/.test(a.message))},
-    {name:"Formulations absolues signalées",fn:()=>qualityAnalyzePlan({content:"Cette solution est garantie sans aucun risque."}).alerts.some(a=>/Formulation absolue/.test(a.message))}
+    {name:"Marge avec distinction bénéfice non signalée",fn:()=>!qualityAnalyzePlan({content:"La marge n'est pas le bénéfice réel ; elle ignore le travail familial."}).alerts.some(a=>/b[ée]n[ée]fice réel du producteur/.test(a.message))},
+    {name:"Rendement t/ha sans cadrage prudent signalé",fn:()=>qualityAnalyzePlan({content:"Le rendement visé est de 25 t/ha."}).alerts.some(a=>/rendement chiffré/i.test(a.message))},
+    {name:"Rendement t/ha avec cadrage prudent non signalé",fn:()=>!qualityAnalyzePlan({content:"Scénario prudent : rendement indicatif de 25 t/ha, à confirmer localement."}).alerts.some(a=>/rendement chiffré/i.test(a.message))},
+    {name:"Formulations absolues signalées",fn:()=>qualityAnalyzePlan({content:"Cette solution est garantie sans aucun risque."}).alerts.some(a=>/trop catégorique/.test(a.message))}
   ];
-  const results=cases.map(c=>{try{const ok=!!c.fn();return{name:c.name,ok,detail:ok?"Contrôle réussi":"Résultat inattendu"};}catch(e){return{name:c.name,ok:false,detail:e.message};}});
+  const results=cases.map(c=>{try{const ok=!!c.fn();return{name:c.name,ok,detail:ok?"Conforme à ce qui est attendu":"Résultat inattendu, à revoir"};}catch(e){return{name:c.name,ok:false,detail:e.message};}});
   sendJson(res,200,{total:results.length,passed:results.filter(x=>x.ok).length,failed:results.filter(x=>!x.ok).length,results});
 }
 

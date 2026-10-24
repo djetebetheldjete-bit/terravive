@@ -49,3 +49,11 @@ Conséquence : une dose de chaux pouvait être chiffrée sans que l’alerte se 
 - **Rendement chiffré (low)** : un rendement en t/ha sans cadrage prudent (scénario / indicatif / ordre de grandeur) est signalé.
 
 Ces contrôles restent **déterministes** (aucun appel à Anthropic), ne corrigent rien automatiquement et ne font qu’attirer l’attention de l’administrateur. Les cinq auto-tests d’origine sont conservés ; six cas ont été ajoutés (dont une **preuve positive** du bug pH : « pH : non précisé » + « 800 kg de chaux » → alerte haute). Les auto-tests passent 11/11 et la suite QA Terravive reste à 33 tests / 176 vérifications. Aucune autre partie du serveur n’a été modifiée.
+
+## v0.6.2 — ton d’écriture aligné sur Terravive
+
+Les textes lus par l’utilisateur ont été réécrits dans le **ton du Terravive principal** : « vous » direct, concret et rassurant, plutôt que le vocabulaire technique d’audit. Rien n’a changé dans la logique de détection ni dans les garde-fous — seules les formulations évoluent.
+
+- **Messages d’alerte** : par exemple « Dose de chaux potentiellement chiffrée alors que le pH est inconnu : vérifier manuellement. » devient « Une dose de chaux est chiffrée alors que le pH du sol n’est pas connu : à vérifier avant de conseiller un chaulage. »
+- **Page `/quality`** : titres, boutons et avertissements reformulés (« Lancer les vérifications », « Vos itinéraires récents », « Banc de vérifications », « Rien à signaler / À examiner / À vérifier »…), dans l’esprit de « Décrivez votre parcelle » ou « Branchez votre station » du tableau de bord.
+- Les cinq statuts techniques inchangés côté contrat (`ok` / `warn` / `error`, `Non connecté.`, rôle administrateur) : seules les phrases visibles changent. Auto-tests 11/11, suite QA 33/176 toujours au vert.
