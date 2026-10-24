@@ -1339,16 +1339,34 @@ function serveStatic(req, res) {
 
 
 // ---------- Quality Guard (contrôles déterministes, sans modification automatique) ----------
+// Détecte un pH déclaré inconnu/non précisé, quelle que soit la ponctuation entre
+// « pH » et le qualificatif (« pH : non précisé », « Le pH est inconnu », etc.).
+const QG_PH_UNKNOWN = /pH[\s:]*(?:du sol\s*)?(?:est\s+)?(?:inconnu|non\s+pr[ée]cis|non\s+mesur|non\s+connu|non\s+fourni)/i;
+// Dose de chaux/chaulage chiffrée (nombre + unité à proximité du mot chaux/chaulage).
+const QG_LIME_DOSE = /(?:\d+(?:[.,]\d+)?\s*(?:kg|g|t|tonnes?)[^.\n]{0,35}(?:chaux|chaulage)|(?:chaux|chaulage)[^.\n]{0,35}\d+(?:[.,]\d+)?\s*(?:kg|g|t|tonnes?))/i;
+// Montant chiffré en francs CFA (digits suivis de FCFA/CFA/XOF) — prix potentiellement inventé.
+const QG_FCFA_AMOUNT = /\d[\d\s., ]*\s*(?:F\s*CFA|FCFA|CFA|XOF)\b/i;
+
 function qualityAnalyzePlan(plan) {
   const content = String((plan && (plan.content || plan.notes)) || "");
   const headings = (content.match(/^#{1,3}\s*(?:\d{1,2}\s*[\.\-:)]|section\s+\d{1,2})/gim) || []).length;
   const alerts = [];
   if (!content.trim()) alerts.push({ severity: "high", message: "Contenu du plan absent ou vide." });
   if (content.trim() && headings < 18) alerts.push({ severity: "medium", message: `Seulement ${headings} titres de sections numérotés détectés ; vérifier la présence des 18 sections.` });
-  if (/chaulage|chaux/i.test(content) && /pH\s*(?:inconnu|non précisé|non mesuré)/i.test(content) && /(?:\d+(?:[.,]\d+)?\s*(?:kg|g|t|tonne)[^.\n]{0,35}(?:chaux|chaulage)|(?:chaux|chaulage)[^.\n]{0,35}\d+(?:[.,]\d+)?\s*(?:kg|g|t|tonne))/i.test(content)) {
+  if (/chaulage|chaux/i.test(content) && QG_PH_UNKNOWN.test(content) && QG_LIME_DOSE.test(content)) {
     alerts.push({ severity: "high", message: "Dose de chaux potentiellement chiffrée alors que le pH est inconnu : vérifier manuellement." });
   }
   if (/\b(?:garanti|sans aucun risque|sans danger|efficacité garantie)\b/i.test(content)) alerts.push({ severity: "medium", message: "Formulation absolue détectée ; vérifier l'incertitude et les précautions." });
+  // Prix chiffré en FCFA : les prix doivent venir du producteur, pas du modèle.
+  if (QG_FCFA_AMOUNT.test(content)) alerts.push({ severity: "medium", message: "Montant chiffré en FCFA détecté : vérifier qu'il n'est pas inventé (les prix doivent être saisis par le producteur)." });
+  // Marge mentionnée sans la distinction « marge ≠ bénéfice réel ».
+  if (/\bmarge\b/i.test(content) && !/n['’]est pas\s+(?:le\s+|un\s+)?b[ée]n[ée]fice/i.test(content)) {
+    alerts.push({ severity: "low", message: "La marge est mentionnée sans la distinction « marge ≠ bénéfice réel » : vérifier." });
+  }
+  // Rendement chiffré (t/ha) sans cadrage prudent (scénarios / indicatif).
+  if (/rendement/i.test(content) && /(?:\bt\s*\/\s*ha\b|tonnes?\b)/i.test(content) && !/(prudent|sc[ée]nario|indicatif|repère|ordre de grandeur)/i.test(content)) {
+    alerts.push({ severity: "low", message: "Rendement chiffré détecté sans cadrage prudent (scénarios / indicatif) : vérifier." });
+  }
   if (/\b(?:prix|coût|FCFA|XOF)\b/i.test(content) && /(?:à compléter|à vérifier localement|non vérifié)/i.test(content)) {
     // Cette combinaison peut être légitime : avertissement seulement, jamais une erreur bloquante.
     alerts.push({ severity: "low", message: "Présence d'estimations économiques à vérifier localement." });
@@ -1415,11 +1433,19 @@ async function handleQualityTests(req,res) {
   const sampleGood = {content:Array.from({length:18},(_,i)=>`## ${i+1}. Section test`).join("\n")};
   const sampleMissing = {content:"## 1. Diagnostic\nTexte de test."};
   const sampleUnknownPh = {content:"Le pH est inconnu. Ne pas appliquer de chaux sans mesure."};
+  // pH non mesuré ET dose de chaux chiffrée : doit déclencher l'alerte haute (phrasés réels Terravive).
+  const sampleLimeNoPh = {content:"pH : non précisé. Appliquer 800 kg de chaux à l'hectare avant semis."};
   const cases = [
     {name:"Contenu vide détecté",fn:()=>qualityAnalyzePlan({content:""}).alerts.some(a=>a.severity==="high")},
     {name:"18 sections numérotées détectées",fn:()=>qualityAnalyzePlan(sampleGood).headings===18},
     {name:"Sections manquantes signalées",fn:()=>qualityAnalyzePlan(sampleMissing).alerts.some(a=>/18 sections/.test(a.message))},
     {name:"Absence de dose de chaux avec pH inconnu",fn:()=>!qualityAnalyzePlan(sampleUnknownPh).alerts.some(a=>/chaux potentiellement chiffrée/.test(a.message))},
+    {name:"Dose de chaux chiffrée + pH non précisé signalée",fn:()=>qualityAnalyzePlan(sampleLimeNoPh).alerts.some(a=>a.severity==="high"&&/chaux potentiellement chiffrée/.test(a.message))},
+    {name:"Montant chiffré en FCFA signalé",fn:()=>qualityAnalyzePlan({content:"Coût estimé : 125 000 FCFA par hectare."}).alerts.some(a=>/FCFA/.test(a.message))},
+    {name:"Marge sans distinction bénéfice signalée",fn:()=>qualityAnalyzePlan({content:"La marge attendue est intéressante pour le producteur."}).alerts.some(a=>/marge/i.test(a.message))},
+    {name:"Marge avec distinction bénéfice non signalée",fn:()=>!qualityAnalyzePlan({content:"La marge n'est pas le bénéfice réel ; elle ignore le travail familial."}).alerts.some(a=>/marge ≠/.test(a.message))},
+    {name:"Rendement t/ha sans cadrage prudent signalé",fn:()=>qualityAnalyzePlan({content:"Le rendement visé est de 25 t/ha."}).alerts.some(a=>/Rendement chiffré/.test(a.message))},
+    {name:"Rendement t/ha avec cadrage prudent non signalé",fn:()=>!qualityAnalyzePlan({content:"Scénario prudent : rendement indicatif de 25 t/ha, à confirmer localement."}).alerts.some(a=>/Rendement chiffré/.test(a.message))},
     {name:"Formulations absolues signalées",fn:()=>qualityAnalyzePlan({content:"Cette solution est garantie sans aucun risque."}).alerts.some(a=>/Formulation absolue/.test(a.message))}
   ];
   const results=cases.map(c=>{try{const ok=!!c.fn();return{name:c.name,ok,detail:ok?"Contrôle réussi":"Résultat inattendu"};}catch(e){return{name:c.name,ok:false,detail:e.message};}});

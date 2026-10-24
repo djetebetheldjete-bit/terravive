@@ -32,3 +32,20 @@ Cette version ajoute une page `/quality` en reprenant les couleurs, variables CS
 ## Correction v0.6 — exécution du contrôle et historique
 
 Le contrôle d’un itinéraire renvoie désormais son résultat même si l’enregistrement de l’historique Supabase échoue. Dans ce cas, l’interface affiche un avertissement clair et le contrôle n’est pas présenté comme enregistré. Pour conserver l’historique, exécuter le bloc SQL de création de `trv_quality_audits` et vérifier les permissions Supabase. La typographie suit les règles du tableau de bord Terravive : Segoe UI pour le texte et Georgia pour les titres.
+
+## Correction v0.6.1 — détection du pH + 3 contrôles supplémentaires
+
+### Le bug corrigé (pH)
+La détection « dose de chaux chiffrée alors que le pH est inconnu » utilisait l’expression `/pH\s*(?:inconnu|non précisé|non mesuré)/i`. Elle **ne reconnaissait pas** les formulations réelles produites par Terravive, parce qu’un mot ou un signe s’intercale entre « pH » et l’état :
+- « pH **:** non précisé » (deux-points)
+- « Le pH **est** inconnu » (verbe « est »)
+- « pH **du sol** non mesuré »
+
+Conséquence : une dose de chaux pouvait être chiffrée sans que l’alerte se déclenche. La détection est désormais portée par `QG_PH_UNKNOWN`, qui tolère deux-points, « est », « du sol », et les variantes *inconnu / non précisé / non mesuré / non connu / non fourni*. L’alerte ne se déclenche que si une **dose chiffrée** de chaux est aussi présente (`QG_LIME_DOSE` : nombre + unité kg/g/t à proximité de « chaux » ou « chaulage »), pour éviter les faux positifs sur « ne pas chauler sans mesure ».
+
+### Trois contrôles déterministes ajoutés
+- **Montant en FCFA (medium)** : un montant chiffré en F CFA / FCFA / XOF est signalé — rappel que les prix doivent être saisis par le producteur et non inventés par le modèle.
+- **Marge ≠ bénéfice (low)** : si « marge » apparaît sans la mention « n’est pas le bénéfice réel », l’audit le signale.
+- **Rendement chiffré (low)** : un rendement en t/ha sans cadrage prudent (scénario / indicatif / ordre de grandeur) est signalé.
+
+Ces contrôles restent **déterministes** (aucun appel à Anthropic), ne corrigent rien automatiquement et ne font qu’attirer l’attention de l’administrateur. Les cinq auto-tests d’origine sont conservés ; six cas ont été ajoutés (dont une **preuve positive** du bug pH : « pH : non précisé » + « 800 kg de chaux » → alerte haute). Les auto-tests passent 11/11 et la suite QA Terravive reste à 33 tests / 176 vérifications. Aucune autre partie du serveur n’a été modifiée.
