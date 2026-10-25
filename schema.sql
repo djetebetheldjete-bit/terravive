@@ -225,3 +225,35 @@ create index if not exists trv_quality_audits_created_idx
 --   alter table trv_quality_audits enable row level security;
 --   -- puis une policy autorisant le rôle de service, ou l'adresse administrateur, selon votre setup.
 -- N'activez pas la RLS sans policy de remplacement : vous bloqueriez l'enregistrement des audits.
+
+-- ===================================================================
+-- Terravive Quality Guard v0.8 : notifications & journal d'actions
+-- (créées à la demande ; si absentes, le serveur bascule en stockage
+--  local sans échouer. Aucune donnée existante n'est touchée.)
+-- ===================================================================
+
+-- Centre de notifications in-app (jamais d'e-mail/SMS sans configuration).
+create table if not exists trv_quality_notifications (
+  id text primary key,
+  type text not null,                 -- critique | nouvel_audit | resolue | echec
+  severity text not null default 'info',
+  message text not null,
+  audit_id text,
+  dedup text,                         -- clé de déduplication (évite les doublons)
+  read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists trv_quality_notifications_idx
+  on trv_quality_notifications (read, created_at desc);
+
+-- Journal d'actions (append-only côté application : pas de route de modification
+-- ni de suppression). Ne contient JAMAIS de secret (mot de passe, clé, jeton).
+create table if not exists trv_quality_logs (
+  id text primary key,
+  action text not null,               -- audit_create | issue_status | export | echec ...
+  actor text,                         -- e-mail de l'utilisateur si disponible
+  ref jsonb,                          -- référence de l'objet (audit_id, plan_id, ...)
+  created_at timestamptz not null default now()
+);
+create index if not exists trv_quality_logs_idx
+  on trv_quality_logs (created_at desc);

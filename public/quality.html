@@ -5,7 +5,7 @@
 <title>Terravive — Quality Guard</title>
 <style>
 :root{--leaf:#2E7D46;--deep:#174D2B;--sun:#C58A2A;--line:#dce6da;--bg:#eef4ec;--surface:#fff;--surface2:#f4f9f2;--panel:#fff;--ink:#15251B;--soft:#53625a;--faint:#8a988e;--good:#2E8B6F;--warn:#C58A2A;--bad:#c0392b;--sidebar:#13351f;--sidebar-ink:#dfeee3;--sidebar-active:#fff;--sidebar-active-ink:#14261a;--shadow:0 8px 28px rgba(20,50,30,.08);--f-display:Georgia,'Times New Roman',serif}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,Arial,sans-serif}button,a{font:inherit}a{color:inherit;text-decoration:none}.layout{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}.sidebar{background:var(--sidebar);color:var(--sidebar-ink);padding:24px 16px;display:flex;flex-direction:column;gap:8px}.brand{display:flex;gap:10px;align-items:center;padding:0 8px 22px}.brand img{width:38px;height:38px;object-fit:contain}.brand strong{display:block;color:#fff;font:700 23px Georgia,"Times New Roman",serif}.brand small{font-size:12px;opacity:.8}.nav{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;color:var(--sidebar-ink);font:600 15px/1.5 "Segoe UI",system-ui,Arial,sans-serif}.nav.active{background:var(--sidebar-active);color:var(--sidebar-active-ink)}.nav:hover{background:rgba(255,255,255,.12)}.nav:focus-visible,.btn:focus-visible,.chip:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #8ec6a1;outline-offset:2px}.sidebar-foot{margin-top:auto;font-size:12px;opacity:.75;padding:10px 8px}.main{padding:28px clamp(18px,3vw,42px);min-width:0}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.11em;color:var(--leaf);font-weight:800}.title{font:700 clamp(26px,3vw,36px) Georgia,"Times New Roman",serif;margin:4px 0;color:var(--deep)}.muted{color:var(--soft)}.actions{display:flex;gap:10px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:10px 15px;cursor:pointer;font-weight:700;display:inline-flex;align-items:center;gap:7px}.btn.primary{background:var(--leaf);border-color:var(--leaf);color:white}.btn.ghost{background:transparent}.btn:hover{filter:brightness(.97)}.btn:disabled{opacity:.55;cursor:default}.btn svg{width:15px;height:15px;flex:0 0 auto}.btn.primary svg{fill:currentColor}.btn.small{padding:7px 11px;font-size:13px;border-radius:10px}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:20px 0}.card{background:var(--surface);border:1px solid var(--line);border-radius:17px;box-shadow:var(--shadow);padding:20px;min-width:0}.metric-label{font-size:13px;color:var(--soft)}.metric{font:700 32px Georgia,"Times New Roman",serif;margin:8px 0 2px;color:var(--deep)}.metric-note{font-size:12px;color:var(--faint)}.metric.crit{color:var(--bad)}.metric.imp{color:#8a5b00}.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}.section-head h2{font:700 22px Georgia,"Times New Roman",serif;color:var(--deep);margin:0}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:620px}th,td{text-align:left;padding:13px 10px;border-bottom:1px solid var(--line);font-size:13px}th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft)}.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800;background:#e6f4e9;color:var(--good)}.badge.warn{background:#fff2d8;color:#8a5b00}.badge.bad{background:#fde8e7;color:var(--bad)}.sev{display:inline-block;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}.sev.critique{background:#fde8e7;color:#b3261e}.sev.important{background:#fff2d8;color:#8a5b00}.sev.mineur{background:#eef1ee;color:#53625a}.st{display:inline-block;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:700;background:#eef1ee;color:#53625a}.st.en_cours{background:#e7eefb;color:#2b53a4}.st.resolue{background:#e6f4e9;color:var(--good)}.alert{border:1px solid #efd8a9;background:#fff8e9;color:#875c12;border-radius:13px;padding:14px 16px;margin:18px 0;font-size:13px}.alert.err{border-color:#f0c9c6;background:#fdeceb;color:#9c2a21}.status{padding:12px;border-radius:12px;background:var(--surface2);color:var(--soft);margin-top:12px}.empty{padding:24px;text-align:center;color:var(--soft)}.small{font-size:12px}.bottom-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}.list{padding-left:20px;margin:8px 0}.list li{margin:7px 0}.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:4px 0 2px}.filters label{display:flex;flex-direction:column;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft);gap:4px}.filters input,.filters select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;background:var(--surface);color:var(--ink)}.scorebar{height:8px;border-radius:999px;background:#eef1ee;overflow:hidden;margin-top:8px;max-width:260px}.scorebar>span{display:block;height:100%;background:var(--leaf)}.anom{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:12px 0;background:var(--surface)}.anom.critique{border-left:5px solid #b3261e}.anom.important{border-left:5px solid var(--sun)}.anom.mineur{border-left:5px solid #9aa79d}.anom-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.anom h4{margin:0;font:700 15px "Segoe UI",system-ui,Arial,sans-serif}.anom dl{margin:12px 0 0;display:grid;grid-template-columns:150px 1fr;gap:6px 14px;font-size:13px}.anom dt{color:var(--soft);font-weight:700}.anom dd{margin:0}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;align-items:center}.chip{border:1px solid var(--line);background:var(--surface2);border-radius:999px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink)}.chip[aria-pressed=true]{background:var(--leaf);color:#fff;border-color:var(--leaf)}.fiche-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 20px;margin:4px 0 8px;font-size:14px}.fiche-meta b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft);font-weight:800;margin-bottom:2px}.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--leaf);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-3px;margin-right:8px}@keyframes sp{to{transform:rotate(360deg)}}.hidden{display:none!important}.nav svg{width:18px;height:18px;flex:0 0 auto}@media(max-width:1000px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:210px minmax(0,1fr)}.bottom-grid{grid-template-columns:1fr}}@media(max-width:700px){.layout{display:block}.sidebar{padding:12px;display:flex;flex-direction:row;flex-wrap:wrap;align-items:center}.brand{padding:0;margin-right:auto}.brand strong{font-size:19px}.brand img{width:32px;height:32px}.nav{padding:9px 10px;font-size:12px}.sidebar-foot{display:none}.main{padding:20px 14px}.top{align-items:flex-start;flex-direction:column}.grid{gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:15px}.metric{font-size:27px}.anom dl{grid-template-columns:1fr}.fiche-meta{grid-template-columns:1fr}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,Arial,sans-serif}button,a{font:inherit}a{color:inherit;text-decoration:none}.layout{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}.sidebar{background:var(--sidebar);color:var(--sidebar-ink);padding:24px 16px;display:flex;flex-direction:column;gap:8px}.brand{display:flex;gap:10px;align-items:center;padding:0 8px 22px}.brand img{width:38px;height:38px;object-fit:contain}.brand strong{display:block;color:#fff;font:700 23px Georgia,"Times New Roman",serif}.brand small{font-size:12px;opacity:.8}.nav{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;color:var(--sidebar-ink);font:600 15px/1.5 "Segoe UI",system-ui,Arial,sans-serif;cursor:pointer;background:none;border:0;width:100%;text-align:left}.nav.active{background:var(--sidebar-active);color:var(--sidebar-active-ink)}.nav:hover{background:rgba(255,255,255,.12)}.nav:focus-visible,.btn:focus-visible,.chip:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #8ec6a1;outline-offset:2px}.sidebar-foot{margin-top:auto;font-size:12px;opacity:.75;padding:10px 8px}.main{padding:28px clamp(18px,3vw,42px);min-width:0}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.11em;color:var(--leaf);font-weight:800}.title{font:700 clamp(26px,3vw,36px) Georgia,"Times New Roman",serif;margin:4px 0;color:var(--deep)}.muted{color:var(--soft)}.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:10px 15px;cursor:pointer;font-weight:700;display:inline-flex;align-items:center;gap:7px}.btn.primary{background:var(--leaf);border-color:var(--leaf);color:white}.btn.ghost{background:transparent}.btn:hover{filter:brightness(.97)}.btn:disabled{opacity:.55;cursor:default}.btn svg{width:15px;height:15px;flex:0 0 auto}.btn.primary svg{fill:currentColor}.btn.small{padding:7px 11px;font-size:13px;border-radius:10px}.iconbtn{position:relative;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:9px 11px;cursor:pointer}.bell-badge{position:absolute;top:-7px;right:-7px;background:var(--bad);color:#fff;border-radius:999px;font-size:10px;font-weight:800;padding:1px 6px;min-width:18px;text-align:center}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:20px 0}.card{background:var(--surface);border:1px solid var(--line);border-radius:17px;box-shadow:var(--shadow);padding:20px;min-width:0}.metric-label{font-size:13px;color:var(--soft)}.metric{font:700 32px Georgia,"Times New Roman",serif;margin:8px 0 2px;color:var(--deep)}.metric-note{font-size:12px;color:var(--faint)}.metric.crit{color:var(--bad)}.metric.imp{color:#8a5b00}.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}.section-head h2{font:700 22px Georgia,"Times New Roman",serif;color:var(--deep);margin:0}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:640px}th,td{text-align:left;padding:13px 10px;border-bottom:1px solid var(--line);font-size:13px}th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft)}.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800;background:#e6f4e9;color:var(--good)}.badge.warn{background:#fff2d8;color:#8a5b00}.badge.bad{background:#fde8e7;color:var(--bad)}.sev{display:inline-block;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}.sev.critique{background:#fde8e7;color:#b3261e}.sev.important{background:#fff2d8;color:#8a5b00}.sev.mineur{background:#eef1ee;color:#53625a}.st{display:inline-block;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:700;background:#eef1ee;color:#53625a}.st.en_cours{background:#e7eefb;color:#2b53a4}.st.resolue{background:#e6f4e9;color:var(--good)}.alert{border:1px solid #efd8a9;background:#fff8e9;color:#875c12;border-radius:13px;padding:14px 16px;margin:18px 0;font-size:13px}.alert.err{border-color:#f0c9c6;background:#fdeceb;color:#9c2a21}.status{padding:12px;border-radius:12px;background:var(--surface2);color:var(--soft);margin-top:12px}.empty{padding:24px;text-align:center;color:var(--soft)}.small{font-size:12px}.list{padding-left:20px;margin:8px 0}.list li{margin:7px 0}.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:4px 0 2px}.filters label{display:flex;flex-direction:column;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft);gap:4px}.filters input,.filters select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;background:var(--surface);color:var(--ink)}.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.scorebar{height:8px;border-radius:999px;background:#eef1ee;overflow:hidden;margin-top:8px;max-width:260px}.scorebar>span{display:block;height:100%;background:var(--leaf)}.anom{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:12px 0;background:var(--surface)}.anom.critique{border-left:5px solid #b3261e}.anom.important{border-left:5px solid var(--sun)}.anom.mineur{border-left:5px solid #9aa79d}.anom-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.anom h4{margin:0;font:700 15px "Segoe UI",system-ui,Arial,sans-serif}.anom dl{margin:12px 0 0;display:grid;grid-template-columns:150px 1fr;gap:6px 14px;font-size:13px}.anom dt{color:var(--soft);font-weight:700}.anom dd{margin:0}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;align-items:center}.chip{border:1px solid var(--line);background:var(--surface2);border-radius:999px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink)}.chip[aria-pressed=true]{background:var(--leaf);color:#fff;border-color:var(--leaf)}.fiche-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 20px;margin:4px 0 8px;font-size:14px}.fiche-meta b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft);font-weight:800;margin-bottom:2px}.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--leaf);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-3px;margin-right:8px}@keyframes sp{to{transform:rotate(360deg)}}.hidden{display:none!important}.nav svg{width:18px;height:18px;flex:0 0 auto}.notif{display:flex;gap:10px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)}.notif:last-child{border-bottom:0}.notif .dot{width:9px;height:9px;border-radius:50%;background:var(--faint);margin-top:6px;flex:0 0 auto}.notif.critique .dot,.notif.echec .dot{background:var(--bad)}.notif.resolue .dot{background:var(--good)}.notif.nouvel_audit .dot{background:var(--sun)}.notif.unread{font-weight:600}.dash2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}.rank{list-style:none;padding:0;margin:6px 0 0}.rank li{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}.rank li:last-child{border-bottom:0}.rank b{font-weight:800;color:var(--deep)}.cmp{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px}.cmp .col{border:1px solid var(--line);border-radius:12px;padding:12px}.cmp h4{margin:0 0 8px;font-size:14px}.pill{display:inline-block;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:800;background:#eef1ee}.pill.up{background:#e6f4e9;color:var(--good)}.pill.down{background:#fde8e7;color:var(--bad)}@media(max-width:1000px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:210px minmax(0,1fr)}.dash2,.cmp{grid-template-columns:1fr}}@media(max-width:700px){.layout{display:block}.sidebar{padding:12px;display:flex;flex-direction:row;flex-wrap:wrap;align-items:center}.brand{padding:0;margin-right:auto}.brand strong{font-size:19px}.brand img{width:32px;height:32px}.nav{padding:9px 10px;font-size:12px;width:auto}.sidebar-foot{display:none}.main{padding:20px 14px}.top{align-items:flex-start;flex-direction:column}.grid{gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:15px}.metric{font-size:27px}.anom dl{grid-template-columns:1fr}.fiche-meta{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -16,26 +16,41 @@
  <a class="nav" href="#plans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z"/><path d="M8.5 11h7M8.5 15h7"/></svg> Itinéraires</a>
  <a class="nav" href="#tests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 7.7-7 9-4-1.3-7-4.4-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg> Banc de vérifications</a>
  <a class="nav" href="#history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> Historique</a>
+ <button class="nav" id="navJournal" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg> Journal</button>
  <a class="nav" href="/tableau"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6l-6 6 6 6"/><path d="M4 12h16"/></svg> Retour à Terravive</a>
  <div class="sidebar-foot">Votre contrôle qualité maison<br>Ces vérifications vous aident, elles ne remplacent pas l'avis d'un agronome.</div>
 </aside>
 <main class="main">
- <header class="top"><div><div class="eyebrow">Contrôle qualité</div><h1 class="title" id="greeting">Terravive Quality Guard</h1><div class="muted">Passez vos itinéraires au contrôle et repérez ce qui mérite un second regard avant de les transmettre.</div></div><div class="actions"><button class="btn" id="refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8"/><path d="M20 4v4h-4"/><path d="M20 12a8 8 0 0 1-13.7 5.7L4 16"/><path d="M4 20v-4h4"/></svg>Actualiser</button><button class="btn primary" id="runTests"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M7 5.2v13.6a.8.8 0 0 0 1.2.7l11-6.8a.8.8 0 0 0 0-1.4l-11-6.8A.8.8 0 0 0 7 5.2z"/></svg>Lancer les vérifications</button></div></header>
+ <header class="top"><div><div class="eyebrow" id="roleTag">Contrôle qualité</div><h1 class="title" id="greeting">Terravive Quality Guard</h1><div class="muted">Passez vos itinéraires au contrôle et repérez ce qui mérite un second regard avant de les transmettre.</div></div>
+  <div class="actions">
+   <button class="iconbtn" id="bellBtn" type="button" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span class="bell-badge hidden" id="bellCount">0</span></button>
+   <button class="btn" id="refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8"/><path d="M20 4v4h-4"/><path d="M20 12a8 8 0 0 1-13.7 5.7L4 16"/><path d="M4 20v-4h4"/></svg>Actualiser</button>
+   <button class="btn primary" id="runTests"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M7 5.2v13.6a.8.8 0 0 0 1.2.7l11-6.8a.8.8 0 0 0 0-1.4l-11-6.8A.8.8 0 0 0 7 5.2z"/></svg>Lancer les vérifications</button>
+  </div>
+ </header>
 
  <div id="notice" class="alert" role="status" aria-live="polite">Chargement des données…</div>
 
- <!-- ========= VUE LISTE (tableau de bord + historique) ========= -->
+ <!-- Panneau notifications -->
+ <section class="card notif-panel hidden" id="notifPanel"><div class="section-head"><h2>Notifications</h2><button class="btn small ghost" id="markAll" type="button">Tout marquer comme lu</button></div><div id="notifList"><div class="empty">Chargement…</div></div></section>
+
+ <!-- ========= VUE LISTE ========= -->
  <div id="listView">
   <section class="grid" aria-label="Indicateurs">
    <article class="card"><div class="metric-label">Audits enregistrés</div><div class="metric" id="mTotal">—</div><div class="metric-note" id="mTotalNote">Historique Quality Guard</div></article>
    <article class="card"><div class="metric-label">Conformes</div><div class="metric" id="mOk">—</div><div class="metric-note">Rien à signaler</div></article>
    <article class="card"><div class="metric-label">À vérifier</div><div class="metric" id="mCheck">—</div><div class="metric-note">Au moins un point ouvert</div></article>
-   <article class="card"><div class="metric-label">Dernier audit</div><div class="metric" id="mLast" style="font-size:20px">—</div><div class="metric-note">Date du contrôle le plus récent</div></article>
+   <article class="card"><div class="metric-label">Dernier audit</div><div class="metric" id="mLast" style="font-size:20px">—</div><div class="metric-note">Contrôle le plus récent</div></article>
    <article class="card"><div class="metric-label">Anomalies critiques</div><div class="metric crit" id="mCrit">—</div><div class="metric-note">Risque / décision dommageable</div></article>
    <article class="card"><div class="metric-label">Anomalies importantes</div><div class="metric imp" id="mImp">—</div><div class="metric-note">Peut fausser une recommandation</div></article>
    <article class="card"><div class="metric-label">Anomalies mineures</div><div class="metric" id="mMin">—</div><div class="metric-note">Rédaction / présentation</div></article>
    <article class="card"><div class="metric-label">Anomalies résolues</div><div class="metric" id="mRes">—</div><div class="metric-note">Vérifiées et corrigées</div></article>
   </section>
+
+  <div class="dash2">
+   <section class="card"><div class="section-head"><h2>Cultures les plus contrôlées</h2></div><ul class="rank" id="topCrops"><li class="muted">—</li></ul></section>
+   <section class="card"><div class="section-head"><h2>Problèmes les plus fréquents</h2></div><ul class="rank" id="topProblems"><li class="muted">—</li></ul></section>
+  </div>
 
   <div class="alert">Ces repères sont indicatifs : les vérifications automatiques signalent quelques points à regarder, rien de plus. Aucun itinéraire n'est corrigé tout seul, et c'est toujours vous qui décidez. Le score affiché est <b>structurel</b>, pas une note agronomique.</div>
 
@@ -43,7 +58,7 @@
    <div class="table-wrap"><table><thead><tr><th>Itinéraire</th><th>Créé le</th><th>Sections</th><th>Contrôle rapide</th><th>Action</th></tr></thead><tbody id="plansBody"><tr><td colspan="5" class="empty">Chargement…</td></tr></tbody></table></div>
   </section>
 
-  <section class="card" id="history" style="margin-top:16px"><div class="section-head"><div><h2>Historique des audits</h2><div class="muted small">Plus récents en premier · cliquez « Consulter » pour la fiche détaillée.</div></div></div>
+  <section class="card" id="history" style="margin-top:16px"><div class="section-head"><div><h2>Historique des audits</h2><div class="muted small">Cliquez « Consulter » pour la fiche, ou cochez deux audits d'un même itinéraire pour les comparer.</div></div></div>
    <div class="filters" role="group" aria-label="Filtres">
     <label>Du<input type="date" id="fFrom"></label>
     <label>Au<input type="date" id="fTo"></label>
@@ -53,13 +68,19 @@
     <button class="btn small primary" id="applyFilters" type="button">Filtrer</button>
     <button class="btn small ghost" id="resetFilters" type="button">Réinitialiser</button>
    </div>
-   <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Itinéraire</th><th>Culture</th><th>Date</th><th>Statut</th><th>Score</th><th>Points</th><th>Action</th></tr></thead><tbody id="historyBody"><tr><td colspan="7" class="empty">Chargement…</td></tr></tbody></table></div>
+   <div class="toolbar">
+    <button class="btn small exportable" id="exportCsv" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg>Exporter CSV (filtres)</button>
+    <button class="btn small comparable" id="compareSel" type="button" disabled>Comparer la sélection (0/2)</button>
+   </div>
+   <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th></th><th>Itinéraire</th><th>Culture</th><th>Date</th><th>Statut</th><th>Score</th><th>Points</th><th>Action</th></tr></thead><tbody id="historyBody"><tr><td colspan="8" class="empty">Chargement…</td></tr></tbody></table></div>
   </section>
+
+  <section class="card" id="journalCard" style="margin-top:16px;display:none"><div class="section-head"><div><h2>Journal des actions</h2><div class="muted small">Traçabilité (sans aucun secret). Lecture seule.</div></div><button class="btn small" id="loadLogs" type="button">Afficher le journal</button></div><div id="logsBody" class="status">Cliquez « Afficher le journal ».</div></section>
 
   <section class="card" id="tests" style="margin-top:16px"><div class="section-head"><h2>Banc de vérifications</h2><span class="badge" id="testBadge">Prêt</span></div><p class="muted">Vérifications internes, exécutées sans appel à l'IA — aucun coût.</p><div id="testResults" class="status">Cliquez sur « Lancer les vérifications » pour les exécuter.</div></section>
  </div>
 
- <!-- ========= VUE FICHE (détail d'un audit) ========= -->
+ <!-- ========= VUE FICHE ========= -->
  <div id="detailView" class="hidden">
   <button class="btn" id="backBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6l-6 6 6 6"/><path d="M4 12h16"/></svg>Retour à l'historique</button>
   <div id="ficheBody" style="margin-top:16px"><div class="card"><span class="spin"></span>Chargement de la fiche…</div></div>
@@ -78,8 +99,9 @@ function sevLabel(s){return s==='critique'?'Critique':s==='important'?'Important
 function stLabel(s){return s==='resolue'?'Résolue':s==='en_cours'?'En cours':'À traiter'}
 function num(v){return (v===null||v===undefined)?'—':v}
 const RUN_ICON='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M7 5.2v13.6a.8.8 0 0 0 1.2.7l11-6.8a.8.8 0 0 0 0-1.4l-11-6.8A.8.8 0 0 0 7 5.2z"/></svg>';
-
-let CROPS=[];
+const PERMS={admin:["read","audit","resolve","export","compare","notify","logs"],auditeur:["read","audit","resolve","export","compare","notify"],lecteur:["read","export","compare","notify"]};
+let ROLE=null, OV=null, SELECTED=[];
+function can(a){return !!ROLE && PERMS[ROLE] && PERMS[ROLE].indexOf(a)>=0}
 function currentFilters(){const q={};const f=$('fFrom').value,t=$('fTo').value,c=$('fCrop').value,s=$('fStatus').value,g=$('fSev').value;if(f)q.from=f;if(t)q.to=t;if(c)q.crop=c;if(s)q.status=s;if(g)q.severity=g;return q}
 function qs(q){const p=Object.entries(q).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v));return p.length?'?'+p.join('&'):''}
 
@@ -88,9 +110,14 @@ async function load(){
  $('notice').textContent='Chargement de vos données…';$('notice').className='alert';
  try{
   const d=await api('/api/quality/overview'+qs(currentFilters()));
+  OV=d; ROLE=d.role;
   $('greeting').textContent='Bonjour '+((d.user&&d.user.name)||'administrateur');
+  $('roleTag').textContent='Rôle : '+(ROLE||'—');
   $('source').textContent='Source : '+esc(d.source);
-  // Tableau de bord (données réelles)
+  $('navJournal').style.display=can('logs')?'':'none';
+  $('journalCard').style.display=can('logs')?'':'none';
+  document.querySelectorAll('.exportable').forEach(b=>b.style.display=can('export')?'':'none');
+  // Métriques
   const m=d.metrics||{};
   $('mTotal').textContent=num(m.total);
   $('mTotalNote').textContent=(d.metrics_total!=null&&d.metrics_total!==m.total)?('sur '+d.metrics_total+' au total'):'Historique Quality Guard';
@@ -98,23 +125,33 @@ async function load(){
   $('mCrit').textContent=num(m.critiques);$('mImp').textContent=num(m.importants);
   $('mMin').textContent=num(m.mineurs);$('mRes').textContent=num(m.resolues);
   $('mLast').textContent=m.dernier?date(m.dernier):'—';
-  // Liste des cultures pour le filtre
-  if(Array.isArray(d.crops)){CROPS=d.crops;const cur=$('fCrop').value;$('fCrop').innerHTML='<option value="">Toutes</option>'+d.crops.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');$('fCrop').value=cur;}
-  // Itinéraires à contrôler
-  $('plansBody').innerHTML=d.plans.length?d.plans.map(p=>`<tr><td><strong>${esc(p.title||p.crop||'Itinéraire sans titre')}</strong><div class="muted small">${esc(p.crop||'Culture non précisée')} · ${esc(p.region||'Région non précisée')}</div></td><td>${date(p.created_at)}</td><td>${p.sections??'—'}/18</td><td>${statusBadge(p.status)}</td><td><button class="btn primary small audit" data-id="${esc(p.id)}" type="button">Contrôler</button></td></tr>`).join(''):'<tr><td colspan="5" class="empty">Vous n\'avez pas encore d\'itinéraire à contrôler.</td></tr>';
+  $('topCrops').innerHTML=(m.top_crops&&m.top_crops.length)?m.top_crops.map(c=>`<li><span>${esc(c.label)}</span><b>${c.count}</b></li>`).join(''):'<li class="muted">Aucune donnée</li>';
+  $('topProblems').innerHTML=(m.top_problems&&m.top_problems.length)?m.top_problems.map(c=>`<li><span>${esc(c.label)}</span><b>${c.count}</b></li>`).join(''):'<li class="muted">Aucune donnée</li>';
+  // Notifications (pastille)
+  const unread=d.unread||0;$('bellCount').textContent=unread;$('bellCount').classList.toggle('hidden',!unread);
+  // Cultures (filtre)
+  if(Array.isArray(d.crops)){const cur=$('fCrop').value;$('fCrop').innerHTML='<option value="">Toutes</option>'+d.crops.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');$('fCrop').value=cur;}
+  // Itinéraires
+  const showAudit=can('audit');
+  $('plansBody').innerHTML=d.plans.length?d.plans.map(p=>`<tr><td><strong>${esc(p.title||p.crop||'Itinéraire sans titre')}</strong><div class="muted small">${esc(p.crop||'Culture non précisée')} · ${esc(p.region||'Région non précisée')}</div></td><td>${date(p.created_at)}</td><td>${p.sections??'—'}/18</td><td>${statusBadge(p.status)}</td><td>${showAudit?`<button class="btn primary small audit" data-id="${esc(p.id)}" type="button">Contrôler</button>`:'<span class="muted small">lecture seule</span>'}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">Vous n\'avez pas encore d\'itinéraire à contrôler.</td></tr>';
   // Historique
+  SELECTED=[];updateCompareBtn();
   const hasFilters=Object.keys(currentFilters()).length>0;
-  $('historyBody').innerHTML=d.audits.length?d.audits.map(a=>`<tr><td><strong>${esc(a.title||'Audit')}</strong></td><td>${a.crop?esc(a.crop):'<span class="muted">—</span>'}</td><td>${datetime(a.created_at)}</td><td>${statusBadge(a.status)}</td><td>${typeof a.score==='number'?a.score+'/100':'—'}</td><td>${a.alert_count||0}${a.resolved_count?` <span class="muted small">(${a.resolved_count} résolue(s))</span>`:''}</td><td><button class="btn small consult" data-id="${esc(a.id)}" type="button">Consulter</button></td></tr>`).join(''):`<tr><td colspan="7" class="empty">${hasFilters?'Aucun audit ne correspond à ces filtres.':'Aucun contrôle enregistré pour l\'instant. Lancez un contrôle sur un itinéraire ci-dessus.'}</td></tr>`;
+  $('historyBody').innerHTML=d.audits.length?d.audits.map(a=>`<tr><td><input type="checkbox" class="selAudit" data-id="${esc(a.id)}" data-plan="${esc(a.plan_id||'')}" aria-label="Sélectionner pour comparaison"></td><td><strong>${esc(a.title||'Audit')}</strong></td><td>${a.crop?esc(a.crop):'<span class="muted">—</span>'}</td><td>${datetime(a.created_at)}</td><td>${statusBadge(a.status)}</td><td>${typeof a.score==='number'?a.score+'/100':'—'}</td><td>${a.alert_count||0}${a.resolved_count?` <span class="muted small">(${a.resolved_count} rés.)</span>`:''}</td><td><button class="btn small consult" data-id="${esc(a.id)}" type="button">Consulter</button></td></tr>`).join(''):`<tr><td colspan="8" class="empty">${hasFilters?'Aucun audit ne correspond à ces filtres.':'Aucun contrôle enregistré. Lancez un contrôle sur un itinéraire ci-dessus.'}</td></tr>`;
   document.querySelectorAll('.audit').forEach(b=>b.addEventListener('click',()=>runAudit(b.dataset.id,b)));
   document.querySelectorAll('.consult').forEach(b=>b.addEventListener('click',()=>openFiche(b.dataset.id)));
+  document.querySelectorAll('.selAudit').forEach(c=>c.addEventListener('change',onSelect));
   $('notice').textContent='C\'est prêt. Rappel : ces vérifications vous aident, elles ne remplacent pas une validation par un agronome.';$('notice').className='status';
  }catch(e){
-  if(e.status===401){$('notice').textContent='Connectez-vous à Terravive avec votre compte administrateur, puis rechargez cette page.';}
-  else if(e.status===403){$('notice').textContent='Accès réservé à un administrateur. Vérifiez votre session Terravive et la variable ADMIN_EMAILS sur Render.';}
-  else {$('notice').textContent=e.message||'Impossible de charger les données.';}
+  if(e.status===401)$('notice').textContent='Connectez-vous à Terravive avec votre compte administrateur, puis rechargez cette page.';
+  else if(e.status===403)$('notice').textContent='Accès refusé : votre compte n\'a pas de rôle Quality Guard. Vérifiez ADMIN_EMAILS (ou QUALITY_AUDITORS / QUALITY_VIEWERS) sur Render.';
+  else $('notice').textContent=e.message||'Impossible de charger les données.';
   $('notice').className='alert err';
  }
 }
+
+function onSelect(e){const id=e.target.dataset.id,plan=e.target.dataset.plan;if(e.target.checked){if(SELECTED.length>=2){e.target.checked=false;return;}SELECTED.push({id,plan});}else{SELECTED=SELECTED.filter(x=>x.id!==id);}updateCompareBtn();}
+function updateCompareBtn(){const b=$('compareSel');b.textContent='Comparer la sélection ('+SELECTED.length+'/2)';b.disabled=SELECTED.length!==2;}
 
 async function runAudit(id,button){
  button.disabled=true;const old=button.textContent;button.textContent='Contrôle…';
@@ -129,20 +166,28 @@ async function runAudit(id,button){
 function showList(){$('detailView').classList.add('hidden');$('listView').classList.remove('hidden');}
 function showDetail(){$('listView').classList.add('hidden');$('detailView').classList.remove('hidden');window.scrollTo(0,0);}
 
+// -------- Fiche --------
+let FICHE=null;
 async function openFiche(id){
  showDetail();
  $('ficheBody').innerHTML='<div class="card"><span class="spin"></span>Chargement de la fiche…</div>';
- try{const d=await api('/api/quality/audit?id='+encodeURIComponent(id));renderFiche(d);}
+ try{const d=await api('/api/quality/audit?id='+encodeURIComponent(id));FICHE=d.audit;renderFiche(d);}
  catch(e){$('ficheBody').innerHTML=`<div class="card"><div class="alert err" style="margin:0">${esc(e.message||'Impossible de charger cette fiche.')}</div></div>`;}
 }
-
 function renderFiche(d){
- const a=d.audit;
+ const a=d.audit;FICHE=a;
  const crop=a.crop?esc(a.crop):'<span class="muted">Non disponible</span>';
  const region=a.region?esc(a.region):'<span class="muted">Non disponible</span>';
  const score=(typeof a.score==='number')?`${a.score}/100`:'<span class="muted">Non calculé</span>';
  const scoreBar=(typeof a.score==='number')?`<div class="scorebar" aria-hidden="true"><span style="width:${a.score}%"></span></div><div class="muted small">Score structurel indicatif — ce n'est pas une note agronomique.</div>`:'';
- const head=`<div class="card">
+ // Options de comparaison : autres audits du même itinéraire
+ const siblings=(OV&&OV.audits?OV.audits:[]).filter(x=>x.plan_id&&a.plan_id&&x.plan_id===a.plan_id&&x.id!==a.id);
+ const cmpCtrl=(can('compare')&&siblings.length)?`<label class="small">Comparer à <select id="cmpSel">${siblings.map(s=>`<option value="${esc(s.id)}">${esc(datetime(s.created_at))}</option>`).join('')}</select></label> <button class="btn small" id="cmpBtn" type="button">Comparer</button>`:'';
+ const tools=`<div class="toolbar">
+   <button class="btn small" id="pdfBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h9l3 3v17H6z"/><path d="M9 13h6M9 17h6M9 9h3"/></svg>Télécharger le PDF</button>
+   ${can('export')?`<button class="btn small" id="csvBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg>Exporter CSV</button>`:''}
+   ${cmpCtrl}</div>`;
+ const head=`<div class="card" id="ficheCard">
    <div class="section-head"><h2>${esc(a.title||'Itinéraire')}</h2>${statusBadge(a.status)}</div>
    <div class="fiche-meta">
     <div><b>Culture</b>${crop}</div>
@@ -150,21 +195,23 @@ function renderFiche(d){
     <div><b>Date du contrôle</b>${datetime(a.created_at)}</div>
     <div><b>Anomalies</b>${a.alert_count||0} au total${a.resolved_count?` · ${a.resolved_count} résolue(s)`:''}</div>
     <div><b>Score</b>${score}</div>
-    <div><b>Itinéraire source</b>${d.plan_available?'Disponible':'<span class="muted">Non disponible (supprimé ou introuvable)</span>'}</div>
-   </div>${scoreBar}
+    <div><b>Itinéraire source</b>${d.plan_available?'Disponible':'<span class="muted">Non disponible</span>'}</div>
+   </div>${scoreBar}${tools}
+   <div id="compareOut"></div>
   </div>`;
  let body;
  if(!a.anomalies.length){
-  body='<div class="card" style="margin-top:16px"><div class="empty">Aucune anomalie détectée par les vérifications automatiques. Un relecture humaine reste recommandée.</div></div>';
+  body='<div class="card" style="margin-top:16px"><div class="empty">Aucune anomalie détectée par les vérifications automatiques. Une relecture humaine reste recommandée.</div></div>';
  }else{
-  body='<div class="card" style="margin-top:16px"><div class="section-head"><h2>Anomalies & corrections</h2><span class="muted small">Gravité : critique, important, mineur</span></div>'+
-   a.anomalies.map(an=>ficheAnom(a.id,an)).join('')+'</div>';
+  body='<div class="card" style="margin-top:16px"><div class="section-head"><h2>Anomalies &amp; corrections</h2><span class="muted small">Gravité : critique, important, mineur</span></div>'+a.anomalies.map(an=>ficheAnom(a.id,an)).join('')+'</div>';
  }
  $('ficheBody').innerHTML=head+body;
+ if($('pdfBtn'))$('pdfBtn').addEventListener('click',()=>printPdf(a,d.plan_available));
+ if($('csvBtn'))$('csvBtn').addEventListener('click',()=>{window.location='/api/quality/export.csv?id='+encodeURIComponent(a.id);});
+ if($('cmpBtn'))$('cmpBtn').addEventListener('click',()=>doCompare(a.id,$('cmpSel').value));
  document.querySelectorAll('.chip[data-issue]').forEach(c=>c.addEventListener('click',()=>setIssueStatus(c.dataset.audit,c.dataset.issue,c.dataset.status)));
  document.querySelectorAll('.suggest').forEach(b=>b.addEventListener('click',()=>suggest(b.dataset.audit,b.dataset.issue,b)));
 }
-
 function ficheAnom(auditId,an){
  const rows=[];
  rows.push(`<dt>Description</dt><dd>${esc(an.description||an.message||'')}</dd>`);
@@ -172,32 +219,92 @@ function ficheAnom(auditId,an){
  if(an.correction)rows.push(`<dt>Correction proposée</dt><dd>${esc(an.correction)}</dd>`);
  if(an.missing)rows.push(`<dt>Information manquante</dt><dd>${esc(an.missing)}</dd>`);
  if(an.needs_human)rows.push(`<dt>Gravité</dt><dd>À confirmer par une vérification humaine.</dd>`);
- const chips=['a_traiter','en_cours','resolue'].map(s=>`<button class="chip" type="button" data-audit="${esc(auditId)}" data-issue="${esc(an.id)}" data-status="${s}" aria-pressed="${an.status===s}">${stLabel(s)}</button>`).join('');
+ const editable=can('resolve');
+ const chips=['a_traiter','en_cours','resolue'].map(s=>`<button class="chip" type="button" ${editable?'':'disabled'} data-audit="${esc(auditId)}" data-issue="${esc(an.id)}" data-status="${s}" aria-pressed="${an.status===s}">${stLabel(s)}</button>`).join('');
+ const ai=(can('audit'))?`<button class="btn small ghost suggest" type="button" data-audit="${esc(auditId)}" data-issue="${esc(an.id)}">Reformulation IA (facultatif)</button>`:'';
  return `<div class="anom ${esc(an.severity)}">
    <div class="anom-head"><h4>${esc(an.title||'Anomalie')}</h4><span class="sev ${esc(an.severity)}">${sevLabel(an.severity)}</span></div>
    <dl>${rows.join('')}</dl>
-   <div class="chips"><span class="muted small">Statut :</span>${chips}
-     <button class="btn small ghost suggest" type="button" data-audit="${esc(auditId)}" data-issue="${esc(an.id)}">Reformulation IA (facultatif)</button>
-   </div>
+   <div class="chips"><span class="muted small">Statut :</span>${chips}${ai}</div>
    <div class="suggest-out muted small" style="margin-top:8px"></div>
   </div>`;
 }
-
 async function setIssueStatus(auditId,issueId,status){
- try{const d=await api('/api/quality/issue',{method:'POST',body:JSON.stringify({auditId,issueId,status})});
-  renderFiche({audit:d.audit,plan_available:true});
- }catch(e){alert(e.message||'Mise à jour impossible.');}
+ try{const d=await api('/api/quality/issue',{method:'POST',body:JSON.stringify({auditId,issueId,status})});renderFiche({audit:d.audit,plan_available:true});}
+ catch(e){alert(e.message||'Mise à jour impossible.');}
 }
-
 async function suggest(auditId,issueId,btn){
  const out=btn.closest('.anom').querySelector('.suggest-out');
  btn.disabled=true;out.innerHTML='<span class="spin"></span>Demande à l\'assistance IA…';
- try{const d=await api('/api/quality/suggest',{method:'POST',body:JSON.stringify({auditId,issueId})});
-  out.innerHTML='<b>Suggestion IA :</b> '+esc(d.suggestion||'(réponse vide)');
- }catch(e){out.innerHTML='<span style="color:var(--bad)">'+esc(e.message||'Assistance IA indisponible.')+'</span> La correction proposée ci-dessus reste utilisable.';}
+ try{const d=await api('/api/quality/suggest',{method:'POST',body:JSON.stringify({auditId,issueId})});out.innerHTML='<b>Suggestion IA :</b> '+esc(d.suggestion||'(réponse vide)');}
+ catch(e){out.innerHTML='<span style="color:var(--bad)">'+esc(e.message||'Assistance IA indisponible.')+'</span> La correction proposée ci-dessus reste utilisable.';}
  finally{btn.disabled=false;}
 }
 
+// -------- Comparaison --------
+async function compareSelection(){ if(SELECTED.length!==2)return; if(SELECTED[0].plan&&SELECTED[1].plan&&SELECTED[0].plan!==SELECTED[1].plan){$('notice').textContent='Choisissez deux audits du même itinéraire pour les comparer.';$('notice').className='alert err';return;} const a=SELECTED[0].id,b=SELECTED[1].id; openFicheThenCompare(a,b); }
+async function openFicheThenCompare(a,b){ await openFiche(b); doCompare(b,a); }
+async function doCompare(a,b){
+ const out=$('compareOut');if(!out)return;
+ out.innerHTML='<div class="status"><span class="spin"></span>Comparaison…</div>';
+ try{const d=await api('/api/quality/compare?a='+encodeURIComponent(a)+'&b='+encodeURIComponent(b));renderCompare(d.comparison);}
+ catch(e){out.innerHTML='<div class="alert err" style="margin:10px 0 0">'+esc(e.message||'Comparaison impossible.')+'</div>';}
+}
+function renderCompare(c){
+ const delta=c.score_comparable?`<span class="pill ${c.score_delta>=0?'up':'down'}">${c.score_delta>=0?'+':''}${c.score_delta} pts</span>`:'<span class="muted small">scores non comparables</span>';
+ const stc=c.status_change?`<span class="pill">${esc(c.status_change.from)} → ${esc(c.status_change.to)}</span>`:'<span class="muted small">statut inchangé</span>';
+ const listOf=arr=>arr.length?('<ul class="list">'+arr.map(a=>`<li><span class="sev ${esc(a.severity)}" style="padding:2px 7px">${sevLabel(a.severity)}</span> ${esc(a.title)}${a.note?` <span class="muted small">(${esc(a.note)})</span>`:''}</li>`).join('')+'</ul>'):'<div class="muted small">Aucune</div>';
+ $('compareOut').innerHTML=`<div style="margin-top:14px"><div class="section-head"><h2 style="font-size:18px">Comparaison des deux contrôles</h2></div>
+   <div class="muted small">Ancien : ${datetime(c.older.created_at)} · Récent : ${datetime(c.newer.created_at)} — Évolution du score : ${delta} · Statut : ${stc}</div>
+   <div class="cmp">
+    <div class="col"><h4>Nouvelles (${c.nouvelles.length})</h4>${listOf(c.nouvelles)}</div>
+    <div class="col"><h4>Corrigées (${c.corrigees.length})</h4>${listOf(c.corrigees)}</div>
+    <div class="col"><h4>Toujours présentes (${c.persistantes.length})</h4>${listOf(c.persistantes)}</div>
+   </div></div>`;
+}
+
+// -------- PDF (impression navigateur, zéro dépendance) --------
+function printPdf(a,planAvail){
+ const w=window.open('','_blank');if(!w){alert('Autorisez les fenêtres pop-up pour générer le PDF.');return;}
+ const row=an=>`<div class="an ${esc(an.severity)}"><div class="anh"><strong>${esc(an.title)}</strong><span class="sev">${sevLabel(an.severity)} · ${stLabel(an.status)}</span></div>
+   <p>${esc(an.description||'')}</p>${an.justification?`<p><b>Pourquoi :</b> ${esc(an.justification)}</p>`:''}${an.correction?`<p><b>Correction :</b> ${esc(an.correction)}</p>`:''}${an.missing?`<p><b>Information manquante :</b> ${esc(an.missing)}</p>`:''}</div>`;
+ const anoms=a.anomalies.length?a.anomalies.map(row).join(''):'<p>Aucune anomalie détectée.</p>';
+ w.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Audit ${esc(a.title)}</title>
+  <style>body{font:13px/1.5 "Segoe UI",Arial,sans-serif;color:#15251B;margin:32px}h1{font:700 24px Georgia,serif;color:#174D2B;margin:0 0 4px}.meta{margin:10px 0 18px;font-size:13px}.meta div{margin:2px 0}.an{border:1px solid #dce6da;border-left:4px solid #9aa79d;border-radius:8px;padding:10px 12px;margin:10px 0}.an.critique{border-left-color:#b3261e}.an.important{border-left-color:#C58A2A}.anh{display:flex;justify-content:space-between;gap:10px}.sev{font-size:11px;color:#53625a}.foot{margin-top:24px;font-size:11px;color:#8a988e;border-top:1px solid #dce6da;padding-top:8px}p{margin:4px 0}</style></head>
+  <body><h1>Terravive Quality Guard — Rapport d'audit</h1>
+  <div class="meta">
+   <div><b>Itinéraire :</b> ${esc(a.title||'—')}</div>
+   <div><b>Culture :</b> ${a.crop?esc(a.crop):'Non disponible'} &nbsp; <b>Localisation :</b> ${a.region?esc(a.region):'Non disponible'}</div>
+   <div><b>Date du contrôle :</b> ${esc(datetime(a.created_at))}</div>
+   <div><b>Statut :</b> ${esc(a.status)} &nbsp; <b>Score structurel indicatif :</b> ${typeof a.score==='number'?a.score+'/100':'non calculé'}</div>
+   <div><b>Anomalies :</b> ${a.alert_count||0} au total${a.resolved_count?` · ${a.resolved_count} résolue(s)`:''}</div>
+  </div>
+  <h2 style="font:700 16px Georgia,serif;color:#174D2B">Anomalies &amp; corrections</h2>
+  ${anoms}
+  <div class="foot">Score structurel indicatif, ce n'est pas une note agronomique. Document généré le ${esc(new Date().toLocaleString('fr-FR'))} par Terravive Quality Guard. Une validation agronomique humaine reste recommandée.</div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},200)}<\/script></body></html>`);
+ w.document.close();
+}
+
+// -------- Notifications --------
+async function toggleNotifs(){const p=$('notifPanel');const hidden=p.classList.contains('hidden');p.classList.toggle('hidden');if(hidden)await loadNotifs();}
+async function loadNotifs(){
+ $('notifList').innerHTML='<div class="status"><span class="spin"></span>Chargement…</div>';
+ try{const d=await api('/api/quality/notifications');
+  $('notifList').innerHTML=d.notifications.length?d.notifications.map(n=>`<div class="notif ${esc(n.type)} ${n.read?'':'unread'}"><span class="dot"></span><div><div>${esc(n.message)}</div><div class="muted small">${datetime(n.created_at)}</div></div></div>`).join(''):'<div class="empty">Aucune notification.</div>';
+ }catch(e){$('notifList').innerHTML='<div class="alert err" style="margin:0">'+esc(e.message)+'</div>';}
+}
+async function markAll(){try{await api('/api/quality/notifications/read',{method:'POST',body:JSON.stringify({all:true})});await loadNotifs();$('bellCount').classList.add('hidden');}catch(e){}}
+
+// -------- Journal --------
+async function loadLogs(){
+ $('logsBody').innerHTML='<span class="spin"></span>Chargement…';
+ try{const d=await api('/api/quality/logs');
+  $('logsBody').innerHTML=d.logs.length?'<div class="table-wrap"><table><thead><tr><th>Date</th><th>Action</th><th>Utilisateur</th><th>Référence</th></tr></thead><tbody>'+d.logs.map(l=>`<tr><td>${datetime(l.created_at)}</td><td><b>${esc(l.action)}</b></td><td>${esc(l.actor||'—')}</td><td class="small muted">${esc(JSON.stringify(l.ref||{}))}</td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Journal vide.</div>';
+ }catch(e){$('logsBody').textContent=e.message;}
+}
+
+// -------- Tests --------
 async function runTests(){
  const b=$('runTests');b.disabled=true;b.textContent='Vérifications en cours…';$('testResults').innerHTML='<span class="spin"></span>Vérifications en cours…';
  try{const d=await api('/api/quality/tests',{method:'POST',body:'{}'});
@@ -212,6 +319,12 @@ $('runTests').addEventListener('click',runTests);
 $('backBtn').addEventListener('click',showList);
 $('applyFilters').addEventListener('click',load);
 $('resetFilters').addEventListener('click',()=>{$('fFrom').value='';$('fTo').value='';$('fCrop').value='';$('fStatus').value='';$('fSev').value='';load();});
+$('bellBtn').addEventListener('click',toggleNotifs);
+$('markAll').addEventListener('click',markAll);
+$('exportCsv').addEventListener('click',()=>{window.location='/api/quality/export.csv'+qs(currentFilters());});
+$('compareSel').addEventListener('click',compareSelection);
+$('loadLogs').addEventListener('click',loadLogs);
+$('navJournal').addEventListener('click',()=>{$('journalCard').scrollIntoView({behavior:'smooth'});loadLogs();});
 load();
 </script>
 </body></html>

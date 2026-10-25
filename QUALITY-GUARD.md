@@ -115,3 +115,17 @@ Toutes les routes Quality Guard restent réservées à `ADMIN_EMAILS` ; entrées
 - Suite QA Terravive (non-régression ITK) : **33 tests / 176 vérifications**, SUCCÈS.
 - Intégration bout-en-bout (serveur réel, session admin) : **31/31** — contrôle → historique → fiche → résolution → persistance disque → filtres → 401/403 → validation des entrées.
 Non exécuté ici : le chemin Supabase/production réel (clé + réseau) et l'assistance IA (clé réelle) — vérifiés par relecture et par un échec réseau propre sous clé factice.
+
+## v0.8 — exports, comparaison, notifications, journal, rôles, tableau de bord avancé
+
+- **Export PDF** depuis chaque fiche (impression navigateur, zéro dépendance) : métadonnées, statut, score, anomalies, gravité, justification, corrections, statut de résolution, date de génération.
+- **Export CSV** d'un audit (une ligne par anomalie) ou d'une liste filtrée (une ligne par audit) : BOM UTF-8, séparateur `;`, **protection anti-injection de formules**. Excel ouvre ces CSV directement (un `.xlsx` natif demanderait une dépendance, écartée par principe).
+- **Comparaison** de deux audits d'un même itinéraire : nouvelles / corrigées / toujours présentes, évolution du score (si comparable) et du statut. « Corrigée » seulement avec preuve (non détectée ou marquée résolue).
+- **Centre de notifications** in-app (anomalie critique, nouvel audit à vérifier, résolution, échec d'enregistrement), avec déduplication et « tout marquer comme lu ». Aucun e-mail/SMS.
+- **Journal d'actions** append-only (création, changement de statut, export, échec) ; sans aucun secret ; lecture réservée aux administrateurs.
+- **Rôles** admin / auditeur / lecteur (via `ADMIN_EMAILS`, `QUALITY_AUDITORS`, `QUALITY_VIEWERS`), permissions **vérifiées côté serveur**. Défaut : seuls les admins — comportement préservé.
+- **Tableau de bord avancé** : cultures les plus contrôlées, problèmes les plus fréquents, + filtres existants.
+- **Sécurité/stabilité** : limitation de débit en mémoire (audit/export/IA), validations, messages d'erreur sans fuite ; l'IA reste facultative et prudente, gère clé absente / réseau / réponse vide.
+
+### Tests réellement exécutés (chemin local)
+Banc de vérifications **42/42** · Intégration fonctionnalités **29/29** (rôles, notifications, journal, exports, comparaison, tableau de bord) · Intégration cycle de base **31/31** · Suite QA ITK **33/33**. Non exécuté : Supabase/production réel et IA avec vraie clé.

@@ -1521,18 +1521,179 @@ function qualityAggregate(audits) {
              importants: null, mineurs: null, resolues: null, dernier: null };
   }
   let conformes = 0, aVerifier = 0, critiques = 0, importants = 0, mineurs = 0, resolues = 0, dernier = null;
+  const cropCount = {}, problemCount = {};
   for (const a of list) {
     if (a.status === "ok") conformes++; else aVerifier++;
+    if (a.crop) cropCount[a.crop] = (cropCount[a.crop] || 0) + 1;
     for (const an of a.anomalies) {
       if (an.severity === "critique") critiques++;
       else if (an.severity === "important") importants++;
       else mineurs++;
       if (an.status === "resolue") resolues++;
+      const key = an.title || an.code || "Anomalie";
+      problemCount[key] = (problemCount[key] || 0) + 1;
     }
     if (a.created_at && (!dernier || String(a.created_at) > String(dernier))) dernier = a.created_at;
   }
-  return { total: list.length, conformes, a_verifier: aVerifier, critiques, importants, mineurs, resolues, dernier };
+  const top = (obj) => Object.entries(obj).sort((x, y) => y[1] - x[1]).slice(0, 5).map(([label, count]) => ({ label, count }));
+  return { total: list.length, conformes, a_verifier: aVerifier, critiques, importants, mineurs, resolues, dernier,
+           top_crops: top(cropCount), top_problems: top(problemCount) };
 }
+
+// ---------- Rôles & permissions (Partie 6) ----------
+// admin via ADMIN_EMAILS (inchangé). Rôles optionnels via QUALITY_AUDITORS / QUALITY_VIEWERS.
+// Défaut (variables vides) : seuls les administrateurs ont accès → comportement préservé.
+const QG_AUDITORS = (process.env.QUALITY_AUDITORS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+const QG_VIEWERS = (process.env.QUALITY_VIEWERS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+const QG_PERMS = {
+  admin: ["read", "audit", "resolve", "export", "compare", "notify", "logs"],
+  auditeur: ["read", "audit", "resolve", "export", "compare", "notify"],
+  lecteur: ["read", "export", "compare", "notify"]
+};
+function qualityRole(u) {
+  if (!u) return null;
+  const e = normEmail(u.email);
+  if (ADMIN_EMAILS.includes(e)) return "admin";
+  if (QG_AUDITORS.includes(e)) return "auditeur";
+  if (QG_VIEWERS.includes(e)) return "lecteur";
+  return null;
+}
+function qualityCan(u, action) { const r = qualityRole(u); return !!r && QG_PERMS[r].includes(action); }
+// Garde commune : renvoie l'utilisateur autorisé, ou répond 401/403 et renvoie null.
+async function qualityGuard(req, res, action) {
+  const user = await currentUser(req);
+  if (!user) { sendJson(res, 401, { error: "Non connecté." }); return null; }
+  if (!qualityCan(user, action)) { sendJson(res, 403, { error: "Accès refusé : votre rôle ne permet pas cette action." }); return null; }
+  return user;
+}
+
+// ---------- Limitation de débit simple (en mémoire, anti-abus) ----------
+const QG_RATE = new Map();
+function qualityRateLimit(req, res, key, maxPerMin) {
+  const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?").toString().split(",")[0].trim();
+  const bucket = key + ":" + ip;
+  const now = Date.now();
+  const entry = QG_RATE.get(bucket) || { count: 0, reset: now + 60000 };
+  if (now > entry.reset) { entry.count = 0; entry.reset = now + 60000; }
+  entry.count++; QG_RATE.set(bucket, entry);
+  if (QG_RATE.size > 5000) { for (const [k, v] of QG_RATE) if (now > v.reset) QG_RATE.delete(k); }
+  if (entry.count > maxPerMin) { sendJson(res, 429, { error: "Trop de requêtes, patientez une minute." }); return false; }
+  return true;
+}
+
+// ---------- Journal d'actions (append-only) ----------
+async function qualityLog(action, user, ref) {
+  const row = { id: crypto.randomBytes(10).toString("hex"), action: String(action).slice(0, 60),
+                actor: user ? normEmail(user.email) : null, ref: ref || null, created_at: new Date().toISOString() };
+  try {
+    if (USE_DB) { await sb("/trv_quality_logs", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([row]) }); }
+    else { const st = loadStore(); if (!Array.isArray(st.qualityLogs)) st.qualityLogs = []; st.qualityLogs.push(row); if (st.qualityLogs.length > 1000) st.qualityLogs = st.qualityLogs.slice(-1000); saveStore(st); }
+  } catch (e) { console.warn("Quality log failed:", e.message); } // ne bloque jamais l'action principale
+}
+async function qualityListLogs() {
+  if (USE_DB) { try { return (await sb("/trv_quality_logs?select=*&order=created_at.desc&limit=100")) || []; } catch (e) { return []; } }
+  const st = loadStore(); return (st.qualityLogs || []).slice().reverse().slice(0, 100);
+}
+
+// ---------- Notifications in-app (Partie 5) ----------
+async function qualityNotify(n) {
+  const row = { id: crypto.randomBytes(10).toString("hex"), type: n.type, severity: n.severity || "info",
+                message: String(n.message || "").slice(0, 300), audit_id: n.audit_id || null,
+                dedup: n.dedup || null, read: false, created_at: new Date().toISOString() };
+  try {
+    if (USE_DB) {
+      if (row.dedup) { // dédup : ne pas recréer une notification identique non lue
+        const ex = await sb(`/trv_quality_notifications?select=id&dedup=eq.${encodeURIComponent(row.dedup)}&read=eq.false&limit=1`);
+        if (ex && ex.length) return;
+      }
+      await sb("/trv_quality_notifications", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([row]) });
+    } else {
+      const st = loadStore(); if (!Array.isArray(st.qualityNotifs)) st.qualityNotifs = [];
+      if (row.dedup && st.qualityNotifs.some((x) => x.dedup === row.dedup && !x.read)) return;
+      st.qualityNotifs.push(row); if (st.qualityNotifs.length > 500) st.qualityNotifs = st.qualityNotifs.slice(-500); saveStore(st);
+    }
+  } catch (e) { console.warn("Quality notify failed:", e.message); }
+}
+async function qualityListNotifs() {
+  if (USE_DB) { try { return (await sb("/trv_quality_notifications?select=*&order=created_at.desc&limit=50")) || []; } catch (e) { return []; } }
+  const st = loadStore(); return (st.qualityNotifs || []).slice().reverse().slice(0, 50);
+}
+async function qualityMarkNotif(id, all) {
+  try {
+    if (USE_DB) {
+      const q = all ? "/trv_quality_notifications?read=eq.false" : `/trv_quality_notifications?id=eq.${encodeURIComponent(id)}`;
+      await sb(q, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ read: true }) });
+    } else {
+      const st = loadStore(); (st.qualityNotifs || []).forEach((x) => { if (all || x.id === id) x.read = true; }); saveStore(st);
+    }
+    return true;
+  } catch (e) { return false; }
+}
+
+// ---------- Comparaison de deux audits (Partie 4) ----------
+// Compare deux audits du MÊME itinéraire. « corrigée » = l'anomalie n'est plus détectée
+// OU est marquée résolue dans l'audit récent (jamais de correction sans preuve enregistrée).
+function qualityCompare(auditA, auditB) {
+  const a = qualityNormalizeAudit(auditA), b = qualityNormalizeAudit(auditB);
+  if (!a || !b) return { error: "Audit introuvable." };
+  if (a.plan_id && b.plan_id && a.plan_id !== b.plan_id) return { error: "Les deux audits ne portent pas sur le même itinéraire." };
+  // older = plus ancien, newer = plus récent
+  const older = String(a.created_at) <= String(b.created_at) ? a : b;
+  const newer = older === a ? b : a;
+  const byCode = (arr) => { const m = {}; for (const x of arr) m[x.code || x.id] = x; return m; };
+  const oldM = byCode(older.anomalies), newM = byCode(newer.anomalies);
+  const nouvelles = [], corrigees = [], persistantes = [];
+  for (const code of Object.keys(newM)) {
+    const an = newM[code];
+    if (!oldM[code]) { if (an.status === "resolue") corrigees.push({ ...an, note: "présente mais marquée résolue" }); else nouvelles.push(an); }
+    else if (an.status === "resolue") corrigees.push({ ...an, note: "marquée résolue dans le contrôle récent" });
+    else persistantes.push(an);
+  }
+  for (const code of Object.keys(oldM)) { if (!newM[code]) corrigees.push({ ...oldM[code], note: "n'est plus détectée dans le contrôle récent" }); }
+  const scoreComparable = typeof older.score === "number" && typeof newer.score === "number";
+  return {
+    older: { id: older.id, created_at: older.created_at, status: older.status, score: older.score },
+    newer: { id: newer.id, created_at: newer.created_at, status: newer.status, score: newer.score },
+    nouvelles, corrigees, persistantes,
+    score_delta: scoreComparable ? (newer.score - older.score) : null,
+    score_comparable: scoreComparable,
+    status_change: older.status !== newer.status ? { from: older.status, to: newer.status } : null
+  };
+}
+
+// ---------- Export CSV (Partie 3) ----------
+// Protection anti-injection de formules : préfixe les cellules commençant par = + - @ etc.
+function qgCsvCell(v) {
+  let s = (v === null || v === undefined) ? "" : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  if (/[";\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function qualityAuditsToCsv(audits) {
+  const sep = ";";
+  const head = ["ID audit", "Itinéraire", "Culture", "Localisation", "Date", "Statut", "Score", "Anomalies", "Résolues"];
+  const lines = [head.join(sep)];
+  for (const raw of audits) {
+    const a = qualityNormalizeAudit(raw); if (!a) continue;
+    lines.push([a.id, a.title, a.crop || "", a.region || "", a.created_at || "", a.status, (typeof a.score === "number" ? a.score : ""), a.alert_count, a.resolved_count].map(qgCsvCell).join(sep));
+  }
+  return "﻿" + lines.join("\r\n"); // BOM UTF-8 pour Excel + accents français
+}
+function qualityAnomaliesToCsv(audit) {
+  const a = qualityNormalizeAudit(audit); const sep = ";";
+  const head = ["ID audit", "Itinéraire", "Culture", "Date", "Anomalie", "Gravité", "Statut", "Description", "Justification", "Correction", "Info manquante"];
+  const lines = [head.join(sep)];
+  for (const an of a.anomalies) {
+    lines.push([a.id, a.title, a.crop || "", a.created_at || "", an.title, an.severity, an.status, an.description || "", an.justification || "", an.correction || "", an.missing || ""].map(qgCsvCell).join(sep));
+  }
+  if (!a.anomalies.length) lines.push([a.id, a.title, a.crop || "", a.created_at || "", "(aucune anomalie)", "", "", "", "", "", ""].map(qgCsvCell).join(sep));
+  return "﻿" + lines.join("\r\n");
+}
+function sendCsv(res, filename, csv) {
+  res.writeHead(200, { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="${filename}"` });
+  res.end(csv);
+}
+
 
 // Filtrage des audits (Partie 6) : culture, statut, gravité, période. Fonction pure.
 function qualityFilterAudits(audits, f) {
@@ -1626,9 +1787,7 @@ function qgParseFilters(req) {
   return f;
 }
 async function handleQualityOverview(req,res) {
-  const user = await currentUser(req);
-  if (!user) return sendJson(res,401,{error:"Non connecté."});
-  if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
+  const user = await qualityGuard(req,res,"read"); if (!user) return;
   try {
     const plans = await qualityListPlans();
     const allAudits = await qualityListAudits();
@@ -1636,21 +1795,23 @@ async function handleQualityOverview(req,res) {
     const filters = qgParseFilters(req);
     const filtered = qualityFilterAudits(allAudits, filters);
     const crops = Array.from(new Set(normalizedAll.map(a => a.crop).filter(Boolean))).sort();
+    const notifs = await qualityListNotifs();
     sendJson(res,200,{
       user:{name:user.name||"administrateur",email:user.email},
+      role: qualityRole(user),
       source:USE_DB?"supabase":"local",
       plans:plans.map(p=>{const q=qualityAnalyzePlan(p);return {id:p.id,title:p.title,crop:p.crop,region:p.region,created_at:p.created_at,sections:q.headings,status:q.status,score:q.score};}),
-      audits: filtered.map(a => ({ id:a.id, title:a.title, crop:a.crop, region:a.region, created_at:a.created_at, status:a.status, score:a.score, alert_count:a.alert_count, resolved_count:a.resolved_count })),
+      audits: filtered.map(a => ({ id:a.id, plan_id:a.plan_id, title:a.title, crop:a.crop, region:a.region, created_at:a.created_at, status:a.status, score:a.score, alert_count:a.alert_count, resolved_count:a.resolved_count })),
       metrics: qualityAggregate(filtered),
       metrics_total: normalizedAll.length,
+      unread: notifs.filter(n => !n.read).length,
       filters, crops
     });
   } catch(e) { console.error("Quality overview:",e.message); sendJson(res,500,{error:"Impossible de charger vos données pour le moment. Réessayez dans un instant."}); }
 }
 async function handleQualityAudit(req,res) {
-  const user = await currentUser(req);
-  if (!user) return sendJson(res,401,{error:"Non connecté."});
-  if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
+  const user = await qualityGuard(req,res,"audit"); if (!user) return;
+  if (!qualityRateLimit(req,res,"audit",30)) return;
   try {
     const body = JSON.parse(await readBody(req) || "{}");
     if (!body.id || typeof body.id !== "string") return sendJson(res,400,{error:"Aucun itinéraire sélectionné."});
@@ -1666,14 +1827,18 @@ async function handleQualityAudit(req,res) {
       created_at:new Date().toISOString(), created_by:user.email
     };
     const { saved, warning } = await qualitySaveAudit(audit);
+    await qualityLog("audit_create", user, { audit_id: audit.id, plan_id: plan.id, status: q.status });
+    // Notifications (Partie 5) : anomalie critique, nouvel audit à vérifier, échec d'enregistrement.
+    const critiques = q.anomalies.filter(a => a.severity === "critique" && a.status !== "resolue");
+    if (critiques.length) await qualityNotify({ type:"critique", severity:"critique", message:`Anomalie critique dans « ${audit.title} » : ${critiques[0].title}.`, audit_id:audit.id, dedup:`crit:${audit.id}` });
+    else if (q.status !== "ok") await qualityNotify({ type:"nouvel_audit", severity:"warn", message:`Nouvel audit à vérifier : « ${audit.title} ».`, audit_id:audit.id, dedup:`verif:${audit.id}` });
+    if (!saved) { await qualityNotify({ type:"echec", severity:"error", message:`Échec d'enregistrement de l'audit « ${audit.title} ».`, audit_id:audit.id, dedup:`fail:${audit.id}` }); await qualityLog("audit_save_failed", user, { audit_id: audit.id }); }
     sendJson(res,200,{ok:true,auditId:audit.id,status:q.status,score:q.score,sections:q.headings,anomalies:q.anomalies,alerts:q.anomalies,saved,warning});
   } catch(e) { console.error("Quality audit:",e.message);sendJson(res,500,{error:"Le contrôle n'a pas pu aboutir. Réessayez dans un instant ; en cas de besoin, le détail technique est dans les journaux Render."}); }
 }
 // Fiche détaillée d'un audit (Partie 3). GET /api/quality/audit?id=...
 async function handleQualityAuditGet(req,res) {
-  const user = await currentUser(req);
-  if (!user) return sendJson(res,401,{error:"Non connecté."});
-  if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
+  const user = await qualityGuard(req,res,"read"); if (!user) return;
   try {
     let id = ""; try { id = new URL(req.url, "http://x").searchParams.get("id") || ""; } catch(e) {}
     if (!id) return sendJson(res,400,{error:"Audit non précisé."});
@@ -1697,9 +1862,7 @@ async function handleQualityAuditGet(req,res) {
 }
 // Changement de statut d'une anomalie (Partie 5). POST /api/quality/issue {auditId, issueId, status}
 async function handleQualityIssue(req,res) {
-  const user = await currentUser(req);
-  if (!user) return sendJson(res,401,{error:"Non connecté."});
-  if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
+  const user = await qualityGuard(req,res,"resolve"); if (!user) return;
   try {
     const body = JSON.parse(await readBody(req) || "{}");
     const auditId = typeof body.auditId === "string" ? body.auditId : "";
@@ -1712,20 +1875,78 @@ async function handleQualityIssue(req,res) {
     const audit = qualityNormalizeAudit(row);
     const anomaly = audit.anomalies.find(a => a.id === issueId || a.code === issueId);
     if (!anomaly) return sendJson(res,404,{error:"Anomalie introuvable dans cet audit."});
+    const before = anomaly.status;
     anomaly.status = status;
     audit.status = qualityStatusFromAnomalies(audit.anomalies);
     audit.score = qualityScore(audit.anomalies);
     audit.alert_count = audit.anomalies.length;
     const { saved, warning } = await qualitySaveAudit(audit, { patch: true });
+    await qualityLog("issue_status", user, { audit_id: audit.id, issue: anomaly.code, from: before, to: status });
+    if (status === "resolue" && before !== "resolue") await qualityNotify({ type:"resolue", severity:"ok", message:`Anomalie résolue dans « ${audit.title} » : ${anomaly.title}.`, audit_id:audit.id });
     sendJson(res,200,{ ok:true, saved, warning, audit });
   } catch(e) { console.error("Quality issue:",e.message); sendJson(res,500,{error:"Le statut n'a pas pu être mis à jour pour le moment."}); }
 }
-// Suggestion de reformulation prudente par l'IA (Partie 5, OPTIONNEL, non automatique).
+// Comparaison de deux audits (Partie 4). GET /api/quality/compare?a=..&b=..
+async function handleQualityCompare(req,res) {
+  const user = await qualityGuard(req,res,"compare"); if (!user) return;
+  try {
+    const u = new URL(req.url, "http://x");
+    const a = u.searchParams.get("a") || "", b = u.searchParams.get("b") || "";
+    if (!a || !b) return sendJson(res,400,{error:"Deux audits sont nécessaires pour comparer."});
+    if (a === b) return sendJson(res,400,{error:"Choisissez deux audits différents."});
+    const rowA = await qualityGetAudit(a), rowB = await qualityGetAudit(b);
+    if (!rowA || !rowB) return sendJson(res,404,{error:"Audit introuvable."});
+    const result = qualityCompare(rowA, rowB);
+    if (result.error) return sendJson(res,400,{error:result.error});
+    sendJson(res,200,{ ok:true, comparison: result });
+  } catch(e) { console.error("Quality compare:",e.message); sendJson(res,500,{error:"La comparaison n'a pas pu être réalisée."}); }
+}
+// Export CSV (Partie 3). GET /api/quality/export.csv[?id=auditId | filtres]
+async function handleQualityExport(req,res) {
+  const user = await qualityGuard(req,res,"export"); if (!user) return;
+  if (!qualityRateLimit(req,res,"export",20)) return;
+  try {
+    const id = (() => { try { return new URL(req.url,"http://x").searchParams.get("id") || ""; } catch(e) { return ""; } })();
+    const stamp = new Date().toISOString().slice(0,10);
+    if (id) {
+      const row = await qualityGetAudit(id);
+      if (!row) return sendJson(res,404,{error:"Audit introuvable."});
+      await qualityLog("export_csv", user, { audit_id: id, kind: "audit" });
+      return sendCsv(res, `terravive-audit-${id.slice(0,8)}-${stamp}.csv`, qualityAnomaliesToCsv(row));
+    }
+    const all = await qualityListAudits();
+    const filters = qgParseFilters(req);
+    const filtered = qualityFilterAudits(all, filters);
+    await qualityLog("export_csv", user, { kind: "liste", count: filtered.length, filters });
+    return sendCsv(res, `terravive-audits-${stamp}.csv`, qualityAuditsToCsv(filtered));
+  } catch(e) { console.error("Quality export:",e.message); sendJson(res,500,{error:"L'export n'a pas pu être généré."}); }
+}
+// Notifications (Partie 5). GET liste / POST marquer lu.
+async function handleQualityNotifs(req,res) {
+  const user = await qualityGuard(req,res,"notify"); if (!user) return;
+  try { const list = await qualityListNotifs(); sendJson(res,200,{ notifications:list, unread:list.filter(n=>!n.read).length }); }
+  catch(e) { console.error("Quality notifs:",e.message); sendJson(res,500,{error:"Notifications indisponibles pour le moment."}); }
+}
+async function handleQualityNotifRead(req,res) {
+  const user = await qualityGuard(req,res,"notify"); if (!user) return;
+  try {
+    const body = JSON.parse(await readBody(req) || "{}");
+    if (!body.all && (typeof body.id !== "string" || !body.id)) return sendJson(res,400,{error:"Notification non précisée."});
+    const ok = await qualityMarkNotif(body.id, !!body.all);
+    sendJson(res,200,{ ok });
+  } catch(e) { console.error("Quality notif read:",e.message); sendJson(res,500,{error:"Mise à jour impossible."}); }
+}
+// Journal d'actions (Partie 7). Réservé aux administrateurs.
+async function handleQualityLogs(req,res) {
+  const user = await qualityGuard(req,res,"logs"); if (!user) return;
+  try { sendJson(res,200,{ logs: await qualityListLogs() }); }
+  catch(e) { console.error("Quality logs:",e.message); sendJson(res,500,{error:"Journal indisponible pour le moment."}); }
+}
+// Suggestion de reformulation prudente par l'IA (Partie 9, OPTIONNEL, non automatique).
 // Réutilise callClaude et les variables d'environnement existantes. Aucune clé côté client.
 async function handleQualitySuggest(req,res) {
-  const user = await currentUser(req);
-  if (!user) return sendJson(res,401,{error:"Non connecté."});
-  if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
+  const user = await qualityGuard(req,res,"audit"); if (!user) return;
+  if (!qualityRateLimit(req,res,"suggest",15)) return;
   if (!API_KEY) return sendJson(res,503,{error:"Assistance IA non configurée (ANTHROPIC_API_KEY absente). Les corrections déterministes restent disponibles."});
   try {
     const body = JSON.parse(await readBody(req) || "{}");
@@ -1737,9 +1958,10 @@ async function handleQualitySuggest(req,res) {
     const audit = qualityNormalizeAudit(row);
     const anomaly = audit.anomalies.find(a => a.id === issueId || a.code === issueId);
     if (!anomaly) return sendJson(res,404,{error:"Anomalie introuvable."});
-    const system = DURABLE_CONTEXT + "\n\nRÔLE : tu aides un administrateur à corriger un itinéraire. On te donne UNE anomalie détectée. Propose une reformulation prudente et une courte explication. RÈGLES ABSOLUES : n'invente AUCUNE dose d'engrais, de chaux ou de produit ; ne garantis aucun rendement ni bénéfice ; distingue faits, estimations et hypothèses ; si une information manque, dis ce qu'il faut mesurer ou compléter plutôt que de l'inventer. Réponds en 4 lignes maximum.";
+    const system = DURABLE_CONTEXT + "\n\nRÔLE : tu aides un administrateur à corriger un itinéraire. On te donne UNE anomalie détectée. Explique le problème, propose une correction concrète, identifie les données manquantes, distingue faits/estimations/hypothèses et signale si une validation humaine est nécessaire. RÈGLES ABSOLUES : n'invente AUCUNE dose d'engrais, de chaux ou de produit ; ne garantis aucun rendement ni bénéfice ; ne transforme pas une hypothèse en fait ; pas de recommandation phytosanitaire dangereuse sans informations suffisantes. Réponds en 5 lignes maximum.";
     const prompt = `Anomalie (gravité ${anomaly.severity}) : ${anomaly.title}\nDescription : ${anomaly.description}\nCorrection déterministe déjà proposée : ${anomaly.correction || "—"}\n\nPropose une reformulation prudente et concrète.`;
-    const suggestion = await callClaude(system, [{ role:"user", content: prompt }], null, 400);
+    const suggestion = await callClaude(system, [{ role:"user", content: prompt }], null, 450);
+    if (!suggestion || !suggestion.trim()) return sendJson(res,502,{error:"Réponse IA vide. La correction déterministe reste utilisable."});
     sendJson(res,200,{ ok:true, suggestion });
   } catch(e) { console.error("Quality suggest:",e.message); sendJson(res,502,{error:"L'assistance IA est momentanément indisponible. Réessayez plus tard ; la correction déterministe reste utilisable."}); }
 }
@@ -1787,7 +2009,25 @@ async function handleQualityTests(req,res) {
     {name:"Filtre par gravité",fn:()=>qualityFilterAudits([{id:"1",status:"warn",alerts:[{severity:"mineur"}]},{id:"2",status:"error",alerts:[{severity:"critique"}]}],{severity:"critique"}).length===1},
     {name:"Filtre par culture (insensible à la casse)",fn:()=>qualityFilterAudits([{id:"1",crop:"Tomate",alerts:[]},{id:"2",crop:"Maïs",alerts:[]}],{crop:"tomate"}).length===1},
     // --- Séparation audits / tests ---
-    {name:"Les enregistrements kind:'tests' ne sont pas des audits",fn:()=>{const n=qualityNormalizeAudit({id:"t",kind:"tests",alerts:[]});return n&&n.id==="t";}}
+    {name:"Les enregistrements kind:'tests' ne sont pas des audits",fn:()=>{const n=qualityNormalizeAudit({id:"t",kind:"tests",alerts:[]});return n&&n.id==="t";}},
+    // --- Tableau de bord avancé (Partie 8) ---
+    {name:"Agrégat : cultures les plus contrôlées",fn:()=>{const m=qualityAggregate([{id:"1",crop:"Tomate",alerts:[]},{id:"2",crop:"Tomate",alerts:[]},{id:"3",crop:"Maïs",alerts:[]}]);return m.top_crops[0].label==="Tomate"&&m.top_crops[0].count===2;}},
+    {name:"Agrégat : problèmes les plus fréquents",fn:()=>{const m=qualityAggregate([{id:"1",alerts:[{code:"fcfa",title:"Montant FCFA",severity:"important"}]},{id:"2",alerts:[{code:"fcfa",title:"Montant FCFA",severity:"important"}]}]);return m.top_problems[0].count===2;}},
+    // --- Comparaison d'audits (Partie 4) ---
+    {name:"Compare : refuse deux itinéraires différents",fn:()=>!!qualityCompare({id:"1",plan_id:"p1",created_at:"2026-01-01",alerts:[]},{id:"2",plan_id:"p2",created_at:"2026-01-02",alerts:[]}).error},
+    {name:"Compare : anomalie disparue = corrigée",fn:()=>{const c=qualityCompare({id:"1",plan_id:"p",created_at:"2026-01-01",alerts:[{code:"fcfa",title:"FCFA",severity:"important"}]},{id:"2",plan_id:"p",created_at:"2026-01-02",alerts:[]});return c.corrigees.length===1&&c.nouvelles.length===0;}},
+    {name:"Compare : anomalie persistante détectée",fn:()=>{const c=qualityCompare({id:"1",plan_id:"p",created_at:"2026-01-01",alerts:[{code:"fcfa",title:"FCFA",severity:"important",status:"a_traiter"}]},{id:"2",plan_id:"p",created_at:"2026-01-02",alerts:[{code:"fcfa",title:"FCFA",severity:"important",status:"a_traiter"}]});return c.persistantes.length===1&&c.corrigees.length===0;}},
+    {name:"Compare : delta de score calculé si comparable",fn:()=>{const c=qualityCompare({id:"1",plan_id:"p",created_at:"2026-01-01",score:70,alerts:[]},{id:"2",plan_id:"p",created_at:"2026-01-02",score:100,alerts:[]});return c.score_comparable&&c.score_delta===30;}},
+    {name:"Compare : anomalie marquée résolue = corrigée (preuve)",fn:()=>{const c=qualityCompare({id:"1",plan_id:"p",created_at:"2026-01-01",alerts:[{code:"fcfa",title:"FCFA",severity:"important",status:"a_traiter"}]},{id:"2",plan_id:"p",created_at:"2026-01-02",alerts:[{code:"fcfa",title:"FCFA",severity:"important",status:"resolue"}]});return c.corrigees.length===1;}},
+    // --- Export CSV (Partie 3) ---
+    {name:"CSV : neutralise l'injection de formule",fn:()=>qgCsvCell("=SUM(A1:A2)").startsWith("'=")},
+    {name:"CSV : échappe les séparateurs et guillemets",fn:()=>qgCsvCell('a;"b"')==='"a;""b"""'},
+    {name:"CSV liste : BOM UTF-8 + en-tête",fn:()=>{const c=qualityAuditsToCsv([{id:"1",title:"ITK",crop:"Tomate",status:"ok",alerts:[]}]);return c.charCodeAt(0)===0xFEFF&&/ID audit;Itin/.test(c);}},
+    {name:"CSV anomalies : une ligne par anomalie",fn:()=>{const c=qualityAnomaliesToCsv({id:"1",title:"ITK",alerts:[{code:"fcfa",title:"FCFA",severity:"important",status:"a_traiter",description:"d"}]});return c.split("\r\n").length===2;}},
+    // --- Permissions (Partie 6) ---
+    {name:"Permissions : lecteur ne peut pas lancer d'audit",fn:()=>QG_PERMS.lecteur.indexOf("audit")===-1&&QG_PERMS.lecteur.indexOf("read")>=0},
+    {name:"Permissions : auditeur peut résoudre, pas voir le journal",fn:()=>QG_PERMS.auditeur.indexOf("resolve")>=0&&QG_PERMS.auditeur.indexOf("logs")===-1},
+    {name:"Permissions : admin a le journal",fn:()=>QG_PERMS.admin.indexOf("logs")>=0}
   ];
   const results=cases.map(c=>{try{const ok=!!c.fn();return{name:c.name,ok,detail:ok?"Conforme à ce qui est attendu":"Résultat inattendu, à revoir"};}catch(e){return{name:c.name,ok:false,detail:e.message};}});
   sendJson(res,200,{total:results.length,passed:results.filter(x=>x.ok).length,failed:results.filter(x=>!x.ok).length,results});
@@ -1847,6 +2087,11 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && url === "/api/quality/audit") return handleQualityAuditGet(req, res);
   if (req.method === "POST" && url === "/api/quality/audit") return handleQualityAudit(req, res);
   if (req.method === "POST" && url === "/api/quality/issue") return handleQualityIssue(req, res);
+  if (req.method === "GET" && url === "/api/quality/compare") return handleQualityCompare(req, res);
+  if (req.method === "GET" && url === "/api/quality/export.csv") return handleQualityExport(req, res);
+  if (req.method === "GET" && url === "/api/quality/notifications") return handleQualityNotifs(req, res);
+  if (req.method === "POST" && url === "/api/quality/notifications/read") return handleQualityNotifRead(req, res);
+  if (req.method === "GET" && url === "/api/quality/logs") return handleQualityLogs(req, res);
   if (req.method === "POST" && url === "/api/quality/suggest") return handleQualitySuggest(req, res);
   if (req.method === "POST" && url === "/api/quality/tests") return handleQualityTests(req, res);
   if (req.method === "GET") return serveStatic(req, res);
