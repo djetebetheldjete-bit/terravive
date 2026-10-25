@@ -57,3 +57,12 @@ Les textes lus par l’utilisateur ont été réécrits dans le **ton du Terravi
 - **Messages d’alerte** : par exemple « Dose de chaux potentiellement chiffrée alors que le pH est inconnu : vérifier manuellement. » devient « Une dose de chaux est chiffrée alors que le pH du sol n’est pas connu : à vérifier avant de conseiller un chaulage. »
 - **Page `/quality`** : titres, boutons et avertissements reformulés (« Lancer les vérifications », « Vos itinéraires récents », « Banc de vérifications », « Rien à signaler / À examiner / À vérifier »…), dans l’esprit de « Décrivez votre parcelle » ou « Branchez votre station » du tableau de bord.
 - Les cinq statuts techniques inchangés côté contrat (`ok` / `warn` / `error`, `Non connecté.`, rôle administrateur) : seules les phrases visibles changent. Auto-tests 11/11, suite QA 33/176 toujours au vert.
+
+## v0.6.3 — vraies icônes dans la page `/quality`
+
+Les pictogrammes du menu latéral étaient de simples caractères Unicode (▦ ◉ ✓ ◷ ↗) et des boutons (↻ ▶). Ils sont remplacés par de **vraies icônes vectorielles SVG**, dessinées à la main et intégrées dans le HTML (aucune dépendance, aucune police d'icônes à charger) :
+
+- Tableau de bord → grille ; Itinéraires → fiche ; Banc de vérifications → bouclier à coche ; Historique → horloge ; Retour à Terravive → flèche retour.
+- Boutons de l'entête : Actualiser → double flèche circulaire ; Lancer les vérifications → triangle « lecture ».
+
+Chaque icône hérite de la couleur du texte (`stroke="currentColor"`), donc elle s'affiche correctement sur le fond vert foncé du menu **comme** en blanc sur le bouton vert et en sombre sur l'onglet actif. Rien d'autre n'a changé.
