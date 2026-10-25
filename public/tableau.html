@@ -169,7 +169,10 @@
       <a href="/cooperative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M15 19a4.5 4.5 0 0 1 6 0"/></svg> Coopérative</a>
       <a href="/comprendre"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 5.5V20.5"/><path d="M8 7h8M8 11h6"/></svg> Comprendre</a>
     </nav>
-    <div class="foot" id="sideFoot"></div>
+    <div class="foot" id="sideFoot">
+      <div id="acctFoot" style="margin-bottom:8px;"></div>
+      <button type="button" id="logoutBtn" onclick="this.disabled=true;this.textContent='Déconnexion…';fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'}).catch(function(){}).finally(function(){location.href='/';});" style="width:100%;justify-content:center;border:1px solid rgba(255,255,255,.3);background:transparent;color:var(--sidebar-ink);border-radius:9px;padding:9px 12px;cursor:pointer;font:inherit;font-weight:600;display:inline-flex;align-items:center;gap:8px;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 12H4M9 7l-5 5 5 5"/><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/></svg>Se déconnecter</button>
+    </div>
   </aside>
 
   <!-- ===== Contenu ===== -->
@@ -787,6 +790,9 @@ void loop() {
   async function load(){
     try{ const r=await fetch("/api/auth/me"); const d=await r.json(); me=d.user||null; }catch(e){ me=null; }
     if(!me){ $("authNote").style.display="block"; $("board").style.display="none"; return; }
+    // Nom du compte au-dessus du bouton de déconnexion (le bouton est statique dans le HTML,
+    // il reste présent même si un script externe échoue à charger).
+    try{ var af=document.getElementById("acctFoot"); if(af&&me){ af.innerHTML='<strong style="color:#fff;font-weight:700;display:block;">'+esc(me.name||"Mon compte")+'</strong><span style="font-size:.78rem;opacity:.85;">'+esc(me.email||"")+'</span>'; } }catch(e){}
     try{ const r=await fetch("/api/dashboard"); const d=await r.json(); if(r.ok) fillDashboard(d); }catch(e){}
     try{ const r=await fetch("/api/station"); const d=await r.json(); if(r.ok){ station=d.station; renderKey(); } }catch(e){}
     // Météo calculée côté navigateur (région du compte, ou position GPS si choisie).
