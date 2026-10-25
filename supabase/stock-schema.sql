@@ -29,11 +29,14 @@ create table if not exists trv_stock_products (
   price       numeric(14,2) not null default 0,   -- prix de vente indicatif (FCFA)
   producer_id text references trv_stock_producers(id),
   is_public   boolean not null default false,     -- visible en vitrine publique
+  image       text,                               -- chemin d'image intégrée (/stock/img/..) ou data URL
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   created_by  text
 );
 create index if not exists trv_stock_products_name_idx on trv_stock_products (name);
+-- Migration idempotente : colonne image si la table existait déjà.
+alter table trv_stock_products add column if not exists image text;
 
 -- Mouvements de stock : SOURCE DE VÉRITÉ du disponible --------------------------
 -- type 'in' ajoute, 'out' retire. qty toujours positive. reason donne le contexte.

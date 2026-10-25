@@ -79,3 +79,10 @@ Aucun secret n'est présent dans le frontend ni dans les livrables. Le navigateu
 - **Vitrine publique & commandes** : base prête, mais les commandes en ligne sont **volontairement désactivées** (`POST /api/stock/public/orders` → 503) jusqu'à une décision commerciale et la configuration de moyens de paiement réels.
 - **Atomicité** : la validation de vente est atomique (RPC). La création d'une récolte/perte insère l'enregistrement puis son mouvement (deux écritures) ; en cas d'échec réseau entre les deux, une incohérence mineure est possible et journalisée — acceptable à l'échelle d'une coopérative.
 - **Multi-unités** : les sommes de quantités de produits d'unités différentes ne sont pas agrégées (ce serait trompeur) ; les agrégats monétaires le sont.
+
+## 9. Images des produits (v1.5)
+
+- **Galerie intégrée** : 7 images reprises du prototype (tomate, concombre, piment, aubergine, laitue, gombo, poivron), servies depuis `public/stock/img/`.
+- À la création d'un produit, une **image par défaut est attribuée selon le nom** (ex. « Tomate » → tomate.webp) ; sinon on peut choisir dans la galerie, **téléverser une photo** (redimensionnée côté navigateur à ≤600 px), ou « Aucune ».
+- Modifiable par **administrateur et animateur** (permission `products`) via le bouton **Modifier** de chaque produit.
+- Stockage : colonne `image` de `trv_stock_products` (chemin intégré `/stock/img/..` ou data URL compacte). **Sécurité** : seules nos images intégrées ou une data URL image bornée (≤ ~440 Ko) sont acceptées — aucune URL externe (anti-hotlink / anti-injection).

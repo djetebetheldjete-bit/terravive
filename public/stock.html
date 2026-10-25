@@ -35,6 +35,15 @@
 .empty{padding:26px;text-align:center;color:var(--soft)}.status{padding:12px;border-radius:12px;background:var(--surface2);color:var(--soft);margin-top:10px}
 .spin{display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--leaf);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-3px;margin-right:8px}@keyframes sp{to{transform:rotate(360deg)}}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;background:var(--surface2);border:1px solid var(--line);flex:0 0 auto}
+.prodcell{display:flex;align-items:center;gap:10px}
+.phimg{width:40px;height:40px;border-radius:8px;background:var(--surface2);border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;color:var(--faint);font-size:17px;flex:0 0 auto}
+.gallery{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 2px}
+.gthumb{width:52px;height:52px;border-radius:10px;object-fit:cover;border:2px solid var(--line);cursor:pointer;background:var(--surface2)}
+.gthumb.sel{border-color:var(--leaf);box-shadow:0 0 0 2px rgba(23,100,67,.25)}
+.gtile{width:52px;height:52px;border-radius:10px;border:2px dashed var(--line);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:var(--soft);font-size:10px;text-align:center;line-height:1.1;background:var(--surface2);padding:3px}
+.gtile.sel{border-color:var(--leaf);color:var(--leaf)}
+.imgprev{width:100%;max-width:120px;border-radius:10px;border:1px solid var(--line);margin-top:6px;display:block}
 input,select,textarea{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--surface);color:var(--ink);width:100%}
 .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}.field label{font-size:12px;font-weight:700;color:var(--soft)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -91,7 +100,7 @@ input,select,textarea{border:1px solid var(--line);border-radius:10px;padding:9p
  <!-- Produits -->
  <section class="view" id="view-products">
   <div class="toolbar"><input id="prodSearch" placeholder="Rechercher un produit…" style="max-width:260px"><button class="btn small primary perm-products" id="addProduct" type="button">+ Nouveau produit</button><button class="btn small perm-export" id="expProducts" type="button">Exporter CSV</button></div>
-  <section class="card"><div class="table-wrap"><table><thead><tr><th>Produit</th><th>Catégorie</th><th>Disponible</th><th>Seuil</th><th>Prix</th><th>Statut</th><th>Producteur</th></tr></thead><tbody id="productsBody"><tr><td colspan="7" class="empty">Chargement…</td></tr></tbody></table></div></section>
+  <section class="card"><div class="table-wrap"><table><thead><tr><th>Produit</th><th>Catégorie</th><th>Disponible</th><th>Seuil</th><th>Prix</th><th>Statut</th><th>Producteur</th><th></th></tr></thead><tbody id="productsBody"><tr><td colspan="8" class="empty">Chargement…</td></tr></tbody></table></div></section>
  </section>
 
  <!-- Récoltes -->
@@ -140,7 +149,30 @@ const UNIT_LABEL={kg:'kg',g:'g',t:'t',l:'L',unite:'unité',caisse:'caisse',sac:'
 const CAUSE_LABEL={pourriture:'Pourriture',degradation:'Dégradation',invendu:'Invendu',transport:'Transport',stockage:'Stockage',autre:'Autre'};
 const PAY_LABEL={especes:'Espèces',mobile_money:'Mobile Money',virement:'Virement',livraison:'À la livraison'};
 const PERMS={admin:["read","products","harvest","sale","validate","loss","payment","producers","export","logs"],operateur:["read","products","harvest","sale","validate","loss","payment","producers","export"],lecteur:["read","export"]};
-let ROLE=null,UNITS=["kg"],PRODUCTS=[],PRODUCERS=[];
+let ROLE=null,UNITS=["kg"],PRODUCTS=[],PRODUCERS=[],DEFAULT_IMAGES={};
+function prodThumb(p){ return p&&p.image ? `<img class="thumb" src="${esc(p.image)}" alt="" loading="lazy">` : '<span class="phimg" aria-hidden="true">🥬</span>'; }
+// Redimensionne une photo côté navigateur (≤600px) → data URL compacte, sans dépendance.
+function resizeImage(file,cb){ const r=new FileReader(); r.onerror=function(){cb(null)}; r.onload=function(){ const im=new Image(); im.onerror=function(){cb(null)}; im.onload=function(){ const max=600; let w=im.width,h=im.height; if(w>max||h>max){ if(w>=h){h=Math.round(h*max/w);w=max;} else {w=Math.round(w*max/h);h=max;} } const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h); let out; try{out=c.toDataURL('image/webp',0.82);}catch(e){out=c.toDataURL('image/jpeg',0.82);} if(out.length>560000)out=c.toDataURL('image/jpeg',0.68); cb(out); }; im.src=r.result; }; r.readAsDataURL(file); }
+// Sélecteur d'image (galerie intégrée + téléverser). Garde le choix dans pick.value.
+const pick={value:null};
+function imagePickerHTML(current){
+  pick.value = current || null;
+  const tiles = Object.entries(DEFAULT_IMAGES).map(([k,path])=>`<img class="gthumb${current===path?' sel':''}" data-val="${esc(path)}" src="${esc(path)}" alt="${esc(k)}" title="${esc(k)}">`).join('');
+  const custom = (current && current.indexOf('data:')===0) ? `<img class="gthumb sel" data-val="__custom__" src="${esc(current)}" alt="photo" title="Votre photo">` : '';
+  return `<div class="field"><label>Image du produit</label>
+    <div class="gallery" id="imgGallery">${tiles}${custom}<span class="gtile${current==='none'?' sel':''}" data-val="none">Aucune</span></div>
+    <label class="btn small ghost" style="width:auto;display:inline-flex;cursor:pointer;">Téléverser une photo<input type="file" accept="image/*" id="imgFile" style="display:none"></label>
+    <img class="imgprev" id="imgPrev" src="${esc(current&&current!=='none'?current:'')}" style="${current&&current!=='none'?'':'display:none'}" alt=""></div>`;
+}
+function wireImagePicker(){
+  const gal=$('imgGallery'); if(!gal) return;
+  function select(val,src){ pick.value=(val==='none')?'none':val; gal.querySelectorAll('.gthumb,.gtile').forEach(e=>e.classList.toggle('sel', e.dataset.val===val)); const pv=$('imgPrev'); if(pv){ if(val==='none'){pv.style.display='none';pv.src='';} else {pv.src=src||val;pv.style.display='block';} } }
+  gal.querySelectorAll('.gthumb').forEach(t=>t.addEventListener('click',()=>select(t.dataset.val,t.getAttribute('src'))));
+  gal.querySelectorAll('.gtile').forEach(t=>t.addEventListener('click',()=>select(t.dataset.val)));
+  const f=$('imgFile'); if(f)f.addEventListener('change',function(){ const file=f.files&&f.files[0]; if(!file)return; if(file.size>8*1024*1024){notice('Image trop lourde (max 8 Mo).','err');return;} resizeImage(file,function(data){ if(!data){notice('Image illisible.','err');return;} // ajoute une vignette "custom" sélectionnée
+    let c=gal.querySelector('[data-val="__custom__"]'); if(!c){ c=document.createElement('img'); c.className='gthumb'; c.dataset.val='__custom__'; c.title='Votre photo'; gal.insertBefore(c,gal.querySelector('.gtile')); c.addEventListener('click',()=>select('__custom__',c.getAttribute('src'))); } c.src=data; pick.customData=data; select('__custom__',data); }); });
+}
+function pickedImage(){ if(pick.value==='__custom__')return pick.customData||undefined; if(pick.value==='none')return 'none'; return pick.value||undefined; }
 function can(a){return !!ROLE&&PERMS[ROLE]&&PERMS[ROLE].indexOf(a)>=0}
 function notice(msg,kind){$('notice').textContent=msg;$('notice').className='alert'+(kind?' '+kind:'')}
 function statusBadge(s){const l={ok:'En stock',bas:'Stock bas',rupture:'Rupture'};return `<span class="badge ${s}">${l[s]||s}</span>`}
@@ -189,13 +221,15 @@ $('dReset').addEventListener('click',()=>{$('dFrom').value='';$('dTo').value='';
 
 // ---- Produits ----
 async function loadProducts(){
- const d=await api('/api/stock/products');PRODUCTS=d.products;UNITS=d.units||UNITS;
+ const d=await api('/api/stock/products');PRODUCTS=d.products;UNITS=d.units||UNITS;DEFAULT_IMAGES=d.default_images||DEFAULT_IMAGES;
  renderProducts(PRODUCTS);
 }
 function renderProducts(list){
  const q=($('prodSearch').value||'').toLowerCase();
  const rows=list.filter(p=>!q||p.name.toLowerCase().includes(q));
- $('productsBody').innerHTML=rows.length?rows.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${esc(p.category||'—')}</td><td>${qty(p.on_hand)} ${esc(UNIT_LABEL[p.unit]||p.unit)}</td><td>${qty(p.min_qty)}</td><td>${money(p.price)}</td><td>${statusBadge(p.status)}</td><td>${esc(p.producer_name||'—')}</td></tr>`).join(''):'<tr><td colspan="7" class="empty">Aucun produit. Cliquez « Nouveau produit » pour commencer.</td></tr>';
+ const editable=can('products');
+ $('productsBody').innerHTML=rows.length?rows.map(p=>`<tr><td><div class="prodcell">${prodThumb(p)}<strong>${esc(p.name)}</strong></div></td><td>${esc(p.category||'—')}</td><td>${qty(p.on_hand)} ${esc(UNIT_LABEL[p.unit]||p.unit)}</td><td>${qty(p.min_qty)}</td><td>${money(p.price)}</td><td>${statusBadge(p.status)}</td><td>${esc(p.producer_name||'—')}</td><td>${editable?`<button class="btn small editP" data-id="${esc(p.id)}" type="button">Modifier</button>`:''}</td></tr>`).join(''):'<tr><td colspan="8" class="empty">Aucun produit. Cliquez « Nouveau produit » pour commencer.</td></tr>';
+ document.querySelectorAll('.editP').forEach(b=>b.addEventListener('click',()=>editProduct(b.dataset.id)));
 }
 $('prodSearch')&&$('prodSearch').addEventListener('input',()=>renderProducts(PRODUCTS));
 
@@ -268,9 +302,25 @@ $('addProduct')&&$('addProduct').addEventListener('click',()=>{modal(`<h3>Nouvea
  <div class="row2"><div class="field"><label>Catégorie</label><input id="pCat" placeholder="Légume, céréale…"></div><div class="field"><label>Unité</label><select id="pUnit">${unitOpts('kg')}</select></div></div>
  <div class="row2"><div class="field"><label>Seuil d'alerte (stock bas)</label><input id="pMin" type="number" min="0" step="0.001" value="0"></div><div class="field"><label>Prix de vente (FCFA)</label><input id="pPrice" type="number" min="0" step="1" value="0"></div></div>
  <div class="field"><label><input type="checkbox" id="pPublic" style="width:auto;margin-right:6px">Visible dans la vitrine publique</label></div>
+ ${imagePickerHTML(null)}
+ <div class="muted small">Si vous ne choisissez rien, une image par défaut est attribuée selon le nom (tomate, concombre…).</div>
  <div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="pSave" type="button">Enregistrer</button></div>`);
- $('pSave').addEventListener('click',async()=>{try{await api('/api/stock/products',{method:'POST',body:JSON.stringify({name:$('pName').value,category:$('pCat').value,unit:$('pUnit').value,min_qty:$('pMin').value,price:$('pPrice').value,is_public:$('pPublic').checked})});closeModal();notice('Produit enregistré.','ok');loadProducts();}catch(e){notice(e.message,'err');}});
+ wireImagePicker();
+ $('pSave').addEventListener('click',async()=>{try{await api('/api/stock/products',{method:'POST',body:JSON.stringify({name:$('pName').value,category:$('pCat').value,unit:$('pUnit').value,min_qty:$('pMin').value,price:$('pPrice').value,is_public:$('pPublic').checked,image:pickedImage()})});closeModal();notice('Produit enregistré.','ok');loadProducts();}catch(e){notice(e.message,'err');}});
 });
+// Modifier un produit (nom, prix, seuil, image…) — admin & animateurs.
+function editProduct(id){
+ const p=PRODUCTS.find(x=>x.id===id); if(!p)return;
+ modal(`<h3>Modifier le produit</h3>
+ <div class="field"><label>Nom *</label><input id="pName" value="${esc(p.name)}"></div>
+ <div class="row2"><div class="field"><label>Catégorie</label><input id="pCat" value="${esc(p.category||'')}"></div><div class="field"><label>Unité</label><select id="pUnit">${unitOpts(p.unit)}</select></div></div>
+ <div class="row2"><div class="field"><label>Seuil d'alerte</label><input id="pMin" type="number" min="0" step="0.001" value="${p.min_qty}"></div><div class="field"><label>Prix (FCFA)</label><input id="pPrice" type="number" min="0" step="1" value="${p.price}"></div></div>
+ <div class="field"><label><input type="checkbox" id="pPublic" style="width:auto;margin-right:6px" ${p.is_public?'checked':''}>Visible dans la vitrine publique</label></div>
+ ${imagePickerHTML(p.image||null)}
+ <div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="pUpd" type="button">Enregistrer</button></div>`);
+ wireImagePicker();
+ $('pUpd').addEventListener('click',async()=>{try{await api('/api/stock/products/update',{method:'POST',body:JSON.stringify({id:p.id,name:$('pName').value,category:$('pCat').value,unit:$('pUnit').value,min_qty:$('pMin').value,price:$('pPrice').value,is_public:$('pPublic').checked,image:pickedImage()})});closeModal();notice('Produit mis à jour.','ok');loadProducts();}catch(e){notice(e.message,'err');}});
+}
 // Récolte
 $('addHarvest')&&$('addHarvest').addEventListener('click',async()=>{await ensureRefs();modal(`<h3>Enregistrer une récolte</h3>
  <div class="field"><label>Produit *</label><select id="hProd">${prodOpts()}</select></div>

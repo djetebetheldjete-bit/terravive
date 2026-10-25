@@ -51,7 +51,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
 
 // ---------- Utilitaires HTTP ----------
-const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".ico": "image/x-icon", ".png": "image/png", ".svg": "image/svg+xml", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml; charset=utf-8", ".jpg": "image/jpeg", ".webmanifest": "application/manifest+json; charset=utf-8", ".json": "application/json; charset=utf-8" };
+const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".ico": "image/x-icon", ".png": "image/png", ".svg": "image/svg+xml", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml; charset=utf-8", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".webmanifest": "application/manifest+json; charset=utf-8", ".json": "application/json; charset=utf-8" };
 function sendJson(res, code, obj) { res.writeHead(code, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(obj)); }
 function readBody(req) { return new Promise((resolve, reject) => { let b = ""; req.on("data", (c) => { b += c; if (b.length > 6e6) req.destroy(); }); req.on("end", () => resolve(b)); req.on("error", reject); }); }
 function normEmail(s) { return String(s || "").trim().toLowerCase(); }
@@ -2067,6 +2067,25 @@ function stockRole(u) {
   return null;
 }
 function stockCan(u, action) { const r = stockRole(u); return !!r && STOCK_PERMS[r].includes(action); }
+// Images intégrées (reprises du prototype). Galerie par défaut, modifiable par admin/animateur.
+const STOCK_DEFAULT_IMAGES = {
+  tomate: "/stock/img/tomate.webp", concombre: "/stock/img/concombre.webp", piment: "/stock/img/piment.webp",
+  aubergine: "/stock/img/aubergine.webp", laitue: "/stock/img/laitue.webp", gombo: "/stock/img/gombo.webp", poivron: "/stock/img/poivron.webp"
+};
+const STOCK_IMG_PATHS = new Set(Object.values(STOCK_DEFAULT_IMAGES));
+function stockDefaultImage(name) {
+  const n = String(name || "").toLowerCase();
+  for (const key of Object.keys(STOCK_DEFAULT_IMAGES)) if (n.includes(key)) return STOCK_DEFAULT_IMAGES[key];
+  return null;
+}
+// Sécurité : on n'accepte QUE nos chemins intégrés ou une data URL image bornée (pas d'URL externe).
+function stockCleanImage(v) {
+  if (typeof v !== "string" || !v) return undefined;             // undefined = ne pas changer
+  if (v === "none") return null;                                 // retirer l'image
+  if (STOCK_IMG_PATHS.has(v)) return v;                          // image intégrée
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length <= 600000) return v; // photo (<~440 Ko)
+  return undefined;                                              // tout le reste est ignoré
+}
 async function stockGuard(req, res, action) {
   const user = await currentUser(req);
   if (!user) { sendJson(res, 401, { error: "Non connecté." }); return null; }
@@ -2115,9 +2134,9 @@ async function handleStockProducts(req, res) {
     const movements = await stkAll("stock_movements");
     const producers = await stkAll("stock_producers");
     const pmap = {}; for (const p of producers) pmap[p.id] = p.name;
-    const rows = products.map(p => { const on = stockOnHand(movements, p.id); return { id: p.id, name: p.name, category: p.category || null, unit: p.unit, min_qty: Number(p.min_qty || 0), price: Number(p.price || 0), producer_id: p.producer_id || null, producer_name: p.producer_id ? (pmap[p.producer_id] || null) : null, is_public: !!p.is_public, on_hand: on, status: stkStatus(on, Number(p.min_qty || 0)) }; });
+    const rows = products.map(p => { const on = stockOnHand(movements, p.id); return { id: p.id, name: p.name, category: p.category || null, unit: p.unit, min_qty: Number(p.min_qty || 0), price: Number(p.price || 0), producer_id: p.producer_id || null, producer_name: p.producer_id ? (pmap[p.producer_id] || null) : null, is_public: !!p.is_public, image: p.image || null, on_hand: on, status: stkStatus(on, Number(p.min_qty || 0)) }; });
     rows.sort((a, b) => a.name.localeCompare(b.name));
-    sendJson(res, 200, { products: rows, role: stockRole(user), units: STOCK_UNITS });
+    sendJson(res, 200, { products: rows, role: stockRole(user), units: STOCK_UNITS, default_images: STOCK_DEFAULT_IMAGES });
   } catch (e) { console.error("stock products:", e.message); sendJson(res, 500, { error: "Impossible de charger les produits pour le moment." }); }
 }
 async function handleStockProductCreate(req, res) {
@@ -2131,7 +2150,9 @@ async function handleStockProductCreate(req, res) {
     const price = Math.max(0, stkNum(b.price) || 0);
     let producer_id = null;
     if (b.producer_id) { const pr = await stkGet("stock_producers", String(b.producer_id)); if (!pr) return sendJson(res, 400, { error: "Producteur introuvable." }); producer_id = pr.id; }
-    const row = { id: stkId(), name, category: b.category ? String(b.category).slice(0, 80) : null, unit, min_qty, price, producer_id, is_public: !!b.is_public, created_at: stkNow(), updated_at: stkNow(), created_by: user.email };
+    let image = stockCleanImage(b.image);
+    if (image === undefined) image = stockDefaultImage(name);   // image par défaut selon le nom (tomate, concombre…)
+    const row = { id: stkId(), name, category: b.category ? String(b.category).slice(0, 80) : null, unit, min_qty, price, producer_id, is_public: !!b.is_public, image, created_at: stkNow(), updated_at: stkNow(), created_by: user.email };
     await stkInsert("stock_products", row);
     await stockLog("product_create", user, { product_id: row.id });
     sendJson(res, 200, { ok: true, product: row });
@@ -2150,6 +2171,7 @@ async function handleStockProductUpdate(req, res) {
     if (b.min_qty !== undefined) patch.min_qty = Math.max(0, stkNum(b.min_qty) || 0);
     if (b.price !== undefined) patch.price = Math.max(0, stkNum(b.price) || 0);
     if (b.is_public !== undefined) patch.is_public = !!b.is_public;
+    if (b.image !== undefined) { const im = stockCleanImage(b.image); if (im !== undefined) patch.image = im; }
     await stkUpdate("stock_products", p.id, patch);
     await stockLog("product_update", user, { product_id: p.id });
     sendJson(res, 200, { ok: true });
@@ -2447,7 +2469,7 @@ async function handleStockPublicProducts(req, res) {
     const products = (await stkAll("stock_products")).filter(p => p.is_public);
     const movements = await stkAll("stock_movements");
     const producers = await stkAll("stock_producers"); const pr = {}; for (const p of producers) pr[p.id] = p;
-    const rows = products.map(p => { const on = stockOnHand(movements, p.id); const prod = p.producer_id ? pr[p.producer_id] : null; return { name: p.name, category: p.category || null, unit: p.unit, price: Number(p.price || 0), available: on > 0 ? on : 0, producer: (prod && prod.consent_public) ? prod.name : null }; }).filter(r => r.available > 0);
+    const rows = products.map(p => { const on = stockOnHand(movements, p.id); const prod = p.producer_id ? pr[p.producer_id] : null; return { name: p.name, category: p.category || null, unit: p.unit, price: Number(p.price || 0), image: p.image || null, available: on > 0 ? on : 0, producer: (prod && prod.consent_public) ? prod.name : null }; }).filter(r => r.available > 0);
     sendJson(res, 200, { products: rows });
   } catch (e) { console.error("stock public:", e.message); sendJson(res, 500, { error: "Catalogue indisponible." }); }
 }
