@@ -812,11 +812,15 @@ void loop() {
         link.style.marginTop='8px'; link.style.borderTop='1px solid rgba(255,255,255,.18)'; link.style.paddingTop='14px';
         menu.appendChild(link);
       }
-      // Stock apparaît aussi dans le menu des administrateurs (les opérateurs/lecteurs peuvent ouvrir /stock directement).
+    }
+    // Onglet Stock : pour l'administrateur ET les animateurs de coopérative (qui gèrent le stock).
+    if(me && (me.isAdmin || me.animator)){
+      const menu=document.querySelector('.side .menu');
       if(menu && !document.getElementById('stockNav')){
         const s=document.createElement('a');
         s.id='stockNav'; s.href='/stock';
         s.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg> Stock';
+        if(!document.getElementById('qualityGuardNav')){ s.style.marginTop='8px'; s.style.borderTop='1px solid rgba(255,255,255,.18)'; s.style.paddingTop='14px'; }
         menu.appendChild(s);
       }
     }

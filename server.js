@@ -2052,11 +2052,17 @@ const STOCK_PERMS = {
   operateur: ["read", "products", "harvest", "sale", "validate", "loss", "payment", "producers", "export"],
   lecteur: ["read", "export"]
 };
+// Rôles Stock CONNECTÉS aux acteurs existants de Terravive :
+//  - administrateur (propriétaire)            → rôle "admin"  (tout + journal)
+//  - animateur de coopérative                 → rôle "operateur" (gère le stock de la coop)
+//  - overrides facultatifs par variables d'env (STOCK_ADMINS / STOCK_OPERATORS / STOCK_VIEWERS)
+// Un cultivateur « simple » n'a pas accès à la gestion interne ; côté clients, c'est la
+// vitrine publique (lecture, et commandes une fois activées) qui s'adresse à eux.
 function stockRole(u) {
   if (!u) return null;
   const e = normEmail(u.email);
-  if (ADMIN_EMAILS.includes(e) || STOCK_ADMINS.includes(e)) return "admin";
-  if (STOCK_OPERATORS.includes(e)) return "operateur";
+  if (u.isAdmin || ADMIN_EMAILS.includes(e) || STOCK_ADMINS.includes(e)) return "admin";
+  if (u.animator || STOCK_OPERATORS.includes(e)) return "operateur";
   if (STOCK_VIEWERS.includes(e)) return "lecteur";
   return null;
 }
