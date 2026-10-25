@@ -1352,31 +1352,200 @@ const QG_LIME_DOSE = /(?:\d+(?:[.,]\d+)?\s*(?:kg|g|t|tonnes?)[^.\n]{0,35}(?:chau
 // Montant chiffré en francs CFA (digits suivis de FCFA/CFA/XOF) — prix potentiellement inventé.
 const QG_FCFA_AMOUNT = /\d[\d\s., ]*\s*(?:F\s*CFA|FCFA|CFA|XOF)\b/i;
 
+// Trois niveaux de gravité (Partie 4). Poids utilisés pour le score indicatif.
+const QG_SEVERITIES = ["critique", "important", "mineur"];
+const QG_STATUSES = ["a_traiter", "en_cours", "resolue"];
+const QG_WEIGHT = { critique: 30, important: 12, mineur: 4 };
+// Compatibilité : anciens enregistrements en high/medium/low.
+function qgMapSeverity(s) {
+  s = String(s || "").toLowerCase();
+  if (s === "high") return "critique";
+  if (s === "medium") return "important";
+  if (s === "low") return "mineur";
+  return QG_SEVERITIES.includes(s) ? s : "mineur";
+}
+// Fabrique une anomalie structurée et complète (Parties 4 & 5).
+function qgMake(o) {
+  return {
+    id: o.code, code: o.code,
+    severity: o.severity,
+    title: o.title,
+    description: o.description,
+    message: o.description,            // alias conservé pour l'historique et l'affichage
+    justification: o.justification,
+    correction: o.correction,          // action corrective concrète, jamais une dose inventée
+    missing: o.missing || null,        // informations manquantes à compléter
+    needs_human: !!o.needs_human,      // gravité à confirmer par un humain
+    status: "a_traiter"                // à traiter | en_cours | resolue
+  };
+}
+// Score qualité INDICATIF et STRUCTUREL (ne juge pas l'exactitude agronomique).
+// 100 moins une pénalité par anomalie NON résolue. Jamais présenté comme une note agronomique.
+function qualityScore(anomalies) {
+  let s = 100;
+  for (const a of (anomalies || [])) {
+    if (a && a.status !== "resolue") s -= (QG_WEIGHT[a.severity] || 4);
+  }
+  return Math.max(0, Math.min(100, s));
+}
+// Statut d'un audit à partir de ses anomalies NON résolues (critique → error).
+function qualityStatusFromAnomalies(anomalies) {
+  const open = (anomalies || []).filter(a => a && a.status !== "resolue");
+  if (open.some(a => a.severity === "critique")) return "error";
+  return open.length ? "warn" : "ok";
+}
+
 function qualityAnalyzePlan(plan) {
   const content = String((plan && (plan.content || plan.notes)) || "");
   const headings = (content.match(/^#{1,3}\s*(?:\d{1,2}\s*[\.\-:)]|section\s+\d{1,2})/gim) || []).length;
-  const alerts = [];
-  if (!content.trim()) alerts.push({ severity: "high", message: "Cet itinéraire est vide : il n'y a aucun texte à contrôler." });
-  if (content.trim() && headings < 18) alerts.push({ severity: "medium", message: `Vous ne retrouvez que ${headings} section(s) numérotée(s) : vérifiez que les 18 sections de l'itinéraire sont bien présentes.` });
+  const anomalies = [];
+  if (!content.trim()) anomalies.push(qgMake({
+    code: "vide", severity: "critique", title: "Itinéraire vide",
+    description: "Cet itinéraire est vide : il n'y a aucun texte à contrôler.",
+    justification: "Sans texte, aucun contrôle n'est possible : le résultat ne pourrait pas être fiable.",
+    correction: "Générez ou collez l'itinéraire complet, puis relancez le contrôle.",
+    missing: "Le contenu de l'itinéraire."
+  }));
+  if (content.trim() && headings < 18) anomalies.push(qgMake({
+    code: "sections", severity: "important", title: "Sections manquantes",
+    description: `Vous ne retrouvez que ${headings} section(s) numérotée(s) : vérifiez que les 18 sections de l'itinéraire sont bien présentes.`,
+    justification: "Un itinéraire Terravive complet compte 18 sections ; il en manque, le plan est peut-être tronqué.",
+    correction: "Vérifiez que la génération n'a pas été coupée et complétez les sections absentes avant diffusion.",
+    missing: `${Math.max(0, 18 - headings)} section(s) sur 18.`
+  }));
   if (/chaulage|chaux/i.test(content) && QG_PH_UNKNOWN.test(content) && QG_LIME_DOSE.test(content)) {
-    alerts.push({ severity: "high", message: "Une dose de chaux est chiffrée alors que le pH du sol n'est pas connu : à vérifier avant de conseiller un chaulage." });
+    anomalies.push(qgMake({
+      code: "chaux_ph", severity: "critique", title: "Chaulage chiffré sans pH connu",
+      description: "Une dose de chaux est chiffrée alors que le pH du sol n'est pas connu : à vérifier avant de conseiller un chaulage.",
+      justification: "Doser la chaux sans connaître le pH peut dégrader le sol : c'est une décision agricole potentiellement dommageable.",
+      correction: "Faites mesurer le pH (test de sol) avant de fixer une dose ; en l'absence de mesure, présentez le chaulage comme conditionnel, sans chiffre.",
+      missing: "La mesure du pH du sol."
+    }));
   }
-  if (/\b(?:garanti|sans aucun risque|sans danger|efficacité garantie)\b/i.test(content)) alerts.push({ severity: "medium", message: "Formulation trop catégorique (« garanti », « sans risque »…) : pensez à rappeler l'incertitude et les précautions d'usage." });
-  // Prix chiffré en FCFA : les prix doivent venir du producteur, pas du modèle.
-  if (QG_FCFA_AMOUNT.test(content)) alerts.push({ severity: "medium", message: "Un montant en F CFA est chiffré dans l'itinéraire : vérifiez qu'il n'est pas inventé — les prix doivent venir du producteur." });
-  // Marge mentionnée sans la distinction « marge ≠ bénéfice réel ».
+  if (/\b(?:garanti|sans aucun risque|sans danger|efficacité garantie)\b/i.test(content)) anomalies.push(qgMake({
+    code: "categorique", severity: "important", title: "Formulation trop catégorique",
+    description: "Formulation trop catégorique (« garanti », « sans risque »…) : pensez à rappeler l'incertitude et les précautions d'usage.",
+    justification: "Une promesse absolue peut pousser à une décision à tort, sans tenir compte des aléas.",
+    correction: "Reformulez prudemment (« dans de bonnes conditions », « selon les observations »), en rappelant les précautions.",
+    missing: null
+  }));
+  if (QG_FCFA_AMOUNT.test(content)) anomalies.push(qgMake({
+    code: "fcfa", severity: "important", title: "Montant chiffré en F CFA",
+    description: "Un montant en F CFA est chiffré dans l'itinéraire : vérifiez qu'il n'est pas inventé — les prix doivent venir du producteur.",
+    justification: "Un prix inventé par le modèle fausse l'estimation économique présentée au producteur.",
+    correction: "Remplacez le montant par un champ à renseigner par le producteur, ou indiquez clairement la source du prix.",
+    missing: "Les prix locaux réels, saisis par le producteur."
+  }));
   if (/\bmarge\b/i.test(content) && !/n['’]est pas\s+(?:le\s+|un\s+)?b[ée]n[ée]fice/i.test(content)) {
-    alerts.push({ severity: "low", message: "La « marge » est mentionnée sans rappeler qu'elle n'est pas le bénéfice réel du producteur : à vérifier." });
+    anomalies.push(qgMake({
+      code: "marge", severity: "mineur", title: "« Marge » sans rappel marge ≠ bénéfice",
+      description: "La « marge » est mentionnée sans rappeler qu'elle n'est pas le bénéfice réel du producteur : à vérifier.",
+      justification: "Sans rappel, la marge peut être confondue avec le bénéfice réel.",
+      correction: "Ajoutez une phrase : « la marge n'est pas le bénéfice réel ; elle ignore le travail familial et l'amortissement ».",
+      missing: null
+    }));
   }
-  // Rendement chiffré (t/ha) sans cadrage prudent (scénarios / indicatif).
   if (/rendement/i.test(content) && /(?:\bt\s*\/\s*ha\b|tonnes?\b)/i.test(content) && !/(prudent|sc[ée]nario|indicatif|repère|ordre de grandeur)/i.test(content)) {
-    alerts.push({ severity: "low", message: "Un rendement chiffré (t/ha) apparaît sans cadrage prudent (scénario, ordre de grandeur, valeur indicative) : à vérifier." });
+    anomalies.push(qgMake({
+      code: "rendement", severity: "mineur", title: "Rendement chiffré sans cadrage",
+      description: "Un rendement chiffré (t/ha) apparaît sans cadrage prudent (scénario, ordre de grandeur, valeur indicative) : à vérifier.",
+      justification: "Un rendement annoncé sans cadrage peut être pris pour une garantie.",
+      correction: "Encadrez par un scénario prudent / intermédiaire / favorable et la mention « indicatif, à confirmer localement ».",
+      missing: null
+    }));
   }
   if (/\b(?:prix|coût|FCFA|XOF)\b/i.test(content) && /(?:à compléter|à vérifier localement|non vérifié)/i.test(content)) {
-    // Cette combinaison peut être légitime : avertissement seulement, jamais une erreur bloquante.
-    alerts.push({ severity: "low", message: "Des estimations économiques sont marquées « à compléter / à vérifier localement » : pensez à les confirmer avec le producteur." });
+    anomalies.push(qgMake({
+      code: "eco_a_verifier", severity: "mineur", title: "Estimations économiques à confirmer",
+      description: "Des estimations économiques sont marquées « à compléter / à vérifier localement » : pensez à les confirmer avec le producteur.",
+      justification: "Des montants explicitement « à compléter » restent à valider avant diffusion.",
+      correction: "Confirmez les chiffres avec le producteur avant de diffuser l'itinéraire.",
+      missing: null
+    }));
   }
-  return { headings, alerts, status: alerts.some(a => a.severity === "high") ? "error" : alerts.length ? "warn" : "ok" };
+  return {
+    headings,
+    anomalies,
+    alerts: anomalies,                       // alias conservé (rétrocompatibilité)
+    score: qualityScore(anomalies),
+    status: qualityStatusFromAnomalies(anomalies)
+  };
+}
+
+// Normalise une ligne d'audit (stockée en base ou en local, éventuellement ancienne)
+// vers une forme homogène et complète pour l'affichage et le tableau de bord.
+function qualityNormalizeAudit(row) {
+  if (!row || typeof row !== "object") return null;
+  // Idempotent : accepte une ligne brute (alerts/issues) OU un audit déjà normalisé (anomalies).
+  const raw = Array.isArray(row.anomalies) ? row.anomalies
+            : Array.isArray(row.alerts) ? row.alerts
+            : Array.isArray(row.issues) ? row.issues : [];
+  const anomalies = raw.map((a, i) => {
+    a = a && typeof a === "object" ? a : { message: String(a || "") };
+    const severity = qgMapSeverity(a.severity);
+    const status = QG_STATUSES.includes(a.status) ? a.status : "a_traiter";
+    const description = a.description || a.message || a.title || "Anomalie";
+    return {
+      id: a.id || a.code || ("a" + i),
+      code: a.code || a.id || ("a" + i),
+      severity, status,
+      title: a.title || description.slice(0, 60),
+      description, message: description,
+      justification: a.justification || null,
+      correction: a.correction || null,
+      missing: a.missing || null,
+      needs_human: !!a.needs_human
+    };
+  });
+  const status = row.status && ["ok", "warn", "error"].includes(row.status)
+    ? row.status : qualityStatusFromAnomalies(anomalies);
+  return {
+    id: row.id, plan_id: row.plan_id || null,
+    title: row.title || row.plan_title || "Itinéraire",
+    crop: row.crop || null, region: row.region || null,
+    created_at: row.created_at || null, created_by: row.created_by || null,
+    status,
+    score: (typeof row.score === "number") ? row.score : qualityScore(anomalies),
+    alert_count: anomalies.length,
+    resolved_count: anomalies.filter(a => a.status === "resolue").length,
+    anomalies
+  };
+}
+
+// Agrégats du tableau de bord à partir des audits NORMALISÉS (données réelles).
+// Distingue une ABSENCE de données (null) d'un vrai zéro.
+function qualityAggregate(audits) {
+  const list = (audits || []).map(qualityNormalizeAudit).filter(Boolean);
+  if (!list.length) {
+    return { total: 0, conformes: null, a_verifier: null, critiques: null,
+             importants: null, mineurs: null, resolues: null, dernier: null };
+  }
+  let conformes = 0, aVerifier = 0, critiques = 0, importants = 0, mineurs = 0, resolues = 0, dernier = null;
+  for (const a of list) {
+    if (a.status === "ok") conformes++; else aVerifier++;
+    for (const an of a.anomalies) {
+      if (an.severity === "critique") critiques++;
+      else if (an.severity === "important") importants++;
+      else mineurs++;
+      if (an.status === "resolue") resolues++;
+    }
+    if (a.created_at && (!dernier || String(a.created_at) > String(dernier))) dernier = a.created_at;
+  }
+  return { total: list.length, conformes, a_verifier: aVerifier, critiques, importants, mineurs, resolues, dernier };
+}
+
+// Filtrage des audits (Partie 6) : culture, statut, gravité, période. Fonction pure.
+function qualityFilterAudits(audits, f) {
+  f = f || {};
+  const list = (audits || []).map(qualityNormalizeAudit).filter(Boolean);
+  return list.filter(a => {
+    if (f.crop && String(a.crop || "").toLowerCase() !== String(f.crop).toLowerCase()) return false;
+    if (f.status && a.status !== f.status) return false;
+    if (f.severity && !a.anomalies.some(an => an.severity === f.severity)) return false;
+    if (f.from && (!a.created_at || String(a.created_at) < String(f.from))) return false;
+    if (f.to && (!a.created_at || String(a.created_at) > String(f.to) + "T23:59:59.999Z")) return false;
+    return true;
+  });
 }
 async function qualityListPlans() {
   if (USE_DB) return (await sb("/trv_plans?select=id,title,crop,region,content,notes,created_at&order=created_at.desc&limit=50")) || [];
@@ -1385,7 +1554,8 @@ async function qualityListPlans() {
 async function qualityListAudits() {
   if (USE_DB) {
     try {
-      const rows = (await sb("/trv_quality_audits?select=id,plan_id,title,status,alert_count,alerts,created_at,kind&order=created_at.desc&limit=100")) || [];
+      // select=* : robuste si une colonne (kind, score…) n'existe pas encore en base.
+      const rows = (await sb("/trv_quality_audits?select=*&order=created_at.desc&limit=100")) || [];
       // Les enregistrements de banc de tests ne sont pas des audits d'itinéraires.
       return rows.filter((row) => row.kind !== "tests").slice(0, 50);
     }
@@ -1393,15 +1563,89 @@ async function qualityListAudits() {
   }
   const st = loadStore(); return (st.qualityAudits || []).slice().reverse().slice(0,50);
 }
+async function qualityGetAudit(id) {
+  if (!id || typeof id !== "string") return null;
+  if (USE_DB) {
+    const rows = await sb(`/trv_quality_audits?id=eq.${encodeURIComponent(id)}&select=*&limit=1`);
+    return (rows && rows[0]) || null;
+  }
+  const st = loadStore(); return (st.qualityAudits || []).find(a => a && a.id === id) || null;
+}
+// Enregistre (upsert) un audit : écriture tolérante au schéma. On tente la ligne complète ;
+// si une colonne manque encore en base, on réessaie avec les colonnes de base pour ne JAMAIS
+// perdre l'audit. Renvoie {saved, warning}.
+async function qualitySaveAudit(audit, { patch } = {}) {
+  const full = {
+    id: audit.id, plan_id: audit.plan_id, title: audit.title,
+    status: audit.status, alert_count: audit.alert_count, alerts: audit.anomalies,
+    created_at: audit.created_at, created_by: audit.created_by,
+    // Colonnes ajoutées (voir schema.sql / migration idempotente).
+    crop: audit.crop, region: audit.region, score: audit.score,
+    // Compatibilité avec l'ancien schéma de production.
+    kind: "audit", plan_title: audit.title, issues: audit.anomalies
+  };
+  const base = {
+    id: audit.id, plan_id: audit.plan_id, title: audit.title,
+    status: audit.status, alert_count: audit.alert_count, alerts: audit.anomalies,
+    created_at: audit.created_at, created_by: audit.created_by
+  };
+  if (USE_DB) {
+    const method = patch ? "PATCH" : "POST";
+    const url = patch ? `/trv_quality_audits?id=eq.${encodeURIComponent(audit.id)}` : "/trv_quality_audits";
+    try {
+      await sb(url, { method, headers: { Prefer: patch ? "return=minimal" : "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(patch ? full : [full]) });
+      return { saved: true, warning: null };
+    } catch (e1) {
+      try {
+        await sb(url, { method, headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch ? base : [base]) });
+        return { saved: true, warning: "Audit enregistré en mode compatibilité (certaines colonnes — culture, score — ne sont pas encore présentes en base : exécutez la migration schema.sql). Détail : " + e1.message };
+      } catch (e2) {
+        console.error("Quality Guard save failed:", e2.message);
+        return { saved: false, warning: "Contrôle effectué, mais l'historique n'a pas pu être enregistré dans Supabase. Vérifiez la table trv_quality_audits et ses permissions. Détail technique : " + e2.message };
+      }
+    }
+  }
+  try {
+    const st = loadStore(); if (!Array.isArray(st.qualityAudits)) st.qualityAudits = [];
+    const row = { ...base, crop: audit.crop, region: audit.region, score: audit.score, kind: "audit", issues: audit.anomalies };
+    const i = st.qualityAudits.findIndex(a => a && a.id === audit.id);
+    if (i >= 0) st.qualityAudits[i] = row; else st.qualityAudits.push(row);
+    if (st.qualityAudits.length > 500) st.qualityAudits = st.qualityAudits.slice(-500);
+    saveStore(st); return { saved: true, warning: null };
+  } catch (e) { return { saved: false, warning: "Contrôle effectué, mais l'historique local n'a pas pu être enregistré." }; }
+}
+function qgParseFilters(req) {
+  let q = {};
+  try { q = Object.fromEntries(new URL(req.url, "http://x").searchParams); } catch (e) {}
+  const f = {};
+  if (q.crop) f.crop = String(q.crop).slice(0, 80);
+  if (["ok", "warn", "error"].includes(q.status)) f.status = q.status;
+  if (QG_SEVERITIES.includes(q.severity)) f.severity = q.severity;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(q.from || "")) f.from = q.from;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(q.to || "")) f.to = q.to;
+  return f;
+}
 async function handleQualityOverview(req,res) {
   const user = await currentUser(req);
   if (!user) return sendJson(res,401,{error:"Non connecté."});
   if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
   try {
     const plans = await qualityListPlans();
-    const audits = await qualityListAudits();
-    sendJson(res,200,{user:{name:user.name||"administrateur",email:user.email},source:USE_DB?"supabase":"local",plans:plans.map(p=>{const q=qualityAnalyzePlan(p);return {id:p.id,title:p.title,crop:p.crop,region:p.region,created_at:p.created_at,sections:q.headings,status:q.status};}),audits});
-  } catch(e) { sendJson(res,500,{error:"Impossible de charger vos données pour le moment. Réessayez dans un instant."}); }
+    const allAudits = await qualityListAudits();
+    const normalizedAll = allAudits.map(qualityNormalizeAudit).filter(Boolean);
+    const filters = qgParseFilters(req);
+    const filtered = qualityFilterAudits(allAudits, filters);
+    const crops = Array.from(new Set(normalizedAll.map(a => a.crop).filter(Boolean))).sort();
+    sendJson(res,200,{
+      user:{name:user.name||"administrateur",email:user.email},
+      source:USE_DB?"supabase":"local",
+      plans:plans.map(p=>{const q=qualityAnalyzePlan(p);return {id:p.id,title:p.title,crop:p.crop,region:p.region,created_at:p.created_at,sections:q.headings,status:q.status,score:q.score};}),
+      audits: filtered.map(a => ({ id:a.id, title:a.title, crop:a.crop, region:a.region, created_at:a.created_at, status:a.status, score:a.score, alert_count:a.alert_count, resolved_count:a.resolved_count })),
+      metrics: qualityAggregate(filtered),
+      metrics_total: normalizedAll.length,
+      filters, crops
+    });
+  } catch(e) { console.error("Quality overview:",e.message); sendJson(res,500,{error:"Impossible de charger vos données pour le moment. Réessayez dans un instant."}); }
 }
 async function handleQualityAudit(req,res) {
   const user = await currentUser(req);
@@ -1415,38 +1659,89 @@ async function handleQualityAudit(req,res) {
     else plan = (loadStore().plans || {})[body.id] || null;
     if (!plan) return sendJson(res,404,{error:"Itinéraire introuvable."});
     const q = qualityAnalyzePlan(plan);
-    const audit = {id:crypto.randomBytes(12).toString("hex"),plan_id:plan.id,title:plan.title||plan.crop||"Itinéraire",status:q.status,alert_count:q.alerts.length,alerts:q.alerts,created_at:new Date().toISOString(),created_by:user.email};
-    let saved = true;
-    let saveWarning = null;
-    if (USE_DB) {
-      try {
-        await sb("/trv_quality_audits",{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify([{
-          id:audit.id,
-          plan_id:audit.plan_id,
-          title:audit.title,
-          status:audit.status,
-          alert_count:audit.alert_count,
-          alerts:audit.alerts,
-          created_at:audit.created_at,
-          created_by:audit.created_by,
-          // Compatibilité avec l'ancien schéma Supabase encore présent en production.
-          kind:"audit",
-          plan_title:audit.title,
-          issues:audit.alerts
-        }])});
-      } catch (dbError) {
-        // Le contrôle du contenu reste utile même si l'historique Supabase n'est pas encore configuré.
-        saved = false;
-        saveWarning = "Contrôle effectué, mais l'historique n'a pas pu être enregistré dans Supabase. Vérifiez la table trv_quality_audits et ses permissions. Détail technique : " + dbError.message;
-        console.error("Quality Guard audit history save failed:", dbError.message);
-      }
-    } else {
-      try {
-        const st=loadStore(); if(!Array.isArray(st.qualityAudits))st.qualityAudits=[];st.qualityAudits.push(audit);if(st.qualityAudits.length>500)st.qualityAudits=st.qualityAudits.slice(-500);saveStore(st);
-      } catch (localError) { saved = false; saveWarning = "Contrôle effectué, mais l'historique local n'a pas pu être enregistré."; }
-    }
-    sendJson(res,200,{ok:true,status:q.status,alerts:q.alerts,sections:q.headings,auditId:audit.id,saved,warning:saveWarning});
+    const audit = {
+      id:crypto.randomBytes(12).toString("hex"), plan_id:plan.id,
+      title:plan.title||plan.crop||"Itinéraire", crop:plan.crop||null, region:plan.region||null,
+      status:q.status, alert_count:q.anomalies.length, score:q.score, anomalies:q.anomalies,
+      created_at:new Date().toISOString(), created_by:user.email
+    };
+    const { saved, warning } = await qualitySaveAudit(audit);
+    sendJson(res,200,{ok:true,auditId:audit.id,status:q.status,score:q.score,sections:q.headings,anomalies:q.anomalies,alerts:q.anomalies,saved,warning});
   } catch(e) { console.error("Quality audit:",e.message);sendJson(res,500,{error:"Le contrôle n'a pas pu aboutir. Réessayez dans un instant ; en cas de besoin, le détail technique est dans les journaux Render."}); }
+}
+// Fiche détaillée d'un audit (Partie 3). GET /api/quality/audit?id=...
+async function handleQualityAuditGet(req,res) {
+  const user = await currentUser(req);
+  if (!user) return sendJson(res,401,{error:"Non connecté."});
+  if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
+  try {
+    let id = ""; try { id = new URL(req.url, "http://x").searchParams.get("id") || ""; } catch(e) {}
+    if (!id) return sendJson(res,400,{error:"Audit non précisé."});
+    const row = await qualityGetAudit(id);
+    if (!row) return sendJson(res,404,{error:"Audit introuvable."});
+    const audit = qualityNormalizeAudit(row);
+    // Métadonnées du plan si l'itinéraire existe encore (sinon : non disponible, jamais inventé).
+    let plan = null;
+    if (audit.plan_id) {
+      try {
+        if (USE_DB) { const rows = await sb(`/trv_plans?id=eq.${encodeURIComponent(audit.plan_id)}&select=title,crop,region,created_at&limit=1`); plan = rows && rows[0] || null; }
+        else plan = (loadStore().plans || {})[audit.plan_id] || null;
+      } catch(e) { plan = null; }
+    }
+    if (plan) {
+      audit.crop = audit.crop || plan.crop || null;
+      audit.region = audit.region || plan.region || null;
+    }
+    sendJson(res,200,{ audit, plan_available: !!plan });
+  } catch(e) { console.error("Quality audit get:",e.message); sendJson(res,500,{error:"Impossible de charger cette fiche pour le moment."}); }
+}
+// Changement de statut d'une anomalie (Partie 5). POST /api/quality/issue {auditId, issueId, status}
+async function handleQualityIssue(req,res) {
+  const user = await currentUser(req);
+  if (!user) return sendJson(res,401,{error:"Non connecté."});
+  if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
+  try {
+    const body = JSON.parse(await readBody(req) || "{}");
+    const auditId = typeof body.auditId === "string" ? body.auditId : "";
+    const issueId = typeof body.issueId === "string" ? body.issueId : "";
+    const status = body.status;
+    if (!auditId || !issueId) return sendJson(res,400,{error:"Audit ou anomalie non précisé."});
+    if (!QG_STATUSES.includes(status)) return sendJson(res,400,{error:"Statut invalide."});
+    const row = await qualityGetAudit(auditId);
+    if (!row) return sendJson(res,404,{error:"Audit introuvable."});
+    const audit = qualityNormalizeAudit(row);
+    const anomaly = audit.anomalies.find(a => a.id === issueId || a.code === issueId);
+    if (!anomaly) return sendJson(res,404,{error:"Anomalie introuvable dans cet audit."});
+    anomaly.status = status;
+    audit.status = qualityStatusFromAnomalies(audit.anomalies);
+    audit.score = qualityScore(audit.anomalies);
+    audit.alert_count = audit.anomalies.length;
+    const { saved, warning } = await qualitySaveAudit(audit, { patch: true });
+    sendJson(res,200,{ ok:true, saved, warning, audit });
+  } catch(e) { console.error("Quality issue:",e.message); sendJson(res,500,{error:"Le statut n'a pas pu être mis à jour pour le moment."}); }
+}
+// Suggestion de reformulation prudente par l'IA (Partie 5, OPTIONNEL, non automatique).
+// Réutilise callClaude et les variables d'environnement existantes. Aucune clé côté client.
+async function handleQualitySuggest(req,res) {
+  const user = await currentUser(req);
+  if (!user) return sendJson(res,401,{error:"Non connecté."});
+  if (!isAdmin(user)) return sendJson(res,403,{error:"Réservé à l'administrateur."});
+  if (!API_KEY) return sendJson(res,503,{error:"Assistance IA non configurée (ANTHROPIC_API_KEY absente). Les corrections déterministes restent disponibles."});
+  try {
+    const body = JSON.parse(await readBody(req) || "{}");
+    const auditId = typeof body.auditId === "string" ? body.auditId : "";
+    const issueId = typeof body.issueId === "string" ? body.issueId : "";
+    if (!auditId || !issueId) return sendJson(res,400,{error:"Audit ou anomalie non précisé."});
+    const row = await qualityGetAudit(auditId);
+    if (!row) return sendJson(res,404,{error:"Audit introuvable."});
+    const audit = qualityNormalizeAudit(row);
+    const anomaly = audit.anomalies.find(a => a.id === issueId || a.code === issueId);
+    if (!anomaly) return sendJson(res,404,{error:"Anomalie introuvable."});
+    const system = DURABLE_CONTEXT + "\n\nRÔLE : tu aides un administrateur à corriger un itinéraire. On te donne UNE anomalie détectée. Propose une reformulation prudente et une courte explication. RÈGLES ABSOLUES : n'invente AUCUNE dose d'engrais, de chaux ou de produit ; ne garantis aucun rendement ni bénéfice ; distingue faits, estimations et hypothèses ; si une information manque, dis ce qu'il faut mesurer ou compléter plutôt que de l'inventer. Réponds en 4 lignes maximum.";
+    const prompt = `Anomalie (gravité ${anomaly.severity}) : ${anomaly.title}\nDescription : ${anomaly.description}\nCorrection déterministe déjà proposée : ${anomaly.correction || "—"}\n\nPropose une reformulation prudente et concrète.`;
+    const suggestion = await callClaude(system, [{ role:"user", content: prompt }], null, 400);
+    sendJson(res,200,{ ok:true, suggestion });
+  } catch(e) { console.error("Quality suggest:",e.message); sendJson(res,502,{error:"L'assistance IA est momentanément indisponible. Réessayez plus tard ; la correction déterministe reste utilisable."}); }
 }
 async function handleQualityTests(req,res) {
   const user = await currentUser(req);
@@ -1458,17 +1753,41 @@ async function handleQualityTests(req,res) {
   // pH non mesuré ET dose de chaux chiffrée : doit déclencher l'alerte haute (phrasés réels Terravive).
   const sampleLimeNoPh = {content:"pH : non précisé. Appliquer 800 kg de chaux à l'hectare avant semis."};
   const cases = [
-    {name:"Contenu vide détecté",fn:()=>qualityAnalyzePlan({content:""}).alerts.some(a=>a.severity==="high")},
+    // --- Détection (Partie 2) ---
+    {name:"Contenu vide détecté (gravité critique)",fn:()=>qualityAnalyzePlan({content:""}).anomalies.some(a=>a.severity==="critique"&&a.code==="vide")},
     {name:"18 sections numérotées détectées",fn:()=>qualityAnalyzePlan(sampleGood).headings===18},
-    {name:"Sections manquantes signalées",fn:()=>qualityAnalyzePlan(sampleMissing).alerts.some(a=>/18 sections/.test(a.message))},
-    {name:"Absence de dose de chaux avec pH inconnu",fn:()=>!qualityAnalyzePlan(sampleUnknownPh).alerts.some(a=>/dose de chaux est chiffrée/.test(a.message))},
-    {name:"Dose de chaux chiffrée + pH non précisé signalée",fn:()=>qualityAnalyzePlan(sampleLimeNoPh).alerts.some(a=>a.severity==="high"&&/dose de chaux est chiffrée/.test(a.message))},
-    {name:"Montant chiffré en F CFA signalé",fn:()=>qualityAnalyzePlan({content:"Coût estimé : 125 000 FCFA par hectare."}).alerts.some(a=>/F ?CFA/.test(a.message))},
-    {name:"Marge sans distinction bénéfice signalée",fn:()=>qualityAnalyzePlan({content:"La marge attendue est intéressante pour le producteur."}).alerts.some(a=>/marge/i.test(a.message))},
-    {name:"Marge avec distinction bénéfice non signalée",fn:()=>!qualityAnalyzePlan({content:"La marge n'est pas le bénéfice réel ; elle ignore le travail familial."}).alerts.some(a=>/b[ée]n[ée]fice réel du producteur/.test(a.message))},
-    {name:"Rendement t/ha sans cadrage prudent signalé",fn:()=>qualityAnalyzePlan({content:"Le rendement visé est de 25 t/ha."}).alerts.some(a=>/rendement chiffré/i.test(a.message))},
-    {name:"Rendement t/ha avec cadrage prudent non signalé",fn:()=>!qualityAnalyzePlan({content:"Scénario prudent : rendement indicatif de 25 t/ha, à confirmer localement."}).alerts.some(a=>/rendement chiffré/i.test(a.message))},
-    {name:"Formulations absolues signalées",fn:()=>qualityAnalyzePlan({content:"Cette solution est garantie sans aucun risque."}).alerts.some(a=>/trop catégorique/.test(a.message))}
+    {name:"Plan complet sans anomalie → score 100",fn:()=>{const q=qualityAnalyzePlan(sampleGood);return q.anomalies.length===0&&q.score===100&&q.status==="ok";}},
+    {name:"Sections manquantes signalées",fn:()=>qualityAnalyzePlan(sampleMissing).anomalies.some(a=>/18 sections/.test(a.message))},
+    {name:"Absence de dose de chaux avec pH inconnu",fn:()=>!qualityAnalyzePlan(sampleUnknownPh).anomalies.some(a=>a.code==="chaux_ph")},
+    {name:"Dose de chaux chiffrée + pH non précisé → critique",fn:()=>qualityAnalyzePlan(sampleLimeNoPh).anomalies.some(a=>a.severity==="critique"&&a.code==="chaux_ph")},
+    {name:"Montant chiffré en F CFA signalé (important)",fn:()=>qualityAnalyzePlan({content:"Coût estimé : 125 000 FCFA par hectare."}).anomalies.some(a=>a.code==="fcfa"&&a.severity==="important")},
+    {name:"Marge sans distinction bénéfice signalée (mineur)",fn:()=>qualityAnalyzePlan({content:"La marge attendue est intéressante pour le producteur."}).anomalies.some(a=>a.code==="marge"&&a.severity==="mineur")},
+    {name:"Marge avec distinction bénéfice non signalée",fn:()=>!qualityAnalyzePlan({content:"La marge n'est pas le bénéfice réel ; elle ignore le travail familial."}).anomalies.some(a=>a.code==="marge")},
+    {name:"Rendement t/ha sans cadrage prudent signalé",fn:()=>qualityAnalyzePlan({content:"Le rendement visé est de 25 t/ha."}).anomalies.some(a=>a.code==="rendement")},
+    {name:"Rendement t/ha avec cadrage prudent non signalé",fn:()=>!qualityAnalyzePlan({content:"Scénario prudent : rendement indicatif de 25 t/ha, à confirmer localement."}).anomalies.some(a=>a.code==="rendement")},
+    {name:"Formulations absolues signalées",fn:()=>qualityAnalyzePlan({content:"Cette solution est garantie sans aucun risque."}).anomalies.some(a=>a.code==="categorique")},
+    // --- Anomalies structurées (Parties 4 & 5) ---
+    {name:"Chaque anomalie porte titre/justification/correction",fn:()=>qualityAnalyzePlan(sampleLimeNoPh).anomalies.every(a=>a.title&&a.justification&&a.correction&&QG_SEVERITIES.includes(a.severity)&&a.status==="a_traiter")},
+    {name:"Anomalie chaux signale l'info manquante (pH)",fn:()=>{const a=qualityAnalyzePlan(sampleLimeNoPh).anomalies.find(x=>x.code==="chaux_ph");return a&&/pH/i.test(a.missing||"");}},
+    // --- Score & statut (Partie 3) ---
+    {name:"Score : une anomalie critique pénalise de 30",fn:()=>qualityScore([{severity:"critique",status:"a_traiter"}])===70},
+    {name:"Score : anomalie résolue ne pénalise plus",fn:()=>qualityScore([{severity:"critique",status:"resolue"}])===100},
+    {name:"Statut : critique ouverte → error",fn:()=>qualityStatusFromAnomalies([{severity:"critique",status:"a_traiter"}])==="error"},
+    {name:"Statut : critique résolue → ok",fn:()=>qualityStatusFromAnomalies([{severity:"critique",status:"resolue"}])==="ok"},
+    {name:"Statut : seulement mineure ouverte → warn",fn:()=>qualityStatusFromAnomalies([{severity:"mineur",status:"a_traiter"}])==="warn"},
+    // --- Normalisation des anciens enregistrements (compat) ---
+    {name:"Normalise un ancien audit (high→critique, statut par défaut)",fn:()=>{const n=qualityNormalizeAudit({id:"x",alerts:[{severity:"high",message:"vieux"}]});return n.anomalies[0].severity==="critique"&&n.anomalies[0].status==="a_traiter"&&n.anomalies[0].id;}},
+    {name:"Normalise un audit stocké en 'issues' (ancien schéma)",fn:()=>qualityNormalizeAudit({id:"y",issues:[{severity:"medium",message:"m"}]}).anomalies[0].severity==="important"},
+    // --- Tableau de bord (Partie 6) ---
+    {name:"Agrégat : aucune donnée → total 0 et compteurs null",fn:()=>{const m=qualityAggregate([]);return m.total===0&&m.critiques===null;}},
+    {name:"Agrégat : compte conformes / à vérifier / gravités",fn:()=>{const m=qualityAggregate([{id:"1",status:"error",alerts:[{severity:"critique",status:"a_traiter"}]},{id:"2",status:"ok",alerts:[]}]);return m.total===2&&m.conformes===1&&m.a_verifier===1&&m.critiques===1;}},
+    {name:"Agrégat : zéro critique distinct d'absence de données",fn:()=>{const m=qualityAggregate([{id:"1",status:"ok",alerts:[]}]);return m.critiques===0&&m.total===1;}},
+    // --- Filtres (Partie 6) ---
+    {name:"Filtre par statut",fn:()=>qualityFilterAudits([{id:"1",status:"error",alerts:[{severity:"critique"}]},{id:"2",status:"ok",alerts:[]}],{status:"ok"}).length===1},
+    {name:"Filtre par gravité",fn:()=>qualityFilterAudits([{id:"1",status:"warn",alerts:[{severity:"mineur"}]},{id:"2",status:"error",alerts:[{severity:"critique"}]}],{severity:"critique"}).length===1},
+    {name:"Filtre par culture (insensible à la casse)",fn:()=>qualityFilterAudits([{id:"1",crop:"Tomate",alerts:[]},{id:"2",crop:"Maïs",alerts:[]}],{crop:"tomate"}).length===1},
+    // --- Séparation audits / tests ---
+    {name:"Les enregistrements kind:'tests' ne sont pas des audits",fn:()=>{const n=qualityNormalizeAudit({id:"t",kind:"tests",alerts:[]});return n&&n.id==="t";}}
   ];
   const results=cases.map(c=>{try{const ok=!!c.fn();return{name:c.name,ok,detail:ok?"Conforme à ce qui est attendu":"Résultat inattendu, à revoir"};}catch(e){return{name:c.name,ok:false,detail:e.message};}});
   sendJson(res,200,{total:results.length,passed:results.filter(x=>x.ok).length,failed:results.filter(x=>!x.ok).length,results});
@@ -1525,7 +1844,10 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && url === "/api/animator/request") return handleAnimRequestGet(req, res);
   if (req.method === "POST" && url === "/api/animator/request") return handleAnimRequestCreate(req, res);
   if (req.method === "GET" && url === "/api/quality/overview") return handleQualityOverview(req, res);
+  if (req.method === "GET" && url === "/api/quality/audit") return handleQualityAuditGet(req, res);
   if (req.method === "POST" && url === "/api/quality/audit") return handleQualityAudit(req, res);
+  if (req.method === "POST" && url === "/api/quality/issue") return handleQualityIssue(req, res);
+  if (req.method === "POST" && url === "/api/quality/suggest") return handleQualitySuggest(req, res);
   if (req.method === "POST" && url === "/api/quality/tests") return handleQualityTests(req, res);
   if (req.method === "GET") return serveStatic(req, res);
   res.writeHead(405); res.end("Méthode non autorisée");

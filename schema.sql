@@ -201,12 +201,27 @@ create table if not exists trv_quality_audits (
   -- sans ces valeurs reste valide.
   kind text,          -- "audit" pour un contrôle d'itinéraire (les "tests" sont filtrés à la lecture)
   plan_title text,    -- copie du titre (compatibilité ancien schéma de production)
-  issues jsonb        -- copie des alertes  (compatibilité ancien schéma de production)
+  issues jsonb,       -- copie des alertes  (compatibilité ancien schéma de production)
+  crop text,          -- culture de l'itinéraire (tableau de bord : filtre par culture)
+  region text,        -- localisation de l'itinéraire
+  score integer       -- score structurel indicatif 0..100 (jamais une note agronomique)
 );
--- Migration idempotente : ajoute les colonnes sur une table déjà créée en production
--- sous l'ancien schéma (sans kind / plan_title / issues). Sans effet si elles existent.
+-- Migration idempotente : ajoute les colonnes sur une table déjà créée en production.
+-- Sans effet si elles existent déjà. Aucune donnée existante n'est supprimée ni modifiée.
 alter table trv_quality_audits add column if not exists kind text;
 alter table trv_quality_audits add column if not exists plan_title text;
 alter table trv_quality_audits add column if not exists issues jsonb;
+alter table trv_quality_audits add column if not exists crop text;
+alter table trv_quality_audits add column if not exists region text;
+alter table trv_quality_audits add column if not exists score integer;
 create index if not exists trv_quality_audits_created_idx
   on trv_quality_audits (created_at desc);
+
+-- Sécurité (défense en profondeur). Quality Guard n'est JAMAIS requêté directement par le
+-- navigateur : le serveur seul lit/écrit cette table avec la clé Supabase côté serveur
+-- (jamais exposée au client), et chaque route est réservée à ADMIN_EMAILS. Si vous utilisez
+-- la clé « service_role » côté serveur, elle contourne la RLS (comportement attendu).
+-- Si vous préférez activer la RLS malgré tout, faites-le SANS casser l'accès serveur, p. ex. :
+--   alter table trv_quality_audits enable row level security;
+--   -- puis une policy autorisant le rôle de service, ou l'adresse administrateur, selon votre setup.
+-- N'activez pas la RLS sans policy de remplacement : vous bloqueriez l'enregistrement des audits.

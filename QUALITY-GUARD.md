@@ -86,3 +86,32 @@ alter table trv_quality_audits add column if not exists issues jsonb;
 ```
 
 Sans effet si les colonnes existent déjà. Après déploiement, exécuter ce bloc (ou l'intégralité de `schema.sql`) dans le SQL Editor de Supabase : le code et la base lisent et écrivent alors exactement les mêmes colonnes, sur une installation neuve **comme** sur l'existante. Logique de contrôle inchangée : auto-tests 11/11, suite QA 33 tests / 176 vérifications toujours au vert.
+
+## v0.7 — audits enrichis, fiches détaillées, gravité, corrections, tableau de bord
+
+Évolution majeure, en préservant l'existant et la logique de détection.
+
+### Anomalies structurées (gravité + corrections)
+Chaque anomalie porte désormais : un titre, une **gravité** (critique / important / mineur), une description, la **justification** du classement, une **correction concrète** proposée, l'**information manquante** à compléter, et un **statut** (à traiter / en cours / résolue). Aucune dose n'est inventée ; les corrections disent quoi mesurer ou compléter. Un **score structurel indicatif** (0–100) est calculé — jamais présenté comme une note agronomique.
+
+### Historique fiable + fiche détaillée
+- Lecture robuste (`select=*`) : une colonne encore absente en base ne casse plus l'historique.
+- Écriture tolérante : si une colonne manque, l'audit est enregistré en mode compatibilité plutôt que perdu.
+- `GET /api/quality/audit?id=…` : fiche complète d'un audit (métadonnées du plan si l'itinéraire existe encore, sinon « non disponible », jamais inventé).
+- `POST /api/quality/issue` : passe une anomalie à « à traiter / en cours / résolue » ; statut et score de l'audit recalculés et persistés.
+- Séparation nette audits / enregistrements de tests (`kind:"tests"` filtré).
+
+### Tableau de bord sur données réelles + filtres
+Agrégats réels : total, conformes, à vérifier, compteurs par gravité, résolues, dernier audit — avec distinction claire entre **absence de données** et **zéro**. Filtres par période, culture, statut et gravité.
+
+### Assistance IA facultative (non automatique)
+`POST /api/quality/suggest` réutilise `callClaude` et les variables d'environnement existantes pour proposer une reformulation prudente d'une anomalie, sur demande. Gardée par l'administrateur ; renvoie 503 si `ANTHROPIC_API_KEY` est absente ; aucune clé côté navigateur ; interdiction d'inventer des doses.
+
+### Sécurité & base
+Toutes les routes Quality Guard restent réservées à `ADMIN_EMAILS` ; entrées validées ; messages d'erreur sans fuite de secret. `schema.sql` ajoute les colonnes `kind, plan_title, issues, crop, region, score` (nullables) avec migration idempotente, sans suppression de données.
+
+### Tests réellement exécutés (chemin local, stockage fichier)
+- Banc de vérifications Quality Guard : **28/28** (détection, gravité, score, statuts, normalisation d'anciens enregistrements, agrégats, filtres).
+- Suite QA Terravive (non-régression ITK) : **33 tests / 176 vérifications**, SUCCÈS.
+- Intégration bout-en-bout (serveur réel, session admin) : **31/31** — contrôle → historique → fiche → résolution → persistance disque → filtres → 401/403 → validation des entrées.
+Non exécuté ici : le chemin Supabase/production réel (clé + réseau) et l'assistance IA (clé réelle) — vérifiés par relecture et par un échec réseau propre sous clé factice.
