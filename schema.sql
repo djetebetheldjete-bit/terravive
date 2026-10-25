@@ -195,7 +195,18 @@ create table if not exists trv_quality_audits (
   alert_count integer not null default 0,
   alerts jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
-  created_by text
+  created_by text,
+  -- Colonnes écrites par le serveur (voir handleQualityAudit / qualityListAudits).
+  -- Laissées NULLABLE : le serveur les fournit toujours, mais une ligne ancienne
+  -- sans ces valeurs reste valide.
+  kind text,          -- "audit" pour un contrôle d'itinéraire (les "tests" sont filtrés à la lecture)
+  plan_title text,    -- copie du titre (compatibilité ancien schéma de production)
+  issues jsonb        -- copie des alertes  (compatibilité ancien schéma de production)
 );
+-- Migration idempotente : ajoute les colonnes sur une table déjà créée en production
+-- sous l'ancien schéma (sans kind / plan_title / issues). Sans effet si elles existent.
+alter table trv_quality_audits add column if not exists kind text;
+alter table trv_quality_audits add column if not exists plan_title text;
+alter table trv_quality_audits add column if not exists issues jsonb;
 create index if not exists trv_quality_audits_created_idx
   on trv_quality_audits (created_at desc);

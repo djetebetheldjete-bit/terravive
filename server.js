@@ -70,7 +70,12 @@ async function sb(pathPart, opts = {}) {
     headers: Object.assign({ apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, opts.headers || {})
   }));
   const text = await res.text(); let data; try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
-  if (!res.ok) { const e = new Error("Base : erreur " + res.status); e.status = res.status; throw e; }
+  if (!res.ok) {
+    const detail = typeof data === "string" ? data : JSON.stringify(data);
+    const e = new Error("Base : erreur " + res.status + (detail ? " — " + detail.slice(0, 500) : ""));
+    e.status = res.status;
+    throw e;
+  }
   return data;
 }
 
@@ -1379,7 +1384,11 @@ async function qualityListPlans() {
 }
 async function qualityListAudits() {
   if (USE_DB) {
-    try { return (await sb("/trv_quality_audits?select=id,plan_id,title,status,alert_count,alerts,created_at&order=created_at.desc&limit=50")) || []; }
+    try {
+      const rows = (await sb("/trv_quality_audits?select=id,plan_id,title,status,alert_count,alerts,created_at,kind&order=created_at.desc&limit=100")) || [];
+      // Les enregistrements de banc de tests ne sont pas des audits d'itinéraires.
+      return rows.filter((row) => row.kind !== "tests").slice(0, 50);
+    }
     catch (e) { console.warn("Quality Guard history unavailable:", e.message); return []; }
   }
   const st = loadStore(); return (st.qualityAudits || []).slice().reverse().slice(0,50);
@@ -1411,7 +1420,20 @@ async function handleQualityAudit(req,res) {
     let saveWarning = null;
     if (USE_DB) {
       try {
-        await sb("/trv_quality_audits",{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify([{id:audit.id,plan_id:audit.plan_id,title:audit.title,status:audit.status,alert_count:audit.alert_count,alerts:audit.alerts,created_at:audit.created_at,created_by:audit.created_by}])});
+        await sb("/trv_quality_audits",{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify([{
+          id:audit.id,
+          plan_id:audit.plan_id,
+          title:audit.title,
+          status:audit.status,
+          alert_count:audit.alert_count,
+          alerts:audit.alerts,
+          created_at:audit.created_at,
+          created_by:audit.created_by,
+          // Compatibilité avec l'ancien schéma Supabase encore présent en production.
+          kind:"audit",
+          plan_title:audit.title,
+          issues:audit.alerts
+        }])});
       } catch (dbError) {
         // Le contrôle du contenu reste utile même si l'historique Supabase n'est pas encore configuré.
         saved = false;

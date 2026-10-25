@@ -66,3 +66,23 @@ Les pictogrammes du menu latéral étaient de simples caractères Unicode (▦ �
 - Boutons de l'entête : Actualiser → double flèche circulaire ; Lancer les vérifications → triangle « lecture ».
 
 Chaque icône hérite de la couleur du texte (`stroke="currentColor"`), donc elle s'affiche correctement sur le fond vert foncé du menu **comme** en blanc sur le bouton vert et en sombre sur l'onglet actif. Rien d'autre n'a changé.
+
+## v0.6.4 — historique Supabase fiabilisé (serveur + schéma alignés)
+
+Objectif : que l'historique des contrôles **s'enregistre et se relise** sans erreur, y compris sur la table de production existante.
+
+### Côté serveur (`server.js`)
+- **Erreurs Supabase explicites** : la fonction `sb()` ajoute désormais le corps de la réponse Supabase (tronqué à 500 caractères) au message d'erreur. Un échec d'enregistrement devient diagnosticable (« Base : erreur 400 — … ») au lieu d'un simple code.
+- **Écriture de l'audit** : l'insert fournit `kind:"audit"`, `plan_title` et `issues` (copies de `title` / `alerts`) pour rester compatible avec l'ancien schéma de production où ces colonnes existaient et bloquaient l'insert quand elles n'étaient pas remplies.
+- **Lecture de l'historique** (`qualityListAudits`) : la requête lit la colonne `kind`, charge jusqu'à 100 lignes et écarte celles marquées `kind:"tests"`, pour ne montrer que les audits d'itinéraires.
+
+### Côté base (`schema.sql`) — **l'ajout de cette version**
+La table `trv_quality_audits` déclare maintenant les trois colonnes utilisées par le serveur — `kind`, `plan_title`, `issues` — laissées **nullables** (le serveur les fournit toujours, mais une ligne ancienne sans ces valeurs reste valide). Une **migration idempotente** est ajoutée pour les bases déjà créées sous l'ancien schéma :
+
+```sql
+alter table trv_quality_audits add column if not exists kind text;
+alter table trv_quality_audits add column if not exists plan_title text;
+alter table trv_quality_audits add column if not exists issues jsonb;
+```
+
+Sans effet si les colonnes existent déjà. Après déploiement, exécuter ce bloc (ou l'intégralité de `schema.sql`) dans le SQL Editor de Supabase : le code et la base lisent et écrivent alors exactement les mêmes colonnes, sur une installation neuve **comme** sur l'existante. Logique de contrôle inchangée : auto-tests 11/11, suite QA 33 tests / 176 vérifications toujours au vert.
