@@ -2188,6 +2188,37 @@ async function handleStockProductGet(req, res) {
     sendJson(res, 200, { product: { ...p, on_hand: on, status: stkStatus(on, Number(p.min_qty || 0)) }, movements: movements.slice(0, 100) });
   } catch (e) { console.error("stock product get:", e.message); sendJson(res, 500, { error: "Impossible de charger ce produit." }); }
 }
+// Produits de démarrage : crée les légumes courants (avec images), à zéro stock. Idempotent.
+const STOCK_STARTER = [["Tomate","/stock/img/tomate.webp"],["Concombre","/stock/img/concombre.webp"],["Piment","/stock/img/piment.webp"],["Aubergine","/stock/img/aubergine.webp"],["Laitue","/stock/img/laitue.webp"],["Gombo","/stock/img/gombo.webp"],["Poivron","/stock/img/poivron.webp"]];
+async function handleStockSeedDefaults(req, res) {
+  const user = await stockGuard(req, res, "products"); if (!user) return;
+  try {
+    const have = new Set((await stkAll("stock_products")).map(p => String(p.name).toLowerCase()));
+    let added = 0;
+    for (const [name, img] of STOCK_STARTER) {
+      if (have.has(name.toLowerCase())) continue;
+      await stkInsert("stock_products", { id: stkId(), name, category: "Légume", unit: "kg", min_qty: 0, price: 0, producer_id: null, is_public: false, image: img, created_at: stkNow(), updated_at: stkNow(), created_by: user.email });
+      added++;
+    }
+    await stockLog("seed_defaults", user, { added });
+    sendJson(res, 200, { ok: true, added, skipped: STOCK_STARTER.length - added });
+  } catch (e) { console.error("stock seed:", e.message); sendJson(res, 500, { error: "Les produits de démarrage n'ont pas pu être ajoutés." }); }
+}
+// Suppression d'un produit : autorisée UNIQUEMENT s'il n'a aucun historique (mouvements/ventes),
+// pour préserver la traçabilité. Sinon on refuse proprement.
+async function handleStockProductDelete(req, res) {
+  const user = await stockGuard(req, res, "products"); if (!user) return;
+  try {
+    const b = JSON.parse(await readBody(req) || "{}");
+    const id = String(b.id || ""); const p = await stkGet("stock_products", id); if (!p) return sendJson(res, 404, { error: "Produit introuvable." });
+    if ((await stkAll("stock_movements")).some(m => m.product_id === id)) return sendJson(res, 400, { error: "Ce produit a un historique de mouvements (récoltes, ventes…) : il ne peut pas être supprimé, pour garder la traçabilité. Vous pouvez le modifier à la place." });
+    if ((await stkAll("stock_sale_items")).some(i => i.product_id === id)) return sendJson(res, 400, { error: "Ce produit figure dans des ventes : il ne peut pas être supprimé." });
+    if (USE_DB) await sb(`/trv_stock_products?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    else { const s = stkLoad(); s.stock_products = s.stock_products.filter(x => x.id !== id); saveStore(s); }
+    await stockLog("product_delete", user, { product_id: id, name: p.name });
+    sendJson(res, 200, { ok: true });
+  } catch (e) { console.error("stock product delete:", e.message); sendJson(res, 500, { error: "La suppression n'a pas pu aboutir." }); }
+}
 
 // ---------- Producteurs ----------
 async function handleStockProducers(req, res) {
@@ -2488,6 +2519,8 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && url === "/api/stock/products") return handleStockProducts(req, res);
   if (req.method === "POST" && url === "/api/stock/products") return handleStockProductCreate(req, res);
   if (req.method === "POST" && url === "/api/stock/products/update") return handleStockProductUpdate(req, res);
+  if (req.method === "POST" && url === "/api/stock/products/seed-defaults") return handleStockSeedDefaults(req, res);
+  if (req.method === "POST" && url === "/api/stock/products/delete") return handleStockProductDelete(req, res);
   if (req.method === "GET" && url === "/api/stock/product") return handleStockProductGet(req, res);
   if (req.method === "GET" && url === "/api/stock/producers") return handleStockProducers(req, res);
   if (req.method === "POST" && url === "/api/stock/producers") return handleStockProducerCreate(req, res);

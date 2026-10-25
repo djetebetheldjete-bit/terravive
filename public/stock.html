@@ -99,7 +99,7 @@ input,select,textarea{border:1px solid var(--line);border-radius:10px;padding:9p
 
  <!-- Produits -->
  <section class="view" id="view-products">
-  <div class="toolbar"><input id="prodSearch" placeholder="Rechercher un produit…" style="max-width:260px"><button class="btn small primary perm-products" id="addProduct" type="button">+ Nouveau produit</button><button class="btn small perm-export" id="expProducts" type="button">Exporter CSV</button></div>
+  <div class="toolbar"><input id="prodSearch" placeholder="Rechercher un produit…" style="max-width:260px"><button class="btn small primary perm-products" id="addProduct" type="button">+ Nouveau produit</button><button class="btn small perm-products" id="seedProducts" type="button">Produits de démarrage</button><button class="btn small perm-export" id="expProducts" type="button">Exporter CSV</button></div>
   <section class="card"><div class="table-wrap"><table><thead><tr><th>Produit</th><th>Catégorie</th><th>Disponible</th><th>Seuil</th><th>Prix</th><th>Statut</th><th>Producteur</th><th></th></tr></thead><tbody id="productsBody"><tr><td colspan="8" class="empty">Chargement…</td></tr></tbody></table></div></section>
  </section>
 
@@ -228,8 +228,21 @@ function renderProducts(list){
  const q=($('prodSearch').value||'').toLowerCase();
  const rows=list.filter(p=>!q||p.name.toLowerCase().includes(q));
  const editable=can('products');
- $('productsBody').innerHTML=rows.length?rows.map(p=>`<tr><td><div class="prodcell">${prodThumb(p)}<strong>${esc(p.name)}</strong></div></td><td>${esc(p.category||'—')}</td><td>${qty(p.on_hand)} ${esc(UNIT_LABEL[p.unit]||p.unit)}</td><td>${qty(p.min_qty)}</td><td>${money(p.price)}</td><td>${statusBadge(p.status)}</td><td>${esc(p.producer_name||'—')}</td><td>${editable?`<button class="btn small editP" data-id="${esc(p.id)}" type="button">Modifier</button>`:''}</td></tr>`).join(''):'<tr><td colspan="8" class="empty">Aucun produit. Cliquez « Nouveau produit » pour commencer.</td></tr>';
+ $('productsBody').innerHTML=rows.length?rows.map(p=>`<tr><td><div class="prodcell">${prodThumb(p)}<strong>${esc(p.name)}</strong></div></td><td>${esc(p.category||'—')}</td><td>${qty(p.on_hand)} ${esc(UNIT_LABEL[p.unit]||p.unit)}</td><td>${qty(p.min_qty)}</td><td>${money(p.price)}</td><td>${statusBadge(p.status)}</td><td>${esc(p.producer_name||'—')}</td><td>${editable?`<button class="btn small editP" data-id="${esc(p.id)}" type="button">Modifier</button> <button class="btn small danger delP" data-id="${esc(p.id)}" data-name="${esc(p.name)}" type="button" title="Supprimer">Supprimer</button>`:''}</td></tr>`).join(''):`<tr><td colspan="8" class="empty">Aucun produit pour l'instant. Cliquez « + Nouveau produit », ou « Produits de démarrage » pour ajouter les légumes courants en un clic.</td></tr>`;
  document.querySelectorAll('.editP').forEach(b=>b.addEventListener('click',()=>editProduct(b.dataset.id)));
+ document.querySelectorAll('.delP').forEach(b=>b.addEventListener('click',()=>delProduct(b.dataset.id,b.dataset.name)));
+}
+function delProduct(id,name){
+ confirmDo('Supprimer le produit « '+name+' » ? (possible seulement s\'il n\'a aucun historique)',async()=>{
+  try{await api('/api/stock/products/delete',{method:'POST',body:JSON.stringify({id})});notice('Produit supprimé.','ok');loadProducts();}
+  catch(e){notice(e.message,'err');}
+ });
+}
+async function seedProducts(){
+ confirmDo('Ajouter les produits de démarrage (tomate, concombre, piment, aubergine, laitue, gombo, poivron) ? Ils seront créés à zéro stock, avec leur image — vous pourrez les modifier, fixer les prix, ou les retirer.',async()=>{
+  try{const d=await api('/api/stock/products/seed-defaults',{method:'POST',body:'{}'});notice(d.added+' produit(s) ajouté(s)'+(d.skipped?(' · '+d.skipped+' déjà présent(s)'):'')+'.','ok');loadProducts();}
+  catch(e){notice(e.message,'err');}
+ });
 }
 $('prodSearch')&&$('prodSearch').addEventListener('input',()=>renderProducts(PRODUCTS));
 
@@ -375,6 +388,7 @@ function payModal(s){modal(`<h3>Enregistrer un paiement</h3><p class="muted smal
  $('paySave').addEventListener('click',async()=>{try{await api('/api/stock/payments',{method:'POST',body:JSON.stringify({sale_id:s.id,amount:$('payAmt').value,method:$('payMethod').value,reference:$('payRef').value})});closeModal();notice('Paiement enregistré.','ok');openSale(s.id);}catch(e){notice(e.message,'err');}});
 }
 // Exports
+$('seedProducts')&&$('seedProducts').addEventListener('click',seedProducts);
 $('expProducts')&&$('expProducts').addEventListener('click',()=>{window.location='/api/stock/export.csv?type=products';});
 $('expSales')&&$('expSales').addEventListener('click',()=>{window.location='/api/stock/export.csv?type=sales';});
 $('refresh').addEventListener('click',()=>loadView(VIEW));
