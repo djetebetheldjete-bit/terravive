@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="fr" data-theme="nature">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terravive — Stock</title>
+<style>
+:root{--leaf:#176443;--deep:#123e2a;--sun:#C58A2A;--line:#dce6d9;--bg:#eef4ec;--surface:#fff;--surface2:#f5f8f4;--ink:#15251B;--soft:#53625a;--faint:#8a988e;--good:#2E8B6F;--warn:#C58A2A;--bad:#c0392b;--sidebar:#123e2a;--sidebar-ink:#dfeee3;--sidebar-active:#fff;--sidebar-active-ink:#14261a;--shadow:0 8px 28px rgba(20,50,30,.08)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,Arial,sans-serif}button,a,input,select,textarea{font:inherit}a{color:inherit;text-decoration:none}
+.layout{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.sidebar{background:var(--sidebar);color:var(--sidebar-ink);padding:24px 16px;display:flex;flex-direction:column;gap:6px}
+.brand{display:flex;gap:10px;align-items:center;padding:0 8px 22px}.brand img{width:38px;height:38px;object-fit:contain}.brand strong{display:block;color:#fff;font:700 23px Georgia,serif}.brand small{font-size:12px;opacity:.8}
+.nav{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;color:var(--sidebar-ink);font:600 15px "Segoe UI",system-ui,Arial,sans-serif;cursor:pointer;background:none;border:0;width:100%;text-align:left}
+.nav.active{background:var(--sidebar-active);color:var(--sidebar-active-ink)}.nav:hover{background:rgba(255,255,255,.12)}.nav svg{width:18px;height:18px;flex:0 0 auto}
+.nav:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #8ec6a1;outline-offset:2px}
+.sidebar-foot{margin-top:auto;font-size:12px;opacity:.75;padding:10px 8px}
+.main{padding:28px clamp(16px,3vw,42px);min-width:0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.11em;color:var(--leaf);font-weight:800}
+.title{font:700 clamp(24px,3vw,34px) Georgia,serif;margin:4px 0;color:var(--deep)}.muted{color:var(--soft)}.small{font-size:12px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:10px 15px;cursor:pointer;font-weight:700;display:inline-flex;align-items:center;gap:7px}
+.btn.primary{background:var(--leaf);border-color:var(--leaf);color:#fff}.btn.ghost{background:transparent}.btn.danger{background:#fdeceb;border-color:#f0c9c6;color:var(--bad)}
+.btn:hover{filter:brightness(.97)}.btn:disabled{opacity:.55;cursor:default}.btn svg{width:15px;height:15px}.btn.small{padding:7px 11px;font-size:13px;border-radius:10px}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:16px 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:17px;box-shadow:var(--shadow);padding:20px;min-width:0}
+.metric-label{font-size:13px;color:var(--soft)}.metric{font:700 28px Georgia,serif;margin:8px 0 2px;color:var(--deep)}.metric-note{font-size:12px;color:var(--faint)}.metric.bad{color:var(--bad)}.metric.warn{color:#8a5b00}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}.section-head h2{font:700 21px Georgia,serif;color:var(--deep);margin:0}
+.dash2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}.rank{list-style:none;padding:0;margin:6px 0 0}.rank li{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}.rank li:last-child{border-bottom:0}.rank b{color:var(--deep)}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:620px}th,td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);font-size:13px}th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--soft)}
+.badge{display:inline-block;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:800}
+.badge.ok{background:#e6f4e9;color:var(--good)}.badge.bas{background:#fff2d8;color:#8a5b00}.badge.rupture{background:#fde8e7;color:var(--bad)}
+.badge.brouillon{background:#eef1ee;color:#53625a}.badge.validee{background:#e6f4e9;color:var(--good)}.badge.annulee{background:#fde8e7;color:var(--bad)}
+.badge.solde{background:#e6f4e9;color:var(--good)}.badge.partiel{background:#fff2d8;color:#8a5b00}.badge.impaye{background:#fde8e7;color:var(--bad)}
+.alert{border:1px solid #efd8a9;background:#fff8e9;color:#875c12;border-radius:13px;padding:13px 16px;margin:14px 0;font-size:13px}.alert.err{border-color:#f0c9c6;background:#fdeceb;color:#9c2a21}.alert.ok{border-color:#bfe3cc;background:#eaf5ee;color:#1f6b45}
+.empty{padding:26px;text-align:center;color:var(--soft)}.status{padding:12px;border-radius:12px;background:var(--surface2);color:var(--soft);margin-top:10px}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--leaf);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-3px;margin-right:8px}@keyframes sp{to{transform:rotate(360deg)}}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+input,select,textarea{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--surface);color:var(--ink);width:100%}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}.field label{font-size:12px;font-weight:700;color:var(--soft)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hidden{display:none!important}.view{display:none}.view.active{display:block}
+.modal-bg{position:fixed;inset:0;background:rgba(18,40,27,.45);display:flex;align-items:flex-start;justify-content:center;padding:34px 16px;z-index:50;overflow:auto}
+.modal{background:var(--surface);border-radius:18px;box-shadow:0 20px 60px rgba(20,50,30,.25);width:100%;max-width:560px;padding:22px}
+.modal h3{font:700 20px Georgia,serif;color:var(--deep);margin:0 0 14px}
+.sale-line{display:grid;grid-template-columns:1fr 80px 110px 90px 34px;gap:8px;align-items:center;margin-bottom:8px}
+.sale-line .sub{font-weight:700;text-align:right}
+.tot{display:flex;justify-content:space-between;font:700 18px Georgia,serif;color:var(--deep);border-top:2px solid var(--line);padding-top:10px;margin-top:8px}
+@media(max-width:1000px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:210px minmax(0,1fr)}.dash2{grid-template-columns:1fr}}
+@media(max-width:700px){.layout{display:block}.sidebar{flex-direction:row;flex-wrap:wrap;padding:12px}.brand{padding:0;margin-right:auto}.sidebar-foot{display:none}.nav{width:auto;font-size:12px;padding:9px 10px}.main{padding:18px 14px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.row2{grid-template-columns:1fr}.sale-line{grid-template-columns:1fr 1fr;gap:6px}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+ <div class="brand"><img src="/logo.png" alt="Terravive"><div><strong>Terravive</strong><small>Stock</small></div></div>
+ <button class="nav active" data-view="dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> Tableau de bord</button>
+ <button class="nav" data-view="products"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg> Produits & stock</button>
+ <button class="nav" data-view="harvests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20c0-6 3-11 8-13-1 7-4 11-8 13z"/><path d="M12 20C8 16 5 11 4 5c5 2 8 7 8 13z"/></svg> Récoltes</button>
+ <button class="nav" data-view="sales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l4 4v16H6z"/><path d="M9 11h6M9 15h6M9 7h3"/></svg> Ventes & paiements</button>
+ <button class="nav" data-view="losses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg> Pertes & qualité</button>
+ <button class="nav" data-view="producers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><path d="M16 5.5a3 3 0 0 1 0 5.5M21 20c0-2.4-1.8-4.2-4-4.8"/></svg> Producteurs</button>
+ <button class="nav" id="navJournal" data-view="journal" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg> Journal</button>
+ <a class="nav" href="/tableau"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6l-6 6 6 6"/><path d="M4 12h16"/></svg> Retour à Terravive</a>
+ <div class="sidebar-foot">Gestion des stocks de la coopérative. Les quantités se calculent à partir des mouvements enregistrés.</div>
+</aside>
+<main class="main">
+ <header class="top"><div><div class="eyebrow" id="roleTag">Gestion des stocks</div><h1 class="title" id="viewTitle">Tableau de bord</h1></div>
+  <div class="actions"><button class="btn" id="refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8"/><path d="M20 4v4h-4"/><path d="M20 12a8 8 0 0 1-13.7 5.7L4 16"/><path d="M4 20v-4h4"/></svg>Actualiser</button></div>
+ </header>
+ <div id="notice" class="alert" role="status" aria-live="polite">Chargement…</div>
+
+ <!-- Tableau de bord -->
+ <section class="view active" id="view-dash">
+  <div class="toolbar"><label class="small muted">Du <input type="date" id="dFrom" style="width:auto;display:inline-block"></label><label class="small muted">Au <input type="date" id="dTo" style="width:auto;display:inline-block"></label><button class="btn small primary" id="dApply" type="button">Filtrer</button><button class="btn small ghost" id="dReset" type="button">Réinitialiser</button></div>
+  <div class="grid">
+   <article class="card"><div class="metric-label">Produits</div><div class="metric" id="mProducts">—</div><div class="metric-note">Références suivies</div></article>
+   <article class="card"><div class="metric-label">Stock bas</div><div class="metric warn" id="mLow">—</div><div class="metric-note">Sous le seuil d'alerte</div></article>
+   <article class="card"><div class="metric-label">En rupture</div><div class="metric bad" id="mOut">—</div><div class="metric-note">Disponible à zéro</div></article>
+   <article class="card"><div class="metric-label">Valeur du stock</div><div class="metric" id="mValue" style="font-size:22px">—</div><div class="metric-note">Disponible × prix</div></article>
+   <article class="card"><div class="metric-label">Chiffre d'affaires</div><div class="metric" id="mRevenue" style="font-size:22px">—</div><div class="metric-note">Ventes validées (période)</div></article>
+   <article class="card"><div class="metric-label">Paiements reçus</div><div class="metric" id="mPaid" style="font-size:22px">—</div><div class="metric-note">Sur la période</div></article>
+   <article class="card"><div class="metric-label">Créances</div><div class="metric warn" id="mReceiv" style="font-size:22px">—</div><div class="metric-note">Restant à encaisser</div></article>
+   <article class="card"><div class="metric-label">Pertes</div><div class="metric bad" id="mLoss" style="font-size:22px">—</div><div class="metric-note">Valeur estimée (période)</div></article>
+  </div>
+  <div class="dash2">
+   <section class="card"><div class="section-head"><h2>Produits les plus vendus</h2></div><ul class="rank" id="topProducts"><li class="muted">—</li></ul></section>
+   <section class="card"><div class="section-head"><h2>Derniers mouvements</h2></div><ul class="rank" id="recentMoves"><li class="muted">—</li></ul></section>
+  </div>
+ </section>
+
+ <!-- Produits -->
+ <section class="view" id="view-products">
+  <div class="toolbar"><input id="prodSearch" placeholder="Rechercher un produit…" style="max-width:260px"><button class="btn small primary perm-products" id="addProduct" type="button">+ Nouveau produit</button><button class="btn small perm-export" id="expProducts" type="button">Exporter CSV</button></div>
+  <section class="card"><div class="table-wrap"><table><thead><tr><th>Produit</th><th>Catégorie</th><th>Disponible</th><th>Seuil</th><th>Prix</th><th>Statut</th><th>Producteur</th></tr></thead><tbody id="productsBody"><tr><td colspan="7" class="empty">Chargement…</td></tr></tbody></table></div></section>
+ </section>
+
+ <!-- Récoltes -->
+ <section class="view" id="view-harvests">
+  <div class="toolbar"><button class="btn small primary perm-harvest" id="addHarvest" type="button">+ Enregistrer une récolte</button></div>
+  <section class="card"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Produit</th><th>Producteur</th><th>Quantité</th><th>Qualité</th><th>Parcelle</th><th>Lot</th></tr></thead><tbody id="harvestsBody"><tr><td colspan="7" class="empty">Chargement…</td></tr></tbody></table></div></section>
+ </section>
+
+ <!-- Ventes -->
+ <section class="view" id="view-sales">
+  <div class="toolbar"><button class="btn small primary perm-sale" id="addSale" type="button">+ Nouvelle vente</button><button class="btn small perm-export" id="expSales" type="button">Exporter CSV</button></div>
+  <div id="saleDetail"></div>
+  <section class="card" id="salesList"><div class="table-wrap"><table><thead><tr><th>Référence</th><th>Date</th><th>Client</th><th>Statut</th><th>Total</th><th>Reste</th><th>Action</th></tr></thead><tbody id="salesBody"><tr><td colspan="7" class="empty">Chargement…</td></tr></tbody></table></div></section>
+ </section>
+
+ <!-- Pertes -->
+ <section class="view" id="view-losses">
+  <div class="toolbar"><button class="btn small primary perm-loss" id="addLoss" type="button">+ Enregistrer une perte</button></div>
+  <section class="card"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Produit</th><th>Quantité</th><th>Cause</th><th>Valeur estimée</th><th>Note</th></tr></thead><tbody id="lossesBody"><tr><td colspan="6" class="empty">Chargement…</td></tr></tbody></table></div></section>
+ </section>
+
+ <!-- Producteurs -->
+ <section class="view" id="view-producers">
+  <div class="toolbar"><button class="btn small primary perm-producers" id="addProducer" type="button">+ Nouveau producteur</button></div>
+  <section class="card"><div class="table-wrap"><table><thead><tr><th>Nom</th><th>Téléphone</th><th>Région</th><th>Coopérative</th><th>Vitrine</th></tr></thead><tbody id="producersBody"><tr><td colspan="5" class="empty">Chargement…</td></tr></tbody></table></div></section>
+ </section>
+
+ <!-- Journal -->
+ <section class="view" id="view-journal">
+  <section class="card"><div class="section-head"><h2>Journal des actions</h2><span class="muted small">Lecture seule, sans aucun secret</span></div><div id="journalBody" class="status">Chargement…</div></section>
+ </section>
+</main>
+</div>
+<div id="modalRoot"></div>
+<script>
+const $=id=>document.getElementById(id);
+async function api(url,opts={}){const r=await fetch(url,{credentials:'same-origin',...opts,headers:{'content-type':'application/json',...(opts.headers||{})}});let j={};try{j=await r.json()}catch{}if(!r.ok){const e=new Error(j.error||('Erreur HTTP '+r.status));e.status=r.status;throw e}return j}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+const fXOF=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'XOF',maximumFractionDigits:0});
+const fNum=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:3});
+function money(v){return (v===null||v===undefined||isNaN(v))?'—':fXOF.format(Number(v))}
+function qty(v){return (v===null||v===undefined||isNaN(v))?'—':fNum.format(Number(v))}
+function date(v){if(!v)return '—';const d=new Date(v);return isNaN(d)?esc(v):d.toLocaleDateString('fr-FR')}
+function datetime(v){if(!v)return '—';const d=new Date(v);return isNaN(d)?esc(v):d.toLocaleString('fr-FR')}
+const UNIT_LABEL={kg:'kg',g:'g',t:'t',l:'L',unite:'unité',caisse:'caisse',sac:'sac'};
+const CAUSE_LABEL={pourriture:'Pourriture',degradation:'Dégradation',invendu:'Invendu',transport:'Transport',stockage:'Stockage',autre:'Autre'};
+const PAY_LABEL={especes:'Espèces',mobile_money:'Mobile Money',virement:'Virement',livraison:'À la livraison'};
+const PERMS={admin:["read","products","harvest","sale","validate","loss","payment","producers","export","logs"],operateur:["read","products","harvest","sale","validate","loss","payment","producers","export"],lecteur:["read","export"]};
+let ROLE=null,UNITS=["kg"],PRODUCTS=[],PRODUCERS=[];
+function can(a){return !!ROLE&&PERMS[ROLE]&&PERMS[ROLE].indexOf(a)>=0}
+function notice(msg,kind){$('notice').textContent=msg;$('notice').className='alert'+(kind?' '+kind:'')}
+function statusBadge(s){const l={ok:'En stock',bas:'Stock bas',rupture:'Rupture'};return `<span class="badge ${s}">${l[s]||s}</span>`}
+function saleBadge(s){const l={brouillon:'Brouillon',validee:'Validée',annulee:'Annulée'};return `<span class="badge ${s}">${l[s]||s}</span>`}
+
+// ---- Navigation ----
+let VIEW='dash';
+const TITLES={dash:'Tableau de bord',products:'Produits & stock',harvests:'Récoltes',sales:'Ventes & paiements',losses:'Pertes & qualité',producers:'Producteurs',journal:'Journal'};
+function setView(v){VIEW=v;document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===v));document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+v));$('viewTitle').textContent=TITLES[v]||'';$('saleDetail').innerHTML='';loadView(v);}
+document.querySelectorAll('.nav[data-view]').forEach(n=>n.addEventListener('click',()=>setView(n.dataset.view)));
+
+// ---- Chargement initial (rôle + permissions) ----
+async function boot(){
+ try{const d=await api('/api/stock/overview');ROLE=d.role;$('roleTag').textContent='Rôle : '+(ROLE||'—');
+  document.querySelectorAll('[class*="perm-"]').forEach(el=>{const m=(el.className.match(/perm-(\w+)/)||[])[1];if(m)el.style.display=can(m)?'':'none';});
+  $('navJournal').style.display=can('logs')?'':'none';
+  renderDash(d);notice('Données réelles chargées. '+(d.public_enabled?'Vitrine publique activée.':'Vitrine publique désactivée.'),'ok');
+ }catch(e){
+  if(e.status===401)notice('Connectez-vous à Terravive, puis rechargez cette page.','err');
+  else if(e.status===403)notice("Accès refusé : votre compte n'a pas de rôle Stock. Vérifiez STOCK_ADMINS / STOCK_OPERATORS / STOCK_VIEWERS (ou ADMIN_EMAILS) sur Render.",'err');
+  else notice(e.message||'Impossible de charger le module.','err');
+ }
+}
+async function loadView(v){
+ try{
+  if(v==='dash'){const d=await api('/api/stock/overview'+dashQS());renderDash(d);}
+  else if(v==='products')await loadProducts();
+  else if(v==='harvests')await loadHarvests();
+  else if(v==='sales')await loadSales();
+  else if(v==='losses')await loadLosses();
+  else if(v==='producers')await loadProducers();
+  else if(v==='journal')await loadJournal();
+ }catch(e){notice(e.message||'Erreur de chargement.','err');}
+}
+function dashQS(){const f=$('dFrom').value,t=$('dTo').value;const p=[];if(f)p.push('from='+f);if(t)p.push('to='+t);return p.length?'?'+p.join('&'):''}
+function renderDash(d){const m=d.metrics||{};
+ $('mProducts').textContent=m.products;$('mLow').textContent=m.low_stock;$('mOut').textContent=m.out_of_stock;
+ $('mValue').textContent=money(m.stock_value);$('mRevenue').textContent=money(m.revenue);$('mPaid').textContent=money(m.paid);
+ $('mReceiv').textContent=money(m.receivables);$('mLoss').textContent=money(m.loss_value);
+ $('topProducts').innerHTML=(d.top_products&&d.top_products.length)?d.top_products.map(p=>`<li><span>${esc(p.name)}</span><b>${qty(p.qty)}</b></li>`).join(''):'<li class="muted">Aucune vente validée pour l\'instant.</li>';
+ $('recentMoves').innerHTML=(d.recent_movements&&d.recent_movements.length)?d.recent_movements.map(m=>`<li><span>${m.type==='in'?'▲':'▼'} ${esc(m.product_name)} <span class="muted small">(${esc(m.reason)})</span></span><b>${qty(m.qty)}</b></li>`).join(''):'<li class="muted">Aucun mouvement enregistré.</li>';
+ if(m.products===0)notice('Votre stock est vide. Commencez par créer un produit, puis enregistrez une récolte.','');
+}
+$('dApply').addEventListener('click',()=>loadView('dash'));
+$('dReset').addEventListener('click',()=>{$('dFrom').value='';$('dTo').value='';loadView('dash');});
+
+// ---- Produits ----
+async function loadProducts(){
+ const d=await api('/api/stock/products');PRODUCTS=d.products;UNITS=d.units||UNITS;
+ renderProducts(PRODUCTS);
+}
+function renderProducts(list){
+ const q=($('prodSearch').value||'').toLowerCase();
+ const rows=list.filter(p=>!q||p.name.toLowerCase().includes(q));
+ $('productsBody').innerHTML=rows.length?rows.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${esc(p.category||'—')}</td><td>${qty(p.on_hand)} ${esc(UNIT_LABEL[p.unit]||p.unit)}</td><td>${qty(p.min_qty)}</td><td>${money(p.price)}</td><td>${statusBadge(p.status)}</td><td>${esc(p.producer_name||'—')}</td></tr>`).join(''):'<tr><td colspan="7" class="empty">Aucun produit. Cliquez « Nouveau produit » pour commencer.</td></tr>';
+}
+$('prodSearch')&&$('prodSearch').addEventListener('input',()=>renderProducts(PRODUCTS));
+
+// ---- Récoltes ----
+async function loadHarvests(){const d=await api('/api/stock/harvests');
+ $('harvestsBody').innerHTML=d.harvests.length?d.harvests.map(h=>`<tr><td>${date(h.harvested_at||h.created_at)}</td><td><strong>${esc(h.product_name)}</strong></td><td>${esc(h.producer_name||'—')}</td><td>${qty(h.qty)} ${esc(UNIT_LABEL[h.unit]||h.unit)}</td><td>${esc(h.quality||'—')}</td><td>${esc(h.parcel||'—')}</td><td>${esc(h.batch_ref||'—')}</td></tr>`).join(''):'<tr><td colspan="7" class="empty">Aucune récolte enregistrée.</td></tr>';
+}
+// ---- Pertes ----
+async function loadLosses(){const d=await api('/api/stock/losses');
+ $('lossesBody').innerHTML=d.losses.length?d.losses.map(l=>`<tr><td>${date(l.lost_at||l.created_at)}</td><td><strong>${esc(l.product_name)}</strong></td><td>${qty(l.qty)}</td><td>${esc(CAUSE_LABEL[l.cause]||l.cause)}</td><td>${money(l.value)}</td><td>${esc(l.note||'—')}</td></tr>`).join(''):'<tr><td colspan="6" class="empty">Aucune perte enregistrée.</td></tr>';
+}
+// ---- Producteurs ----
+async function loadProducers(){const d=await api('/api/stock/producers');PRODUCERS=d.producers;
+ $('producersBody').innerHTML=d.producers.length?d.producers.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${esc(p.phone||'—')}</td><td>${esc(p.region||'—')}</td><td>${esc(p.cooperative||'—')}</td><td>${p.consent_public?'Oui':'Non'}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">Aucun producteur enregistré.</td></tr>';
+}
+// ---- Journal ----
+async function loadJournal(){const d=await api('/api/stock/logs');
+ $('journalBody').innerHTML=d.logs.length?'<div class="table-wrap"><table><thead><tr><th>Date</th><th>Action</th><th>Utilisateur</th><th>Référence</th></tr></thead><tbody>'+d.logs.map(l=>`<tr><td>${datetime(l.created_at)}</td><td><b>${esc(l.action)}</b></td><td>${esc(l.actor||'—')}</td><td class="small muted">${esc(JSON.stringify(l.ref||{}))}</td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Journal vide.</div>';
+}
+// ---- Ventes ----
+async function loadSales(){const d=await api('/api/stock/sales');
+ $('salesBody').innerHTML=d.sales.length?d.sales.map(s=>`<tr><td><strong>${esc(s.reference)}</strong></td><td>${date(s.sold_at||s.created_at)}</td><td>${esc(s.customer_name||'—')}</td><td>${saleBadge(s.status)}</td><td>${money(s.total)}</td><td>${money(s.remaining)}</td><td><button class="btn small openSale" data-id="${esc(s.id)}" type="button">Ouvrir</button></td></tr>`).join(''):'<tr><td colspan="7" class="empty">Aucune vente. Cliquez « Nouvelle vente ».</td></tr>';
+ document.querySelectorAll('.openSale').forEach(b=>b.addEventListener('click',()=>openSale(b.dataset.id)));
+}
+async function openSale(id){
+ try{const d=await api('/api/stock/sale?id='+encodeURIComponent(id));renderSale(d);}
+ catch(e){notice(e.message,'err');}
+}
+function renderSale(d){
+ const s=d.sale;$('salesList').classList.add('hidden');
+ const canEdit=can('validate'),canPay=can('payment');
+ const settle={solde:'Soldé',partiel:'Partiel',impaye:'Impayé'}[s.settlement]||s.settlement;
+ const acts=[];
+ if(s.status==='brouillon'&&canEdit)acts.push(`<button class="btn small primary" id="valSale" type="button">Valider la vente</button>`);
+ if(s.status!=='annulee'&&canEdit)acts.push(`<button class="btn small danger" id="canSale" type="button">Annuler</button>`);
+ if(s.status==='validee'&&canPay&&s.remaining>0)acts.push(`<button class="btn small" id="paySale" type="button">Enregistrer un paiement</button>`);
+ acts.push(`<button class="btn small" id="printSale" type="button">Imprimer le reçu</button>`);
+ $('saleDetail').innerHTML=`<section class="card"><div class="section-head"><div><h2>Vente ${esc(s.reference)}</h2><div class="muted small">${esc(s.customer_name||'Client non précisé')} · ${date(s.sold_at||s.created_at)}</div></div><button class="btn small ghost" id="closeSale" type="button">← Liste des ventes</button></div>
+  <div style="margin:4px 0 12px">${saleBadge(s.status)} <span class="badge ${s.settlement}">${settle}</span></div>
+  <div class="table-wrap"><table><thead><tr><th>Produit</th><th>Quantité</th><th>Prix unitaire</th><th>Sous-total</th></tr></thead><tbody>${d.items.map(i=>`<tr><td>${esc(i.product_name)}</td><td>${qty(i.qty)}</td><td>${money(i.unit_price)}</td><td>${money(i.subtotal)}</td></tr>`).join('')}</tbody></table></div>
+  <div class="tot"><span>Total</span><span>${money(s.total)}</span></div>
+  <div class="tot" style="border:0;font-size:15px;color:var(--soft)"><span>Payé</span><span>${money(s.paid)}</span></div>
+  <div class="tot" style="border:0;font-size:15px"><span>Reste à payer</span><span>${money(s.remaining)}</span></div>
+  ${d.payments.length?`<div class="muted small" style="margin-top:10px"><b>Paiements :</b> ${d.payments.map(p=>money(p.amount)+' ('+(PAY_LABEL[p.method]||p.method)+')').join(', ')}</div>`:''}
+  <div class="toolbar" style="margin-top:16px">${acts.join('')}</div></section>`;
+ $('closeSale').addEventListener('click',()=>{$('saleDetail').innerHTML='';$('salesList').classList.remove('hidden');});
+ if($('valSale'))$('valSale').addEventListener('click',()=>confirmDo('Valider cette vente ? Le stock sera décrémenté.',async()=>{await api('/api/stock/sales/validate',{method:'POST',body:JSON.stringify({id:s.id})});notice('Vente validée, stock mis à jour.','ok');openSale(s.id);}));
+ if($('canSale'))$('canSale').addEventListener('click',()=>confirmDo('Annuler cette vente ? Si elle était validée, le stock sera recrédité (traçable).',async()=>{await api('/api/stock/sales/cancel',{method:'POST',body:JSON.stringify({id:s.id})});notice('Vente annulée.','ok');openSale(s.id);}));
+ if($('paySale'))$('paySale').addEventListener('click',()=>payModal(s));
+ $('printSale').addEventListener('click',()=>printReceipt(s,d.items));
+}
+function printReceipt(s,items){
+ const w=window.open('','_blank');if(!w){alert('Autorisez les pop-up pour imprimer.');return;}
+ w.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Reçu ${esc(s.reference)}</title><style>body{font:13px "Segoe UI",Arial,sans-serif;margin:28px;color:#15251B}h1{font:700 22px Georgia,serif;color:#123e2a;margin:0}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{text-align:left;padding:7px 6px;border-bottom:1px solid #dce6d9;font-size:13px}.tot{display:flex;justify-content:space-between;font-weight:700;border-top:2px solid #dce6d9;padding-top:8px;margin-top:6px}.foot{margin-top:22px;font-size:11px;color:#8a988e}</style></head><body><h1>Terravive — Reçu de vente</h1><div>Référence : <b>${esc(s.reference)}</b> · ${date(s.sold_at||s.created_at)}<br>Client : ${esc(s.customer_name||'—')} · Statut : ${esc(s.status)}</div><table><thead><tr><th>Produit</th><th>Qté</th><th>P.U.</th><th>Sous-total</th></tr></thead><tbody>${items.map(i=>`<tr><td>${esc(i.product_name)}</td><td>${qty(i.qty)}</td><td>${money(i.unit_price)}</td><td>${money(i.subtotal)}</td></tr>`).join('')}</tbody></table><div class="tot"><span>Total</span><span>${money(s.total)}</span></div><div class="tot" style="border:0"><span>Payé</span><span>${money(s.paid)}</span></div><div class="tot" style="border:0"><span>Reste</span><span>${money(s.remaining)}</span></div><div class="foot">Montants en FCFA (XOF). Reçu généré le ${new Date().toLocaleString('fr-FR')} par Terravive Stock.</div><script>window.onload=function(){setTimeout(function(){window.print()},200)}<\/script></body></html>`);
+ w.document.close();
+}
+
+// ---- Modales / formulaires ----
+function modal(html){$('modalRoot').innerHTML=`<div class="modal-bg"><div class="modal">${html}</div></div>`;$('modalRoot').querySelector('.modal-bg').addEventListener('click',e=>{if(e.target.classList.contains('modal-bg'))closeModal();});}
+function closeModal(){$('modalRoot').innerHTML='';}
+function confirmDo(msg,fn){modal(`<h3>Confirmation</h3><p>${esc(msg)}</p><div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" id="mNo" type="button">Annuler</button><button class="btn small primary" id="mYes" type="button">Confirmer</button></div>`);$('mNo').addEventListener('click',closeModal);$('mYes').addEventListener('click',async()=>{try{closeModal();await fn();}catch(e){notice(e.message,'err');}});}
+function unitOpts(sel){return UNITS.map(u=>`<option value="${u}"${u===sel?' selected':''}>${UNIT_LABEL[u]||u}</option>`).join('')}
+function prodOpts(){return PRODUCTS.map(p=>`<option value="${esc(p.id)}">${esc(p.name)} (${qty(p.on_hand)} ${esc(UNIT_LABEL[p.unit]||p.unit)})</option>`).join('')}
+function producerOpts(){return '<option value="">—</option>'+PRODUCERS.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}
+async function ensureRefs(){if(!PRODUCTS.length){try{const d=await api('/api/stock/products');PRODUCTS=d.products;UNITS=d.units||UNITS;}catch(e){}}if(!PRODUCERS.length){try{const d=await api('/api/stock/producers');PRODUCERS=d.producers;}catch(e){}}}
+
+// Produit
+$('addProduct')&&$('addProduct').addEventListener('click',()=>{modal(`<h3>Nouveau produit</h3>
+ <div class="field"><label>Nom *</label><input id="pName" placeholder="Ex. Tomate"></div>
+ <div class="row2"><div class="field"><label>Catégorie</label><input id="pCat" placeholder="Légume, céréale…"></div><div class="field"><label>Unité</label><select id="pUnit">${unitOpts('kg')}</select></div></div>
+ <div class="row2"><div class="field"><label>Seuil d'alerte (stock bas)</label><input id="pMin" type="number" min="0" step="0.001" value="0"></div><div class="field"><label>Prix de vente (FCFA)</label><input id="pPrice" type="number" min="0" step="1" value="0"></div></div>
+ <div class="field"><label><input type="checkbox" id="pPublic" style="width:auto;margin-right:6px">Visible dans la vitrine publique</label></div>
+ <div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="pSave" type="button">Enregistrer</button></div>`);
+ $('pSave').addEventListener('click',async()=>{try{await api('/api/stock/products',{method:'POST',body:JSON.stringify({name:$('pName').value,category:$('pCat').value,unit:$('pUnit').value,min_qty:$('pMin').value,price:$('pPrice').value,is_public:$('pPublic').checked})});closeModal();notice('Produit enregistré.','ok');loadProducts();}catch(e){notice(e.message,'err');}});
+});
+// Récolte
+$('addHarvest')&&$('addHarvest').addEventListener('click',async()=>{await ensureRefs();modal(`<h3>Enregistrer une récolte</h3>
+ <div class="field"><label>Produit *</label><select id="hProd">${prodOpts()}</select></div>
+ <div class="field"><label>Producteur</label><select id="hProducer">${producerOpts()}</select></div>
+ <div class="row2"><div class="field"><label>Quantité *</label><input id="hQty" type="number" min="0" step="0.001"></div><div class="field"><label>Unité</label><select id="hUnit">${unitOpts('kg')}</select></div></div>
+ <div class="row2"><div class="field"><label>Qualité</label><input id="hQual" placeholder="A, B…"></div><div class="field"><label>Date</label><input id="hDate" type="date"></div></div>
+ <div class="row2"><div class="field"><label>Parcelle</label><input id="hParcel"></div><div class="field"><label>Lot</label><input id="hBatch"></div></div>
+ <div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="hSave" type="button">Enregistrer</button></div>`);
+ $('hSave').addEventListener('click',async()=>{try{await api('/api/stock/harvests',{method:'POST',body:JSON.stringify({product_id:$('hProd').value,producer_id:$('hProducer').value||null,qty:$('hQty').value,unit:$('hUnit').value,quality:$('hQual').value,harvested_at:$('hDate').value,parcel:$('hParcel').value,batch_ref:$('hBatch').value})});closeModal();notice('Récolte enregistrée, stock mis à jour.','ok');loadView('harvests');}catch(e){notice(e.message,'err');}});
+});
+// Perte
+$('addLoss')&&$('addLoss').addEventListener('click',async()=>{await ensureRefs();modal(`<h3>Enregistrer une perte</h3>
+ <div class="field"><label>Produit *</label><select id="lProd">${prodOpts()}</select></div>
+ <div class="row2"><div class="field"><label>Quantité *</label><input id="lQty" type="number" min="0" step="0.001"></div><div class="field"><label>Cause</label><select id="lCause">${Object.entries(CAUSE_LABEL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div></div>
+ <div class="field"><label>Date</label><input id="lDate" type="date"></div>
+ <div class="field"><label>Commentaire</label><textarea id="lNote" rows="2"></textarea></div>
+ <div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="lSave" type="button">Enregistrer</button></div>`);
+ $('lSave').addEventListener('click',async()=>{try{await api('/api/stock/losses',{method:'POST',body:JSON.stringify({product_id:$('lProd').value,qty:$('lQty').value,cause:$('lCause').value,lost_at:$('lDate').value,note:$('lNote').value})});closeModal();notice('Perte enregistrée, stock mis à jour.','ok');loadView('losses');}catch(e){notice(e.message,'err');}});
+});
+// Producteur
+$('addProducer')&&$('addProducer').addEventListener('click',()=>{modal(`<h3>Nouveau producteur</h3>
+ <div class="field"><label>Nom *</label><input id="rName"></div>
+ <div class="row2"><div class="field"><label>Téléphone</label><input id="rPhone"></div><div class="field"><label>Région</label><input id="rRegion"></div></div>
+ <div class="field"><label>Coopérative</label><input id="rCoop"></div>
+ <div class="field"><label><input type="checkbox" id="rConsent" style="width:auto;margin-right:6px">Accepte d'être présenté dans la vitrine publique</label></div>
+ <div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="rSave" type="button">Enregistrer</button></div>`);
+ $('rSave').addEventListener('click',async()=>{try{await api('/api/stock/producers',{method:'POST',body:JSON.stringify({name:$('rName').value,phone:$('rPhone').value,region:$('rRegion').value,cooperative:$('rCoop').value,consent_public:$('rConsent').checked})});closeModal();notice('Producteur enregistré.','ok');loadView('producers');}catch(e){notice(e.message,'err');}});
+});
+// Vente
+$('addSale')&&$('addSale').addEventListener('click',async()=>{await ensureRefs();
+ modal(`<h3>Nouvelle vente</h3>
+ <div class="field"><label>Client</label><input id="sClient" placeholder="Nom du client (facultatif)"></div>
+ <div id="saleLines"></div>
+ <button class="btn small ghost" id="addLine" type="button">+ Ajouter une ligne</button>
+ <div class="tot"><span>Total</span><span id="saleTotal">0 F CFA</span></div>
+ <div class="toolbar" style="justify-content:flex-end;margin-top:14px"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="sSave" type="button">Créer la vente (brouillon)</button></div>`);
+ const lines=$('saleLines');
+ function addLine(){const row=document.createElement('div');row.className='sale-line';row.innerHTML=`<select class="lp">${prodOpts()}</select><input class="lq" type="number" min="0" step="0.001" placeholder="Qté"><input class="lpr" type="number" min="0" step="1" placeholder="Prix"><div class="sub">0</div><button class="btn small danger lx" type="button">×</button>`;lines.appendChild(row);
+  const sel=row.querySelector('.lp'),q=row.querySelector('.lq'),pr=row.querySelector('.lpr');
+  function fillPrice(){const p=PRODUCTS.find(x=>x.id===sel.value);if(p&&!pr.value)pr.value=p.price;recalc();}
+  sel.addEventListener('change',fillPrice);q.addEventListener('input',recalc);pr.addEventListener('input',recalc);
+  row.querySelector('.lx').addEventListener('click',()=>{row.remove();recalc();});fillPrice();}
+ function recalc(){let t=0;lines.querySelectorAll('.sale-line').forEach(r=>{const q=Number(r.querySelector('.lq').value)||0,p=Number(r.querySelector('.lpr').value)||0,st=q*p;r.querySelector('.sub').textContent=fXOF.format(st);t+=st;});$('saleTotal').textContent=fXOF.format(t);}
+ $('addLine').addEventListener('click',addLine);addLine();
+ $('sSave').addEventListener('click',async()=>{const items=[];lines.querySelectorAll('.sale-line').forEach(r=>{const pid=r.querySelector('.lp').value,q=Number(r.querySelector('.lq').value)||0,p=Number(r.querySelector('.lpr').value);if(pid&&q>0)items.push({product_id:pid,qty:q,unit_price:p});});if(!items.length){notice('Ajoutez au moins une ligne valide.','err');return;}try{const d=await api('/api/stock/sales',{method:'POST',body:JSON.stringify({customer_name:$('sClient').value,items})});closeModal();notice('Vente créée ('+d.reference+'). Validez-la pour décrémenter le stock.','ok');await loadSales();openSale(d.saleId);}catch(e){notice(e.message,'err');}});
+});
+function payModal(s){modal(`<h3>Enregistrer un paiement</h3><p class="muted small">Reste à payer : ${money(s.remaining)}</p>
+ <div class="row2"><div class="field"><label>Montant (FCFA) *</label><input id="payAmt" type="number" min="1" step="1"></div><div class="field"><label>Moyen</label><select id="payMethod">${Object.entries(PAY_LABEL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div></div>
+ <div class="field"><label>Référence (facultatif)</label><input id="payRef"></div>
+ <div class="alert small">N'enregistrez un paiement que lorsqu'il est réellement reçu. Aucun paiement automatique n'est effectué.</div>
+ <div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="paySave" type="button">Enregistrer</button></div>`);
+ $('paySave').addEventListener('click',async()=>{try{await api('/api/stock/payments',{method:'POST',body:JSON.stringify({sale_id:s.id,amount:$('payAmt').value,method:$('payMethod').value,reference:$('payRef').value})});closeModal();notice('Paiement enregistré.','ok');openSale(s.id);}catch(e){notice(e.message,'err');}});
+}
+// Exports
+$('expProducts')&&$('expProducts').addEventListener('click',()=>{window.location='/api/stock/export.csv?type=products';});
+$('expSales')&&$('expSales').addEventListener('click',()=>{window.location='/api/stock/export.csv?type=sales';});
+$('refresh').addEventListener('click',()=>loadView(VIEW));
+boot();
+</script>
+</body></html>

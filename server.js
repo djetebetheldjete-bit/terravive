@@ -1328,6 +1328,7 @@ function serveStatic(req, res) {
   if (urlPath === "/arduino") urlPath = "/arduino.html";
   if (urlPath === "/tableau" || urlPath === "/dashboard") urlPath = "/tableau.html";
   if (urlPath === "/quality") urlPath = "/quality.html";
+  if (urlPath === "/stock") urlPath = "/stock.html";
   if (urlPath === "/comprendre") urlPath = "/comprendre.html";
   if (urlPath === "/conseiller" || urlPath === "/chat") urlPath = "/conseiller.html";
   if (urlPath === "/cooperative" || urlPath === "/coop") urlPath = "/cooperative.html";
@@ -2033,11 +2034,449 @@ async function handleQualityTests(req,res) {
   sendJson(res,200,{total:results.length,passed:results.filter(x=>x.ok).length,failed:results.filter(x=>!x.ok).length,results});
 }
 
+// ============================================================================
+// Terravive Stock — module de gestion des stocks agricoles (intégré au serveur).
+// Réutilise : auth de session (currentUser), stockage Supabase REST (sb) ou local
+// (loadStore/saveStore), sendJson/readBody. Zéro dépendance ajoutée.
+// Règle d'or : le disponible se CALCULE à partir des mouvements, jamais stocké en double.
+// ============================================================================
+const STOCK_UNITS = ["kg", "g", "t", "l", "unite", "caisse", "sac"];
+const STOCK_LOSS_CAUSES = ["pourriture", "degradation", "invendu", "transport", "stockage", "autre"];
+const STOCK_PAY_METHODS = ["especes", "mobile_money", "virement", "livraison"];
+const STOCK_ADMINS = (process.env.STOCK_ADMINS || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+const STOCK_OPERATORS = (process.env.STOCK_OPERATORS || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+const STOCK_VIEWERS = (process.env.STOCK_VIEWERS || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+const STOCK_PUBLIC_ENABLED = /^(1|true|on|oui)$/i.test((process.env.STOCK_PUBLIC_ENABLED || "").trim());
+const STOCK_PERMS = {
+  admin: ["read", "products", "harvest", "sale", "validate", "loss", "payment", "producers", "export", "logs"],
+  operateur: ["read", "products", "harvest", "sale", "validate", "loss", "payment", "producers", "export"],
+  lecteur: ["read", "export"]
+};
+function stockRole(u) {
+  if (!u) return null;
+  const e = normEmail(u.email);
+  if (ADMIN_EMAILS.includes(e) || STOCK_ADMINS.includes(e)) return "admin";
+  if (STOCK_OPERATORS.includes(e)) return "operateur";
+  if (STOCK_VIEWERS.includes(e)) return "lecteur";
+  return null;
+}
+function stockCan(u, action) { const r = stockRole(u); return !!r && STOCK_PERMS[r].includes(action); }
+async function stockGuard(req, res, action) {
+  const user = await currentUser(req);
+  if (!user) { sendJson(res, 401, { error: "Non connecté." }); return null; }
+  if (!stockCan(user, action)) { sendJson(res, 403, { error: "Accès refusé : votre rôle ne permet pas cette action." }); return null; }
+  return user;
+}
+const stkNow = () => new Date().toISOString();
+const stkId = () => crypto.randomBytes(12).toString("hex");
+const STOCK_TABLES = ["stock_products", "stock_producers", "stock_movements", "stock_harvests", "stock_sales", "stock_sale_items", "stock_payments", "stock_losses", "stock_logs"];
+function stkLoad() { const s = loadStore(); for (const k of STOCK_TABLES) if (!Array.isArray(s[k])) s[k] = []; return s; }
+// Accès données unifié (datasets de taille coopérative : on lit tout et on calcule en JS).
+async function stkAll(table) {
+  if (USE_DB) { try { return (await sb(`/trv_${table}?select=*&limit=5000`)) || []; } catch (e) { console.warn("stock read " + table + ":", e.message); return []; } }
+  return stkLoad()[table].slice();
+}
+async function stkInsert(table, row) {
+  if (USE_DB) await sb(`/trv_${table}`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([row]) });
+  else { const s = stkLoad(); s[table].push(row); saveStore(s); }
+  return row;
+}
+async function stkUpdate(table, id, patch) {
+  if (USE_DB) await sb(`/trv_${table}?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
+  else { const s = stkLoad(); const r = s[table].find(x => x.id === id); if (r) Object.assign(r, patch); saveStore(s); }
+}
+async function stkGet(table, id) {
+  if (USE_DB) { const r = await sb(`/trv_${table}?id=eq.${encodeURIComponent(id)}&select=*&limit=1`); return (r && r[0]) || null; }
+  return stkLoad()[table].find(x => x.id === id) || null;
+}
+async function stockLog(action, user, ref) {
+  const row = { id: stkId(), action: String(action).slice(0, 60), actor: user ? normEmail(user.email) : null, ref: ref || null, created_at: stkNow() };
+  try { if (USE_DB) await sb("/trv_stock_audit_logs", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([row]) }); else { const s = stkLoad(); s.stock_logs.push(row); saveStore(s); } } catch (e) { console.warn("stock log:", e.message); }
+}
+// Disponible d'un produit = somme signée de ses mouvements.
+function stockOnHand(movements, productId) {
+  let q = 0; for (const m of movements) if (m.product_id === productId) q += (m.type === "in" ? Number(m.qty) : -Number(m.qty));
+  return Math.round(q * 1000) / 1000;
+}
+function stkNum(v) { const n = Number(v); return (isFinite(n)) ? n : NaN; }
+function stkStatus(onhand, min) { if (onhand <= 0) return "rupture"; if (min > 0 && onhand <= min) return "bas"; return "ok"; }
+
+// ---------- Produits ----------
+async function handleStockProducts(req, res) {
+  const user = await stockGuard(req, res, "read"); if (!user) return;
+  try {
+    const products = await stkAll("stock_products");
+    const movements = await stkAll("stock_movements");
+    const producers = await stkAll("stock_producers");
+    const pmap = {}; for (const p of producers) pmap[p.id] = p.name;
+    const rows = products.map(p => { const on = stockOnHand(movements, p.id); return { id: p.id, name: p.name, category: p.category || null, unit: p.unit, min_qty: Number(p.min_qty || 0), price: Number(p.price || 0), producer_id: p.producer_id || null, producer_name: p.producer_id ? (pmap[p.producer_id] || null) : null, is_public: !!p.is_public, on_hand: on, status: stkStatus(on, Number(p.min_qty || 0)) }; });
+    rows.sort((a, b) => a.name.localeCompare(b.name));
+    sendJson(res, 200, { products: rows, role: stockRole(user), units: STOCK_UNITS });
+  } catch (e) { console.error("stock products:", e.message); sendJson(res, 500, { error: "Impossible de charger les produits pour le moment." }); }
+}
+async function handleStockProductCreate(req, res) {
+  const user = await stockGuard(req, res, "products"); if (!user) return;
+  try {
+    const b = JSON.parse(await readBody(req) || "{}");
+    const name = String(b.name || "").trim();
+    if (!name) return sendJson(res, 400, { error: "Le nom du produit est obligatoire." });
+    const unit = STOCK_UNITS.includes(b.unit) ? b.unit : "kg";
+    const min_qty = Math.max(0, stkNum(b.min_qty) || 0);
+    const price = Math.max(0, stkNum(b.price) || 0);
+    let producer_id = null;
+    if (b.producer_id) { const pr = await stkGet("stock_producers", String(b.producer_id)); if (!pr) return sendJson(res, 400, { error: "Producteur introuvable." }); producer_id = pr.id; }
+    const row = { id: stkId(), name, category: b.category ? String(b.category).slice(0, 80) : null, unit, min_qty, price, producer_id, is_public: !!b.is_public, created_at: stkNow(), updated_at: stkNow(), created_by: user.email };
+    await stkInsert("stock_products", row);
+    await stockLog("product_create", user, { product_id: row.id });
+    sendJson(res, 200, { ok: true, product: row });
+  } catch (e) { console.error("stock product create:", e.message); sendJson(res, 500, { error: "Le produit n'a pas pu être enregistré." }); }
+}
+async function handleStockProductUpdate(req, res) {
+  const user = await stockGuard(req, res, "products"); if (!user) return;
+  try {
+    const b = JSON.parse(await readBody(req) || "{}");
+    if (!b.id) return sendJson(res, 400, { error: "Produit non précisé." });
+    const p = await stkGet("stock_products", String(b.id)); if (!p) return sendJson(res, 404, { error: "Produit introuvable." });
+    const patch = { updated_at: stkNow() };
+    if (b.name !== undefined) { const n = String(b.name).trim(); if (!n) return sendJson(res, 400, { error: "Le nom ne peut pas être vide." }); patch.name = n; }
+    if (b.category !== undefined) patch.category = b.category ? String(b.category).slice(0, 80) : null;
+    if (b.unit !== undefined && STOCK_UNITS.includes(b.unit)) patch.unit = b.unit;
+    if (b.min_qty !== undefined) patch.min_qty = Math.max(0, stkNum(b.min_qty) || 0);
+    if (b.price !== undefined) patch.price = Math.max(0, stkNum(b.price) || 0);
+    if (b.is_public !== undefined) patch.is_public = !!b.is_public;
+    await stkUpdate("stock_products", p.id, patch);
+    await stockLog("product_update", user, { product_id: p.id });
+    sendJson(res, 200, { ok: true });
+  } catch (e) { console.error("stock product update:", e.message); sendJson(res, 500, { error: "La modification n'a pas pu être enregistrée." }); }
+}
+async function handleStockProductGet(req, res) {
+  const user = await stockGuard(req, res, "read"); if (!user) return;
+  try {
+    let id = ""; try { id = new URL(req.url, "http://x").searchParams.get("id") || ""; } catch (e) {}
+    if (!id) return sendJson(res, 400, { error: "Produit non précisé." });
+    const p = await stkGet("stock_products", id); if (!p) return sendJson(res, 404, { error: "Produit introuvable." });
+    const movements = (await stkAll("stock_movements")).filter(m => m.product_id === id).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const on = stockOnHand(movements, id);
+    sendJson(res, 200, { product: { ...p, on_hand: on, status: stkStatus(on, Number(p.min_qty || 0)) }, movements: movements.slice(0, 100) });
+  } catch (e) { console.error("stock product get:", e.message); sendJson(res, 500, { error: "Impossible de charger ce produit." }); }
+}
+
+// ---------- Producteurs ----------
+async function handleStockProducers(req, res) {
+  const user = await stockGuard(req, res, "read"); if (!user) return;
+  try { const list = (await stkAll("stock_producers")).sort((a, b) => String(a.name).localeCompare(String(b.name))); sendJson(res, 200, { producers: list }); }
+  catch (e) { console.error("stock producers:", e.message); sendJson(res, 500, { error: "Impossible de charger les producteurs." }); }
+}
+async function handleStockProducerCreate(req, res) {
+  const user = await stockGuard(req, res, "producers"); if (!user) return;
+  try {
+    const b = JSON.parse(await readBody(req) || "{}");
+    const name = String(b.name || "").trim(); if (!name) return sendJson(res, 400, { error: "Le nom du producteur est obligatoire." });
+    const row = { id: stkId(), name, phone: b.phone ? String(b.phone).slice(0, 40) : null, region: b.region ? String(b.region).slice(0, 80) : null, cooperative: b.cooperative ? String(b.cooperative).slice(0, 120) : null, consent_public: !!b.consent_public, created_at: stkNow(), created_by: user.email };
+    await stkInsert("stock_producers", row);
+    await stockLog("producer_create", user, { producer_id: row.id });
+    sendJson(res, 200, { ok: true, producer: row });
+  } catch (e) { console.error("stock producer create:", e.message); sendJson(res, 500, { error: "Le producteur n'a pas pu être enregistré." }); }
+}
+
+// ---------- Récoltes (entrée en stock) ----------
+async function handleStockHarvests(req, res) {
+  const user = await stockGuard(req, res, "read"); if (!user) return;
+  try {
+    const list = (await stkAll("stock_harvests")).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const products = await stkAll("stock_products"); const pm = {}; for (const p of products) pm[p.id] = p.name;
+    const producers = await stkAll("stock_producers"); const rm = {}; for (const p of producers) rm[p.id] = p.name;
+    sendJson(res, 200, { harvests: list.slice(0, 200).map(h => ({ ...h, product_name: pm[h.product_id] || "—", producer_name: h.producer_id ? (rm[h.producer_id] || "—") : null })) });
+  } catch (e) { console.error("stock harvests:", e.message); sendJson(res, 500, { error: "Impossible de charger les récoltes." }); }
+}
+async function handleStockHarvestCreate(req, res) {
+  const user = await stockGuard(req, res, "harvest"); if (!user) return;
+  try {
+    const b = JSON.parse(await readBody(req) || "{}");
+    const product = await stkGet("stock_products", String(b.product_id || "")); if (!product) return sendJson(res, 400, { error: "Sélectionnez un produit valide." });
+    const qty = stkNum(b.qty); if (!(qty > 0)) return sendJson(res, 400, { error: "La quantité récoltée doit être supérieure à zéro." });
+    let producer_id = null; if (b.producer_id) { const pr = await stkGet("stock_producers", String(b.producer_id)); if (!pr) return sendJson(res, 400, { error: "Producteur introuvable." }); producer_id = pr.id; }
+    const id = stkId();
+    const harvest = { id, product_id: product.id, producer_id, qty, unit: STOCK_UNITS.includes(b.unit) ? b.unit : product.unit, quality: b.quality ? String(b.quality).slice(0, 40) : null, parcel: b.parcel ? String(b.parcel).slice(0, 120) : null, batch_ref: b.batch_ref ? String(b.batch_ref).slice(0, 60) : null, harvested_at: /^\d{4}-\d{2}-\d{2}$/.test(b.harvested_at || "") ? b.harvested_at : null, created_at: stkNow(), created_by: user.email };
+    await stkInsert("stock_harvests", harvest);
+    // Mouvement d'entrée correspondant.
+    await stkInsert("stock_movements", { id: stkId(), product_id: product.id, type: "in", qty, reason: "harvest", ref_type: "harvest", ref_id: id, note: null, created_at: stkNow(), created_by: user.email });
+    await stockLog("harvest_create", user, { harvest_id: id, product_id: product.id, qty });
+    sendJson(res, 200, { ok: true, harvest });
+  } catch (e) { console.error("stock harvest create:", e.message); sendJson(res, 500, { error: "La récolte n'a pas pu être enregistrée." }); }
+}
+
+// ---------- Pertes (sortie de stock, tracée) ----------
+async function handleStockLosses(req, res) {
+  const user = await stockGuard(req, res, "read"); if (!user) return;
+  try {
+    const list = (await stkAll("stock_losses")).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const products = await stkAll("stock_products"); const pm = {}, prc = {}; for (const p of products) { pm[p.id] = p.name; prc[p.id] = Number(p.price || 0); }
+    sendJson(res, 200, { losses: list.slice(0, 200).map(l => ({ ...l, product_name: pm[l.product_id] || "—", value: Number(l.qty) * (prc[l.product_id] || 0) })) });
+  } catch (e) { console.error("stock losses:", e.message); sendJson(res, 500, { error: "Impossible de charger les pertes." }); }
+}
+async function handleStockLossCreate(req, res) {
+  const user = await stockGuard(req, res, "loss"); if (!user) return;
+  try {
+    const b = JSON.parse(await readBody(req) || "{}");
+    const product = await stkGet("stock_products", String(b.product_id || "")); if (!product) return sendJson(res, 400, { error: "Sélectionnez un produit valide." });
+    const qty = stkNum(b.qty); if (!(qty > 0)) return sendJson(res, 400, { error: "La quantité perdue doit être supérieure à zéro." });
+    const cause = STOCK_LOSS_CAUSES.includes(b.cause) ? b.cause : "autre";
+    const movements = await stkAll("stock_movements"); const avail = stockOnHand(movements, product.id);
+    if (qty > avail) return sendJson(res, 400, { error: `Perte supérieure au stock disponible (disponible : ${avail}).` });
+    const id = stkId();
+    const loss = { id, product_id: product.id, qty, cause, note: b.note ? String(b.note).slice(0, 300) : null, lost_at: /^\d{4}-\d{2}-\d{2}$/.test(b.lost_at || "") ? b.lost_at : null, created_at: stkNow(), created_by: user.email };
+    await stkInsert("stock_losses", loss);
+    await stkInsert("stock_movements", { id: stkId(), product_id: product.id, type: "out", qty, reason: "loss", ref_type: "loss", ref_id: id, note: cause, created_at: stkNow(), created_by: user.email });
+    await stockLog("loss_create", user, { loss_id: id, product_id: product.id, qty, cause });
+    sendJson(res, 200, { ok: true, loss });
+  } catch (e) { console.error("stock loss create:", e.message); sendJson(res, 500, { error: "La perte n'a pas pu être enregistrée." }); }
+}
+
+// ---------- Ventes ----------
+async function handleStockSales(req, res) {
+  const user = await stockGuard(req, res, "read"); if (!user) return;
+  try {
+    const list = (await stkAll("stock_sales")).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    sendJson(res, 200, { sales: list.slice(0, 200).map(s => ({ ...s, total: Number(s.total || 0), paid: Number(s.paid || 0), remaining: Math.max(0, Number(s.total || 0) - Number(s.paid || 0)) })) });
+  } catch (e) { console.error("stock sales:", e.message); sendJson(res, 500, { error: "Impossible de charger les ventes." }); }
+}
+async function handleStockSaleGet(req, res) {
+  const user = await stockGuard(req, res, "read"); if (!user) return;
+  try {
+    let id = ""; try { id = new URL(req.url, "http://x").searchParams.get("id") || ""; } catch (e) {}
+    const sale = await stkGet("stock_sales", id); if (!sale) return sendJson(res, 404, { error: "Vente introuvable." });
+    const items = (await stkAll("stock_sale_items")).filter(i => i.sale_id === id);
+    const payments = (await stkAll("stock_payments")).filter(p => p.sale_id === id);
+    const products = await stkAll("stock_products"); const pm = {}; for (const p of products) pm[p.id] = p.name;
+    const total = Number(sale.total || 0), paid = Number(sale.paid || 0);
+    sendJson(res, 200, { sale: { ...sale, total, paid, remaining: Math.max(0, total - paid), settlement: paid <= 0 ? "impaye" : paid >= total ? "solde" : "partiel" }, items: items.map(i => ({ ...i, product_name: pm[i.product_id] || "—", qty: Number(i.qty), unit_price: Number(i.unit_price), subtotal: Number(i.subtotal) })), payments });
+  } catch (e) { console.error("stock sale get:", e.message); sendJson(res, 500, { error: "Impossible de charger cette vente." }); }
+}
+async function handleStockSaleCreate(req, res) {
+  const user = await stockGuard(req, res, "sale"); if (!user) return;
+  if (!qualityRateLimit(req, res, "stock_sale", 60)) return;
+  try {
+    const b = JSON.parse(await readBody(req) || "{}");
+    const rawItems = Array.isArray(b.items) ? b.items : [];
+    if (!rawItems.length) return sendJson(res, 400, { error: "Ajoutez au moins une ligne à la vente." });
+    const products = await stkAll("stock_products"); const pById = {}; for (const p of products) pById[p.id] = p;
+    const items = []; let total = 0;
+    for (const it of rawItems) {
+      const p = pById[String(it.product_id || "")]; if (!p) return sendJson(res, 400, { error: "Un produit de la vente est introuvable." });
+      const qty = stkNum(it.qty); if (!(qty > 0)) return sendJson(res, 400, { error: "Chaque ligne doit avoir une quantité positive." });
+      // Le serveur recalcule : prix fourni sinon prix du produit ; sous-total = qty × prix.
+      const unit_price = (it.unit_price !== undefined && stkNum(it.unit_price) >= 0) ? stkNum(it.unit_price) : Number(p.price || 0);
+      const subtotal = Math.round(qty * unit_price * 100) / 100;
+      total += subtotal;
+      items.push({ id: stkId(), product_id: p.id, qty, unit_price, subtotal });
+    }
+    total = Math.round(total * 100) / 100;
+    const id = stkId();
+    const reference = "V-" + new Date().toISOString().slice(2, 10).replace(/-/g, "") + "-" + id.slice(0, 4).toUpperCase();
+    const sale = { id, reference, customer_name: b.customer_name ? String(b.customer_name).slice(0, 120) : null, status: "brouillon", total, paid: 0, sold_at: /^\d{4}-\d{2}-\d{2}$/.test(b.sold_at || "") ? b.sold_at : null, created_at: stkNow(), validated_at: null, created_by: user.email };
+    await stkInsert("stock_sales", sale);
+    for (const it of items) await stkInsert("stock_sale_items", { ...it, sale_id: id });
+    await stockLog("sale_create", user, { sale_id: id, total });
+    sendJson(res, 200, { ok: true, saleId: id, reference, total, status: "brouillon" });
+  } catch (e) { console.error("stock sale create:", e.message); sendJson(res, 500, { error: "La vente n'a pas pu être créée." }); }
+}
+// Validation ATOMIQUE (RPC en base, logique en mémoire en local). Décrémente le stock.
+async function stockValidateSale(saleId, actor) {
+  if (USE_DB) {
+    const out = await sb("/rpc/trv_stock_validate_sale", { method: "POST", body: JSON.stringify({ p_sale_id: saleId, p_actor: actor }) });
+    return out && typeof out === "object" ? out : { ok: false, error: "Réponse inattendue de la base." };
+  }
+  const s = stkLoad();
+  const sale = s.stock_sales.find(x => x.id === saleId);
+  if (!sale) return { ok: false, error: "Vente introuvable." };
+  if (sale.status === "validee") return { ok: false, error: "Cette vente est déjà validée." };
+  if (sale.status === "annulee") return { ok: false, error: "Cette vente est annulée." };
+  const items = s.stock_sale_items.filter(i => i.sale_id === saleId);
+  const need = {}; for (const i of items) need[i.product_id] = (need[i.product_id] || 0) + Number(i.qty);
+  for (const pid of Object.keys(need)) { const avail = stockOnHand(s.stock_movements, pid); if (need[pid] > avail) return { ok: false, error: `Stock insuffisant pour un produit (demandé ${need[pid]}, disponible ${avail}).` }; }
+  for (const i of items) s.stock_movements.push({ id: stkId(), product_id: i.product_id, type: "out", qty: Number(i.qty), reason: "sale", ref_type: "sale", ref_id: saleId, created_at: stkNow(), created_by: actor });
+  sale.status = "validee"; sale.validated_at = stkNow();
+  s.stock_logs.push({ id: stkId(), action: "sale_validate", actor: normEmail(actor), ref: { sale_id: saleId }, created_at: stkNow() });
+  saveStore(s);
+  return { ok: true };
+}
+async function handleStockSaleValidate(req, res) {
+  const user = await stockGuard(req, res, "validate"); if (!user) return;
+  try {
+    const b = JSON.parse(await readBody(req) || "{}");
+    const id = String(b.id || ""); if (!id) return sendJson(res, 400, { error: "Vente non précisée." });
+    const sale = await stkGet("stock_sales", id); if (!sale) return sendJson(res, 404, { error: "Vente introuvable." });
+    const r = await stockValidateSale(id, user.email);
+    if (!r.ok) return sendJson(res, 400, { error: r.error || "Validation impossible." });
+    await stockLog("sale_validate", user, { sale_id: id });
+    sendJson(res, 200, { ok: true });
+  } catch (e) { console.error("stock sale validate:", e.message); sendJson(res, 500, { error: "La validation n'a pas pu aboutir." }); }
+}
+async function handleStockSaleCancel(req, res) {
+  const user = await stockGuard(req, res, "validate"); if (!user) return;
+  try {
+    const b = JSON.parse(await readBody(req) || "{}");
+    const id = String(b.id || ""); const sale = await stkGet("stock_sales", id); if (!sale) return sendJson(res, 404, { error: "Vente introuvable." });
+    if (sale.status === "annulee") return sendJson(res, 400, { error: "Cette vente est déjà annulée." });
+    // Si elle était validée, on COMPENSE par des mouvements d'entrée (traçable, pas de suppression).
+    if (sale.status === "validee") {
+      const items = (await stkAll("stock_sale_items")).filter(i => i.sale_id === id);
+      for (const i of items) await stkInsert("stock_movements", { id: stkId(), product_id: i.product_id, type: "in", qty: Number(i.qty), reason: "adjustment", ref_type: "sale_cancel", ref_id: id, note: "annulation vente", created_at: stkNow(), created_by: user.email });
+    }
+    await stkUpdate("stock_sales", id, { status: "annulee" });
+    await stockLog("sale_cancel", user, { sale_id: id });
+    sendJson(res, 200, { ok: true });
+  } catch (e) { console.error("stock sale cancel:", e.message); sendJson(res, 500, { error: "L'annulation n'a pas pu aboutir." }); }
+}
+
+// ---------- Paiements ----------
+async function handleStockPaymentCreate(req, res) {
+  const user = await stockGuard(req, res, "payment"); if (!user) return;
+  try {
+    const b = JSON.parse(await readBody(req) || "{}");
+    const sale = await stkGet("stock_sales", String(b.sale_id || "")); if (!sale) return sendJson(res, 404, { error: "Vente introuvable." });
+    if (sale.status === "annulee") return sendJson(res, 400, { error: "Vente annulée : aucun paiement possible." });
+    const amount = stkNum(b.amount); if (!(amount > 0)) return sendJson(res, 400, { error: "Le montant doit être supérieur à zéro." });
+    const method = STOCK_PAY_METHODS.includes(b.method) ? b.method : "especes";
+    const paidBefore = Number(sale.paid || 0);
+    const row = { id: stkId(), sale_id: sale.id, amount, method, reference: b.reference ? String(b.reference).slice(0, 80) : null, paid_at: /^\d{4}-\d{2}-\d{2}$/.test(b.paid_at || "") ? b.paid_at : null, created_at: stkNow(), created_by: user.email };
+    await stkInsert("stock_payments", row);
+    await stkUpdate("stock_sales", sale.id, { paid: Math.round((paidBefore + amount) * 100) / 100 });
+    await stockLog("payment_create", user, { sale_id: sale.id, amount, method });
+    sendJson(res, 200, { ok: true, payment: row });
+  } catch (e) { console.error("stock payment create:", e.message); sendJson(res, 500, { error: "Le paiement n'a pas pu être enregistré." }); }
+}
+
+// ---------- Tableau de bord (données réelles) ----------
+function stkInPeriod(dateStr, from, to) {
+  if (!dateStr) return true;
+  const d = String(dateStr).slice(0, 10);
+  if (from && d < from) return false;
+  if (to && d > to) return false;
+  return true;
+}
+async function handleStockOverview(req, res) {
+  const user = await stockGuard(req, res, "read"); if (!user) return;
+  try {
+    let from = "", to = ""; try { const q = new URL(req.url, "http://x").searchParams; from = /^\d{4}-\d{2}-\d{2}$/.test(q.get("from") || "") ? q.get("from") : ""; to = /^\d{4}-\d{2}-\d{2}$/.test(q.get("to") || "") ? q.get("to") : ""; } catch (e) {}
+    const products = await stkAll("stock_products");
+    const movements = await stkAll("stock_movements");
+    const sales = await stkAll("stock_sales");
+    const saleItems = await stkAll("stock_sale_items");
+    const payments = await stkAll("stock_payments");
+    const losses = await stkAll("stock_losses");
+    const harvests = await stkAll("stock_harvests");
+    const priceOf = {}; const nameOf = {}; for (const p of products) { priceOf[p.id] = Number(p.price || 0); nameOf[p.id] = p.name; }
+    let low = 0, out = 0, stockValue = 0;
+    for (const p of products) { const on = stockOnHand(movements, p.id); const st = stkStatus(on, Number(p.min_qty || 0)); if (st === "rupture") out++; else if (st === "bas") low++; if (on > 0) stockValue += on * priceOf[p.id]; }
+    const validSales = sales.filter(s => s.status === "validee" && stkInPeriod(s.validated_at || s.created_at, from, to));
+    const revenue = validSales.reduce((n, s) => n + Number(s.total || 0), 0);
+    const paidInPeriod = payments.filter(p => stkInPeriod(p.paid_at || p.created_at, from, to)).reduce((n, p) => n + Number(p.amount || 0), 0);
+    const receivables = sales.filter(s => s.status === "validee").reduce((n, s) => n + Math.max(0, Number(s.total || 0) - Number(s.paid || 0)), 0);
+    const periodLosses = losses.filter(l => stkInPeriod(l.lost_at || l.created_at, from, to));
+    const lossQty = periodLosses.reduce((n, l) => n + Number(l.qty || 0), 0);
+    const lossValue = periodLosses.reduce((n, l) => n + Number(l.qty || 0) * (priceOf[l.product_id] || 0), 0);
+    const periodHarvests = harvests.filter(h => stkInPeriod(h.harvested_at || h.created_at, from, to));
+    // Produits les plus vendus (sur ventes validées de la période)
+    const validIds = new Set(validSales.map(s => s.id));
+    const sold = {}; for (const it of saleItems) if (validIds.has(it.sale_id)) sold[it.product_id] = (sold[it.product_id] || 0) + Number(it.qty || 0);
+    const topProducts = Object.entries(sold).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, qty]) => ({ name: nameOf[id] || "—", qty: Math.round(qty * 1000) / 1000 }));
+    const recent = movements.slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 10).map(m => ({ ...m, product_name: nameOf[m.product_id] || "—" }));
+    sendJson(res, 200, {
+      role: stockRole(user), source: USE_DB ? "supabase" : "local", public_enabled: STOCK_PUBLIC_ENABLED,
+      metrics: {
+        products: products.length, low_stock: low, out_of_stock: out,
+        stock_value: Math.round(stockValue), revenue: Math.round(revenue), paid: Math.round(paidInPeriod),
+        receivables: Math.round(receivables), loss_qty: Math.round(lossQty * 1000) / 1000, loss_value: Math.round(lossValue),
+        sales_count: validSales.length, harvests_count: periodHarvests.length, losses_count: periodLosses.length
+      },
+      top_products: topProducts, recent_movements: recent, filters: { from, to }
+    });
+  } catch (e) { console.error("stock overview:", e.message); sendJson(res, 500, { error: "Impossible de charger le tableau de bord pour le moment." }); }
+}
+
+// ---------- Export CSV ----------
+async function handleStockExport(req, res) {
+  const user = await stockGuard(req, res, "export"); if (!user) return;
+  if (!qualityRateLimit(req, res, "stock_export", 20)) return;
+  try {
+    const type = (() => { try { return new URL(req.url, "http://x").searchParams.get("type") || "products"; } catch (e) { return "products"; } })();
+    const stamp = new Date().toISOString().slice(0, 10); const sep = ";"; let head = [], lines = [], fname = "";
+    const products = await stkAll("stock_products"); const nameOf = {}; for (const p of products) nameOf[p.id] = p.name;
+    if (type === "movements") {
+      head = ["Date", "Produit", "Type", "Quantité", "Motif", "Référence", "Par"];
+      const mv = (await stkAll("stock_movements")).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+      lines = mv.map(m => [m.created_at, nameOf[m.product_id] || m.product_id, m.type === "in" ? "entrée" : "sortie", m.qty, m.reason, m.ref_id || "", m.created_by || ""]);
+      fname = `terravive-stock-mouvements-${stamp}.csv`;
+    } else if (type === "sales") {
+      head = ["Référence", "Date", "Client", "Statut", "Total FCFA", "Payé FCFA", "Reste FCFA"];
+      const sa = (await stkAll("stock_sales")).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+      lines = sa.map(s => [s.reference, s.created_at, s.customer_name || "", s.status, Number(s.total || 0), Number(s.paid || 0), Math.max(0, Number(s.total || 0) - Number(s.paid || 0))]);
+      fname = `terravive-stock-ventes-${stamp}.csv`;
+    } else {
+      head = ["Produit", "Catégorie", "Unité", "Stock disponible", "Seuil bas", "Prix FCFA", "Statut"];
+      const movements = await stkAll("stock_movements");
+      lines = products.map(p => { const on = stockOnHand(movements, p.id); return [p.name, p.category || "", p.unit, on, Number(p.min_qty || 0), Number(p.price || 0), stkStatus(on, Number(p.min_qty || 0))]; });
+      fname = `terravive-stock-produits-${stamp}.csv`;
+    }
+    const csv = "﻿" + [head.join(sep)].concat(lines.map(r => r.map(qgCsvCell).join(sep))).join("\r\n");
+    await stockLog("export_csv", user, { type });
+    res.writeHead(200, { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="${fname}"` });
+    res.end(csv);
+  } catch (e) { console.error("stock export:", e.message); sendJson(res, 500, { error: "L'export n'a pas pu être généré." }); }
+}
+
+// ---------- Journal d'audit ----------
+async function handleStockLogs(req, res) {
+  const user = await stockGuard(req, res, "logs"); if (!user) return;
+  try { const logs = (await stkAll("stock_logs")).concat(USE_DB ? (await stkAll("stock_audit_logs")) : []).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 100); sendJson(res, 200, { logs }); }
+  catch (e) { console.error("stock logs:", e.message); sendJson(res, 500, { error: "Journal indisponible pour le moment." }); }
+}
+
+// ---------- Vitrine publique (lecture seule, activée par STOCK_PUBLIC_ENABLED) ----------
+async function handleStockPublicProducts(req, res) {
+  if (!STOCK_PUBLIC_ENABLED) return sendJson(res, 404, { error: "La vitrine publique n'est pas activée." });
+  try {
+    const products = (await stkAll("stock_products")).filter(p => p.is_public);
+    const movements = await stkAll("stock_movements");
+    const producers = await stkAll("stock_producers"); const pr = {}; for (const p of producers) pr[p.id] = p;
+    const rows = products.map(p => { const on = stockOnHand(movements, p.id); const prod = p.producer_id ? pr[p.producer_id] : null; return { name: p.name, category: p.category || null, unit: p.unit, price: Number(p.price || 0), available: on > 0 ? on : 0, producer: (prod && prod.consent_public) ? prod.name : null }; }).filter(r => r.available > 0);
+    sendJson(res, 200, { products: rows });
+  } catch (e) { console.error("stock public:", e.message); sendJson(res, 500, { error: "Catalogue indisponible." }); }
+}
+// Commandes publiques : préparées côté base, VOLONTAIREMENT désactivées tant que non configurées.
+function handleStockPublicOrder(req, res) {
+  return sendJson(res, 503, { error: "Les commandes en ligne ne sont pas encore activées. Cette fonctionnalité sera ouverte après configuration (décision commerciale et moyens de paiement)." });
+}
+
 // ---------- Routeur ----------
 const server = http.createServer((req, res) => {
   const url = (req.url || "").split("?")[0];
   // Point de contrôle de santé (pour un moniteur d'uptime : garde le service éveillé et signale les pannes).
   if (req.method === "GET" && (url === "/healthz" || url === "/api/health")) return sendJson(res, 200, { ok: true, service: "terravive", time: new Date().toISOString(), uptime_s: Math.round(process.uptime()), db: USE_DB ? "supabase" : "local" });
+  // ---- Terravive Stock ----
+  if (req.method === "GET" && url === "/api/stock/overview") return handleStockOverview(req, res);
+  if (req.method === "GET" && url === "/api/stock/products") return handleStockProducts(req, res);
+  if (req.method === "POST" && url === "/api/stock/products") return handleStockProductCreate(req, res);
+  if (req.method === "POST" && url === "/api/stock/products/update") return handleStockProductUpdate(req, res);
+  if (req.method === "GET" && url === "/api/stock/product") return handleStockProductGet(req, res);
+  if (req.method === "GET" && url === "/api/stock/producers") return handleStockProducers(req, res);
+  if (req.method === "POST" && url === "/api/stock/producers") return handleStockProducerCreate(req, res);
+  if (req.method === "GET" && url === "/api/stock/harvests") return handleStockHarvests(req, res);
+  if (req.method === "POST" && url === "/api/stock/harvests") return handleStockHarvestCreate(req, res);
+  if (req.method === "GET" && url === "/api/stock/losses") return handleStockLosses(req, res);
+  if (req.method === "POST" && url === "/api/stock/losses") return handleStockLossCreate(req, res);
+  if (req.method === "GET" && url === "/api/stock/sales") return handleStockSales(req, res);
+  if (req.method === "GET" && url === "/api/stock/sale") return handleStockSaleGet(req, res);
+  if (req.method === "POST" && url === "/api/stock/sales") return handleStockSaleCreate(req, res);
+  if (req.method === "POST" && url === "/api/stock/sales/validate") return handleStockSaleValidate(req, res);
+  if (req.method === "POST" && url === "/api/stock/sales/cancel") return handleStockSaleCancel(req, res);
+  if (req.method === "POST" && url === "/api/stock/payments") return handleStockPaymentCreate(req, res);
+  if (req.method === "GET" && url === "/api/stock/export.csv") return handleStockExport(req, res);
+  if (req.method === "GET" && url === "/api/stock/logs") return handleStockLogs(req, res);
+  if (req.method === "GET" && url === "/api/stock/public/products") return handleStockPublicProducts(req, res);
+  if (req.method === "POST" && url === "/api/stock/public/orders") return handleStockPublicOrder(req, res);
   if (req.method === "POST" && url === "/api/auth/register") return handleRegister(req, res);
   if (req.method === "POST" && url === "/api/auth/login") return handleLogin(req, res);
   if (req.method === "POST" && url === "/api/auth/logout") return handleLogout(req, res);
