@@ -89,6 +89,10 @@
   .modal p{ color:var(--soft); font-size:.86rem; margin:0 0 12px; }
   .modal .switch{ text-align:center; font-size:.82rem; color:var(--soft); margin-top:12px; }
   .modal .link{ background:none; border:none; color:var(--leaf); font-weight:600; cursor:pointer; }
+  .authseg{ display:flex; gap:4px; background:var(--surface2); border:1px solid var(--line); border-radius:11px; padding:3px; margin:4px 0 14px; }
+  .authseg .seg{ flex:1; border:none; background:none; border-radius:8px; padding:9px 6px; font-weight:700; font-size:.82rem; color:var(--soft); cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .authseg .seg.active{ background:var(--leaf); color:#fff; }
+  .authseg .seg svg{ width:17px; height:17px; }
   /* Aide « modes de conduite » */
   .modehelp{ display:inline-flex; align-items:center; gap:5px; margin-top:5px; background:none; border:none; padding:2px 0; color:var(--leaf); font-family:inherit; font-weight:600; font-size:.8rem; cursor:pointer; text-decoration:underline; }
   .modehelp:hover{ color:var(--deep); }
@@ -409,6 +413,11 @@
   <div class="modal-bg" id="authModal">
     <div class="modal">
       <h3 id="authTitle">Créer mon compte</h3>
+      <div class="authseg" id="authSeg" role="tablist" aria-label="Type de profil">
+        <button type="button" class="seg active" data-type="client" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><path d="M16 3.5a3 3 0 0 1 0 5.8"/></svg>Client</button>
+        <button type="button" class="seg" data-type="animateur" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><path d="M16 3.5a3 3 0 0 1 0 5.8M22 20c0-2.4-1.8-4.3-4-4.8"/></svg>Animateur</button>
+        <button type="button" class="seg" data-type="admin" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>Administrateur</button>
+      </div>
       <p id="authIntro">Gratuit — pour sauvegarder vos plans et suivre vos cultures.</p>
       <div id="nameWrap"><label style="font-size:.8rem;color:var(--soft);font-weight:600;">Nom</label><input id="auName" placeholder="Votre nom" maxlength="80"></div>
       <div id="regionWrap"><label style="font-size:.8rem;color:var(--soft);font-weight:600;">Région (facultatif)</label><input id="auRegion" placeholder="ex. Bouaké" maxlength="80"></div>
@@ -424,6 +433,7 @@
 <script>
   const $ = (id) => document.getElementById(id);
   let me = null, authMode = "register", currentPlan = null, chatHistory = [];
+  let accountType = "client";   // client | animateur | admin (admin = par e-mail, pas un vrai choix)
 
   // ---- Rendu Markdown minimal (##, listes -, **gras**, TABLEAUX, paragraphes) ----
   function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
@@ -494,27 +504,50 @@
     $("authModal").classList.add("show");
     // Le mot de passe est toujours masqué à l'ouverture (l'icône œil permet de l'afficher).
     try{ const ip=$("auPass"), ey=$("auPassEye"); if(ip) ip.type="password"; if(ey){ ey.setAttribute("aria-pressed","false"); ey.setAttribute("aria-label","Afficher le mot de passe"); ey.title="Afficher le mot de passe"; ey.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>'; } }catch(e){}
+    // L'administrateur ne se crée pas : accès par e-mail, connexion seulement.
+    if(accountType==="admin") authMode="login";
     const reg = authMode==="register";
-    $("authTitle").textContent = reg? "Créer mon compte":"Se connecter";
-    $("authIntro").textContent = reg? "Gratuit — pour sauvegarder vos plans et suivre vos cultures." : "Content de vous revoir.";
+    // Marque le segment actif.
+    document.querySelectorAll('#authSeg .seg').forEach(function(b){ var on=b.dataset.type===accountType; b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
+    var titles={ client:{ reg:"Créer mon compte client", log:"Connexion client" }, animateur:{ reg:"Devenir animateur", log:"Connexion animateur" }, admin:{ reg:"Accès administrateur", log:"Accès administrateur" } };
+    var intros={ client:{ reg:"Pour voir nos produits et suivre vos cultures.", log:"Content de vous revoir." },
+                 animateur:{ reg:"Créez votre compte : votre demande d'animateur sera envoyée à l'administrateur, qui la confirmera.", log:"Connectez-vous ; vous gérez le stock une fois confirmé par l'administrateur." },
+                 admin:{ reg:"", log:"Réservé à l'adresse de l'administrateur. Connectez-vous avec ce compte." } };
+    $("authTitle").textContent = titles[accountType][reg?"reg":"log"];
+    $("authIntro").textContent = intros[accountType][reg?"reg":"log"];
     $("nameWrap").style.display = reg? "block":"none"; $("regionWrap").style.display = reg? "block":"none";
     $("authGo").textContent = reg? "Créer mon compte":"Se connecter";
-    $("authSwitch").innerHTML = reg? 'Déjà un compte ? <button class="link" id="switchLink" type="button">Se connecter</button>' : 'Pas encore de compte ? <button class="link" id="switchLink" type="button">Créer un compte</button>';
-    $("switchLink").addEventListener("click", ()=>openAuth(reg?"login":"register"));
-    $("authErr").textContent=""; $("auPass").value="";
+    $("authGo").disabled=false;
+    // L'administrateur n'a pas d'inscription ; les autres profils gardent la bascule.
+    if(accountType==="admin"){ $("authSwitch").innerHTML=''; }
+    else { $("authSwitch").innerHTML = reg? 'Déjà un compte ? <button class="link" id="switchLink" type="button">Se connecter</button>' : 'Pas encore de compte ? <button class="link" id="switchLink" type="button">Créer un compte</button>'; $("switchLink").addEventListener("click", ()=>openAuth(reg?"login":"register")); }
+    var ae=$("authErr"); ae.textContent=""; ae.style.color=""; $("auPass").value="";
   }
+  // Choix du profil (Client / Animateur / Administrateur).
+  document.querySelectorAll('#authSeg .seg').forEach(function(b){ b.addEventListener('click', function(){ accountType=b.dataset.type; openAuth(accountType==="admin"?"login":authMode); }); });
   function closeAuth(){ $("authModal").classList.remove("show"); }
   async function doAuth(){
-    const err=$("authErr"); err.textContent="";
+    const err=$("authErr"); err.style.color=""; err.textContent="";
+    const wasRegister = authMode==="register";
     const email=$("auEmail").value.trim(), pass=$("auPass").value;
     if(!email||!pass){ err.textContent="Renseignez l'e-mail et le mot de passe."; return; }
-    const url = authMode==="register" ? "/api/auth/register" : "/api/auth/login";
-    const body = authMode==="register" ? { name:$("auName").value, region:$("auRegion").value, email, password:pass } : { email, password:pass };
+    const url = wasRegister ? "/api/auth/register" : "/api/auth/login";
+    const body = wasRegister ? { name:$("auName").value, region:$("auRegion").value, email, password:pass } : { email, password:pass };
     $("authGo").disabled=true;
     try{
       const r = await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
       const d = await r.json(); if(!r.ok){ err.textContent=d.error||"Erreur"; $("authGo").disabled=false; return; }
-      me = d.user; closeAuth(); render();
+      me = d.user;
+      // Inscription en tant qu'animateur : on envoie la demande, confirmée ensuite par l'administrateur.
+      if(wasRegister && accountType==="animateur"){
+        try{ await fetch("/api/animator/request",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({region:$("auRegion").value||""})}); }catch(e){}
+        err.style.color="var(--leaf)";
+        err.textContent="Compte créé. Votre demande d'animateur a été envoyée — un administrateur la confirmera. En attendant, vous avez un accès client.";
+        $("authGo").textContent="Compte créé ✓"; $("authGo").disabled=true;
+        setTimeout(function(){ closeAuth(); render(); }, 3000);
+        return;
+      }
+      closeAuth(); render();
     }catch(e){ err.textContent="Serveur injoignable."; }
     $("authGo").disabled=false;
   }
