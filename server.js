@@ -144,6 +144,10 @@ function isAdminEmail(u) { return !!u && ADMIN_EMAILS.includes(normEmail(u.email
 function isAdmin(u) { return isAdminEmail(u) && (!ADMIN_CODE || !!u._adminUnlocked); }
 function isAnimator(u) { return !!u && (!!u.animator || isAdmin(u)); }
 function userProfile(u) { return (u && u.profile === "client") ? "client" : "cultivateur"; }
+// Vrai compte « client » (vitrine uniquement) : profil client ET aucun rôle technique.
+// Un admin / animateur / cultivateur certifié n'est JAMAIS traité comme un client,
+// même si son profil valait « client ». Sert à fermer les pages et API techniques.
+function isClientOnly(u) { return !!u && userProfile(u) === "client" && !isAdmin(u) && !isAnimator(u) && !u.certified; }
 function publicUser(u) { return u ? { id: u.id, email: u.email, name: u.name, region: u.region || null, isAdmin: isAdmin(u), animator: isAnimator(u), certified: !!(u && u.certified), profile: userProfile(u), admin_email: isAdminEmail(u) } : null; }
 async function setUserAnimator(userId, val) {
   if (USE_DB) { try { await sb(`/trv_users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ animator: !!val }) }); } catch (e) { console.error("setUserAnimator:", e.message); } return; }
@@ -2601,11 +2605,51 @@ async function handleShopProducts(req, res) {
   } catch (e) { console.error("shop:", e.message); sendJson(res, 500, { error: "Boutique indisponible pour le moment." }); }
 }
 
+// ---------- Garde d'accès « client » (contrôle côté SERVEUR) ----------
+// Un compte « client » est une simple vitrine : il ne voit que la boutique.
+// Les pages et les API techniques lui sont fermées PAR LE SERVEUR, de sorte
+// que le navigateur ne peut pas contourner la restriction (une redirection
+// JavaScript ne suffit pas : la page et surtout ses données doivent être
+// refusées en amont). Admin / animateur / cultivateur certifié : accès complet.
+const CLIENT_BLOCKED_PAGES = new Set([
+  "/tableau", "/tableau.html", "/dashboard",
+  "/conseiller", "/conseiller.html", "/chat",
+  "/arduino", "/arduino.html",
+  "/cooperative", "/cooperative.html", "/coop",
+  "/comprendre", "/comprendre.html",
+  "/diagnostic", "/diagnostic.html",
+  "/stock", "/stock.html",
+  "/quality", "/quality.html"
+]);
+// Seules ces API sont ouvertes à un compte client (le reste est refusé).
+function clientApiAllowed(url) {
+  if (url === "/api/health") return true;
+  if (url.startsWith("/api/auth/")) return true;      // s'identifier / se déconnecter / /me
+  if (url === "/api/shop/products") return true;       // produits de la boutique
+  if (url.startsWith("/api/stock/public/")) return true; // catalogue public (déjà protégé à part)
+  return false;
+}
+// Renvoie true si la requête a été refusée (la réponse est alors déjà envoyée).
+async function denyIfClient(req, res, url, method) {
+  const isBlockedPage = method === "GET" && CLIENT_BLOCKED_PAGES.has(url);
+  const isApi = url.startsWith("/api/");
+  if (!isBlockedPage && !isApi) return false;          // page publique / ressource statique : rien à vérifier
+  if (isApi && clientApiAllowed(url)) return false;    // API autorisée au client
+  let u = null;
+  try { u = await currentUser(req); } catch (e) { u = null; }
+  if (!isClientOnly(u)) return false;                  // non connecté ou non-client : règles habituelles
+  if (isBlockedPage) { res.writeHead(302, { Location: "/boutique" }); res.end(); return true; }
+  sendJson(res, 403, { error: "Accès réservé. Votre compte est un compte client : rendez-vous sur la boutique pour voir les produits." });
+  return true;
+}
+
 // ---------- Routeur ----------
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const url = (req.url || "").split("?")[0];
   // Point de contrôle de santé (pour un moniteur d'uptime : garde le service éveillé et signale les pannes).
   if (req.method === "GET" && (url === "/healthz" || url === "/api/health")) return sendJson(res, 200, { ok: true, service: "terravive", time: new Date().toISOString(), uptime_s: Math.round(process.uptime()), db: USE_DB ? "supabase" : "local" });
+  // Un compte « client » ne peut atteindre que la boutique et l'authentification.
+  if (await denyIfClient(req, res, url, req.method)) return;
   // ---- Terravive Stock ----
   if (req.method === "GET" && url === "/api/stock/overview") return handleStockOverview(req, res);
   if (req.method === "GET" && url === "/api/stock/products") return handleStockProducts(req, res);
