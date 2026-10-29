@@ -2593,6 +2593,20 @@ async function handleStockPublicProducts(req, res) {
 function handleStockPublicOrder(req, res) {
   return sendJson(res, 503, { error: "Les commandes en ligne ne sont pas encore activées. Cette fonctionnalité sera ouverte après configuration (décision commerciale et moyens de paiement)." });
 }
+// Catalogue de DÉMONSTRATION de la boutique. Affiché UNIQUEMENT quand la coopérative
+// n'a encore aucun produit réellement disponible, pour que le client voie un aperçu
+// plutôt qu'une page vide. Ce ne sont PAS de vrais produits en vente : la boutique les
+// signale clairement comme des exemples, et ils disparaissent dès qu'un vrai produit
+// disponible existe.
+const SHOP_DEMO = [
+  { name: "Tomate",    category: "Légume", unit: "kg",    price: 600,  available: 25 },
+  { name: "Concombre", category: "Légume", unit: "kg",    price: 500,  available: 18 },
+  { name: "Piment",    category: "Légume", unit: "kg",    price: 1500, available: 8 },
+  { name: "Aubergine", category: "Légume", unit: "kg",    price: 700,  available: 20 },
+  { name: "Laitue",    category: "Légume", unit: "unite", price: 300,  available: 40 },
+  { name: "Gombo",     category: "Légume", unit: "kg",    price: 800,  available: 15 },
+  { name: "Poivron",   category: "Légume", unit: "kg",    price: 1200, available: 12 }
+].map(d => ({ name: d.name, category: d.category, unit: d.unit, price: d.price, image: stockDefaultImage(d.name), available: d.available, producer: null }));
 // Boutique client (utilisateur connecté) : voir les produits disponibles. Lecture seule.
 async function handleShopProducts(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Connectez-vous pour voir la boutique." });
@@ -2601,7 +2615,9 @@ async function handleShopProducts(req, res) {
     const movements = await stkAll("stock_movements");
     const producers = await stkAll("stock_producers"); const pr = {}; for (const p of producers) pr[p.id] = p;
     const rows = products.map(p => { const on = stockOnHand(movements, p.id); const prod = p.producer_id ? pr[p.producer_id] : null; return { name: p.name, category: p.category || null, unit: p.unit, price: Number(p.price || 0), image: p.image || null, available: on > 0 ? on : 0, producer: (prod && prod.consent_public) ? prod.name : null }; }).filter(r => r.available > 0).sort((a, b) => a.name.localeCompare(b.name));
-    sendJson(res, 200, { products: rows, user: { name: user.name || null } });
+    // Aucun produit réel disponible → aperçu de démonstration, clairement marqué comme exemples.
+    if (rows.length === 0) return sendJson(res, 200, { products: SHOP_DEMO, demo: true, user: { name: user.name || null } });
+    sendJson(res, 200, { products: rows, demo: false, user: { name: user.name || null } });
   } catch (e) { console.error("shop:", e.message); sendJson(res, 500, { error: "Boutique indisponible pour le moment." }); }
 }
 
