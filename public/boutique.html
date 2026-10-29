@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fr" data-theme="nature">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terravive — Boutique</title>
+<style>
+:root{--leaf:#176443;--deep:#123e2a;--sun:#C58A2A;--line:#dce6d9;--bg:#eef4ec;--surface:#fff;--surface2:#f5f8f4;--ink:#15251B;--soft:#53625a;--faint:#8a988e;--good:#2E8B6F;--bad:#c0392b;--shadow:0 8px 28px rgba(20,50,30,.08)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,Arial,sans-serif}
+a{color:inherit}.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+header{background:var(--deep);color:#fff}
+.bar{display:flex;align-items:center;gap:12px;padding:16px 0}
+.brand{display:flex;align-items:center;gap:10px;font:700 22px Georgia,serif}.brand img{width:36px;height:36px;object-fit:contain}
+.brand small{display:block;font:400 12px "Segoe UI",sans-serif;opacity:.85}
+.grow{flex:1}
+.btn{border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;border-radius:10px;padding:8px 13px;cursor:pointer;font:inherit;font-weight:700;display:inline-flex;align-items:center;gap:7px}
+.btn svg{width:15px;height:15px}
+.hero{padding:26px 0 8px}.hero h1{font:700 clamp(24px,3vw,34px) Georgia,serif;color:var(--deep);margin:0 0 4px}.hero p{color:var(--soft);margin:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;margin:18px 0 40px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+.card .ph{height:150px;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:40px}
+.card img{width:100%;height:150px;object-fit:cover;display:block}
+.card .body{padding:13px 14px;display:flex;flex-direction:column;gap:4px;flex:1}
+.card .name{font:700 16px Georgia,serif;color:var(--deep)}
+.card .cat{font-size:12px;color:var(--faint)}
+.card .price{font:700 18px "Segoe UI",sans-serif;color:var(--leaf);margin-top:4px}
+.card .avail{font-size:12px;color:var(--soft)}
+.card .prod{font-size:12px;color:var(--faint);margin-top:2px}
+.pill{display:inline-block;align-self:flex-start;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:800;background:#e6f4e9;color:var(--good);margin-top:6px}
+.notice{border:1px solid #efd8a9;background:#fff8e9;color:#875c12;border-radius:13px;padding:16px;margin:22px 0;font-size:14px}
+.notice.err{border-color:#f0c9c6;background:#fdeceb;color:#9c2a21}
+.empty{padding:40px;text-align:center;color:var(--soft)}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--leaf);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-3px;margin-right:8px}@keyframes sp{to{transform:rotate(360deg)}}
+.foot{color:var(--faint);font-size:12px;text-align:center;padding:20px 0 30px}
+@media(max-width:600px){.card .ph,.card img{height:120px}}
+</style>
+</head>
+<body>
+<header><div class="wrap bar">
+  <div class="brand"><img src="/logo.png" alt="Terravive"><div>Terravive<small>Boutique</small></div></div>
+  <div class="grow"></div>
+  <span id="hello" style="opacity:.9;font-size:14px;margin-right:4px"></span>
+  <button class="btn" type="button" onclick="this.disabled=true;this.textContent='Déconnexion…';fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'}).catch(function(){}).finally(function(){location.href='/';});"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 12H4M9 7l-5 5 5 5"/><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/></svg>Se déconnecter</button>
+</div></header>
+<main class="wrap">
+  <div class="hero"><h1>Nos produits</h1><p>Les produits frais de la coopérative, avec leurs quantités disponibles et leurs prix.</p></div>
+  <div id="notice" class="notice" role="status">Chargement…</div>
+  <div class="grid" id="grid"></div>
+  <div class="foot">Montants en FCFA. Les disponibilités se mettent à jour selon les récoltes et les ventes de la coopérative.</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+const fXOF=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'XOF',maximumFractionDigits:0});
+const fNum=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:3});
+const UNIT={kg:'kg',g:'g',t:'t',l:'L',unite:'unité',caisse:'caisse',sac:'sac'};
+async function load(){
+ try{
+  const r=await fetch('/api/shop/products',{credentials:'same-origin'});
+  if(r.status===401){ $('notice').className='notice err'; $('notice').innerHTML='Connectez-vous pour voir la boutique. <a href="/app" style="color:inherit;font-weight:700;text-decoration:underline">Se connecter</a>'; return; }
+  const d=await r.json();
+  if(!r.ok){ $('notice').className='notice err'; $('notice').textContent=d.error||'Boutique indisponible.'; return; }
+  if(d.user&&d.user.name) $('hello').textContent='Bonjour '+d.user.name;
+  if(!d.products.length){ $('notice').style.display='none'; $('grid').innerHTML='<div class="empty">Aucun produit disponible pour le moment. Revenez bientôt !</div>'; return; }
+  $('notice').style.display='none';
+  $('grid').innerHTML=d.products.map(p=>`<article class="card">
+    ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy">`:'<div class="ph" aria-hidden="true">🥬</div>'}
+    <div class="body">
+      <div class="name">${esc(p.name)}</div>
+      <div class="cat">${esc(p.category||'Produit')}</div>
+      <div class="price">${p.price>0?fXOF.format(p.price)+' <span style="font-weight:400;color:var(--soft);font-size:13px">/ '+esc(UNIT[p.unit]||p.unit)+'</span>':'<span style="color:var(--soft);font-weight:400;font-size:14px">Prix à demander</span>'}</div>
+      <div class="avail">Disponible : ${fNum.format(p.available)} ${esc(UNIT[p.unit]||p.unit)}</div>
+      ${p.producer?`<div class="prod">Producteur : ${esc(p.producer)}</div>`:''}
+      <span class="pill">En vente</span>
+    </div></article>`).join('');
+ }catch(e){ $('notice').className='notice err'; $('notice').textContent='Serveur injoignable.'; }
+}
+load();
+</script>
+</body></html>

@@ -226,6 +226,14 @@
             <div id="animMsg" class="muted" style="margin-top:7px;"></div>
             <div id="animReqList" class="section-gap"></div>
             <div id="animList" class="section-gap"></div>
+            <div id="certReqList" class="section-gap"></div>
+          </div>
+
+          <div class="card" id="certCard" style="display:none;border-color:var(--leaf);">
+            <h2 class="ct">Devenir cultivateur certifié</h2>
+            <div class="muted">Si vous maîtrisez Terravive, demandez votre certification. Une fois <b>approuvé par l'administrateur</b>, vous gérez votre propre stock en autonomie, sans passer par un animateur.</div>
+            <div id="certStatus" class="section-gap muted">—</div>
+            <button class="btn primary" id="certAsk" type="button" style="margin-top:8px;display:none;">Demander la certification</button>
           </div>
 
           <div class="card">
@@ -813,8 +821,10 @@ void loop() {
         menu.appendChild(link);
       }
     }
-    // Onglet Stock : pour l'administrateur ET les animateurs de coopérative (qui gèrent le stock).
-    if(me && (me.isAdmin || me.animator)){
+    // Cultivateur (ni admin, ni animateur, ni déjà certifié, ni compte client) : proposer la certification.
+    if(me && !me.isAdmin && !me.animator && !me.certified && me.profile!=="client"){ try{ initCertRequest(); }catch(e){} }
+    // Onglet Stock : administrateur, animateurs, ET cultivateurs certifiés (qui gèrent leur stock).
+    if(me && (me.isAdmin || me.animator || me.certified)){
       const menu=document.querySelector('.side .menu');
       if(menu && !document.getElementById('stockNav')){
         const s=document.createElement('a');
@@ -842,6 +852,46 @@ void loop() {
     $("animRevoke").addEventListener("click",function(){ act(false); });
     loadAnimReqs();
     loadAnimList();
+    loadCertReqs();
+  }
+  // Admin : demandes de certification des cultivateurs.
+  async function loadCertReqs(){
+    const box=$("certReqList"); if(!box) return;
+    try{
+      const r=await fetch("/api/admin/certify-requests"); const d=await r.json(); if(!r.ok) return;
+      const reqs=d.requests||[];
+      if(!reqs.length){ box.innerHTML=''; return; }
+      box.innerHTML='<div style="font-weight:700;color:var(--leaf);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin:12px 0 6px;">Demandes de certification cultivateur ('+reqs.length+')</div>'
+        + reqs.map(function(q){ const when=q.created_at?new Date(q.created_at).toLocaleDateString("fr-FR"):"";
+          return '<div style="border:1px solid var(--leaf);border-radius:10px;padding:9px 11px;margin-bottom:7px;background:color-mix(in srgb,var(--leaf) 7%,var(--surface));">'
+            +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="flex:1;min-width:150px;"><b>'+esc(q.name||q.email)+'</b> <span class="muted" style="font-size:.82rem;">'+esc(q.email)+(q.region?(" · "+esc(q.region)):"")+' · '+esc(when)+'</span></span>'
+            +'<button class="btn primary" type="button" data-creq="'+esc(q.id)+'|1" style="padding:5px 11px;">Certifier</button>'
+            +'<button class="btn" type="button" data-creq="'+esc(q.id)+'|0" style="padding:5px 11px;border-color:#c0392b;color:#c0392b;">Refuser</button></div></div>';
+        }).join("");
+      box.querySelectorAll("[data-creq]").forEach(function(b){ b.addEventListener("click", async function(){
+        const pr=b.getAttribute("data-creq").split("|"); b.disabled=true;
+        const rr=await fetch("/api/admin/certify-requests/decide",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:pr[0],approve:pr[1]==="1"})});
+        if(rr.ok){ loadCertReqs(); } else { b.disabled=false; }
+      }); });
+    }catch(e){}
+  }
+  // Cultivateur : demander la certification.
+  async function initCertRequest(){
+    const card=$("certCard"); if(!card) return; card.style.display="block";
+    const st=$("certStatus"), btn=$("certAsk");
+    try{
+      const r=await fetch("/api/certify/request"); const d=await r.json();
+      if(d.certified){ st.textContent="Vous êtes certifié : l'onglet « Stock » est accessible."; st.style.color="var(--good)"; btn.style.display="none"; return; }
+      if(d.request && d.request.status==="en_attente"){ st.textContent="Demande en attente de validation par l'administrateur."; btn.style.display="none"; return; }
+      if(d.request && d.request.status==="refusée"){ st.textContent="Votre précédente demande a été refusée. Vous pouvez en soumettre une nouvelle."; }
+      else { st.textContent="Vous n'êtes pas encore certifié."; }
+      btn.style.display="inline-block";
+      btn.onclick=async function(){ btn.disabled=true; btn.textContent="Envoi…";
+        const rr=await fetch("/api/certify/request",{method:"POST",headers:{"content-type":"application/json"},body:"{}"}); const dd=await rr.json();
+        if(rr.ok){ st.textContent="Demande envoyée. L'administrateur la confirmera."; st.style.color="var(--leaf)"; btn.style.display="none"; }
+        else { st.textContent=dd.error||"Demande impossible."; btn.disabled=false; btn.textContent="Demander la certification"; }
+      };
+    }catch(e){}
   }
   async function loadAnimReqs(){
     const box=$("animReqList"); if(!box) return;

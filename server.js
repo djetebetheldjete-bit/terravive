@@ -81,7 +81,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [] }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [] }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -101,9 +101,9 @@ async function getUserById(id) {
   if (USE_DB) { try { const r = await sb(`/trv_users?id=eq.${encodeURIComponent(id)}&select=*`); return (r && r[0]) || null; } catch (e) { return null; } }
   return loadStore().users[id] || null;
 }
-async function createUser({ email, name, password, region }) {
+async function createUser({ email, name, password, region, profile }) {
   const e = normEmail(email);
-  const user = { id: newId(), email: e, name: String(name || "").trim().slice(0, 80) || e.split("@")[0], pass: hashPassword(password), region: String(region || "").trim().slice(0, 80) || null, created_at: new Date().toISOString() };
+  const user = { id: newId(), email: e, name: String(name || "").trim().slice(0, 80) || e.split("@")[0], pass: hashPassword(password), region: String(region || "").trim().slice(0, 80) || null, profile: (profile === "client" ? "client" : "cultivateur"), created_at: new Date().toISOString() };
   if (USE_DB) { await sb(`/trv_users`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([user]) }); }
   else { const s = loadStore(); s.users[user.id] = user; s.emails[e] = user.id; saveStore(s); }
   return user;
@@ -129,13 +129,51 @@ async function getSessionUser(token) {
 function parseCookies(req) { const h = req.headers.cookie || ""; const out = {}; h.split(";").forEach((p) => { const i = p.indexOf("="); if (i > -1) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim()); }); return out; }
 function setSessionCookie(res, token) { res.setHeader("Set-Cookie", `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax${COOKIE_SECURE}; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`); }
 function clearSessionCookie(res) { res.setHeader("Set-Cookie", `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax${COOKIE_SECURE}; Max-Age=0`); }
-async function currentUser(req) { const t = parseCookies(req)[SESSION_COOKIE]; return t ? await getSessionUser(t) : null; }
-function isAdmin(u) { return !!u && ADMIN_EMAILS.includes(normEmail(u.email)); }
+// Code administrateur (facultatif). S'il est défini, un compte administrateur doit AUSSI
+// fournir ce code (onglet « Administrateur ») pour obtenir les droits admin dans sa session.
+// S'il n'est pas défini, le comportement reste celui d'avant (admin par e-mail seul).
+const ADMIN_CODE = (process.env.ADMIN_CODE || "").trim();
+const ADMIN_UNLOCKED = new Set(); // jetons de session ayant fourni le bon code (mémoire ; réinit. au redémarrage)
+async function currentUser(req) {
+  const t = parseCookies(req)[SESSION_COOKIE]; if (!t) return null;
+  const u = await getSessionUser(t); if (!u) return null;
+  // Clone léger (ne pollue pas le stockage) + indicateur « code admin fourni pour cette session ».
+  return Object.assign({}, u, { _token: t, _adminUnlocked: (!ADMIN_CODE) || ADMIN_UNLOCKED.has(t) });
+}
+function isAdminEmail(u) { return !!u && ADMIN_EMAILS.includes(normEmail(u.email)); }
+function isAdmin(u) { return isAdminEmail(u) && (!ADMIN_CODE || !!u._adminUnlocked); }
 function isAnimator(u) { return !!u && (!!u.animator || isAdmin(u)); }
-function publicUser(u) { return u ? { id: u.id, email: u.email, name: u.name, region: u.region || null, isAdmin: isAdmin(u), animator: isAnimator(u) } : null; }
+function userProfile(u) { return (u && u.profile === "client") ? "client" : "cultivateur"; }
+function publicUser(u) { return u ? { id: u.id, email: u.email, name: u.name, region: u.region || null, isAdmin: isAdmin(u), animator: isAnimator(u), certified: !!(u && u.certified), profile: userProfile(u), admin_email: isAdminEmail(u) } : null; }
 async function setUserAnimator(userId, val) {
   if (USE_DB) { try { await sb(`/trv_users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ animator: !!val }) }); } catch (e) { console.error("setUserAnimator:", e.message); } return; }
   const s = loadStore(); if (s.users[userId]) { s.users[userId].animator = !!val; saveStore(s); }
+}
+async function setUserCertified(userId, val) {
+  if (USE_DB) { try { await sb(`/trv_users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ certified: !!val }) }); } catch (e) { console.error("setUserCertified:", e.message); } return; }
+  const s = loadStore(); if (s.users[userId]) { s.users[userId].certified = !!val; saveStore(s); }
+}
+// Demandes de CERTIFICATION cultivateur (maîtrise de Terravive) — décidées par l'administrateur.
+async function listCertRequests(status) {
+  if (USE_DB) { try { const q = status ? `&status=eq.${encodeURIComponent(status)}` : ""; return (await sb(`/trv_cert_requests?select=*${q}&order=created_at.desc`)) || []; } catch (e) { return []; } }
+  let a = (loadStore().certReqs || []); if (status) a = a.filter((r) => r.status === status); return a.slice().sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)));
+}
+async function getCertRequestByUser(userId) {
+  if (USE_DB) { try { const r = await sb(`/trv_cert_requests?user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc&limit=1`); return (r && r[0]) || null; } catch (e) { return null; } }
+  const a = (loadStore().certReqs || []).filter((r) => r.user_id === userId).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at))); return a[0] || null;
+}
+async function getCertRequest(id) {
+  if (!id) return null;
+  if (USE_DB) { try { const r = await sb(`/trv_cert_requests?id=eq.${encodeURIComponent(id)}&select=*`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return (loadStore().certReqs || []).find((r) => r.id === id) || null;
+}
+async function addCertRequest(rec) {
+  if (USE_DB) { try { await sb(`/trv_cert_requests`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("addCertRequest:", e.message); } return; }
+  const s = loadStore(); (s.certReqs = s.certReqs || []).push(rec); saveStore(s);
+}
+async function updateCertRequest(id, fields) {
+  if (USE_DB) { try { await sb(`/trv_cert_requests?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(fields) }); } catch (e) {} return; }
+  const s = loadStore(); const r = (s.certReqs || []).find((x) => x.id === id); if (r) { Object.assign(r, fields); saveStore(s); }
 }
 // Demandes pour devenir animateur (soumises par l'agriculteur, décidées par le propriétaire).
 async function listAnimRequests(status) {
@@ -806,7 +844,7 @@ async function handleRegister(req, res) {
     if (!validEmail(email)) return sendJson(res, 400, { error: "Adresse e-mail invalide." });
     if (typeof p.password !== "string" || p.password.length < 6) return sendJson(res, 400, { error: "Le mot de passe doit contenir au moins 6 caractères." });
     if (await findUserByEmail(email)) return sendJson(res, 409, { error: "Un compte existe déjà avec cette adresse. Connectez-vous." });
-    const user = await createUser({ email, name: p.name, password: p.password, region: p.region });
+    const user = await createUser({ email, name: p.name, password: p.password, region: p.region, profile: p.profile });
     const token = await createSession(user.id); setSessionCookie(res, token);
     sendJson(res, 200, { user: publicUser(user) });
   } catch (e) { sendJson(res, 500, { error: e.message || "Erreur serveur." }); }
@@ -816,11 +854,20 @@ async function handleLogin(req, res) {
     let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
     const user = await findUserByEmail(p.email);
     if (!user || !verifyPassword(p.password, user.pass)) return sendJson(res, 401, { error: "E-mail ou mot de passe incorrect." });
+    // Onglet « Administrateur » + code administrateur configuré : le code est exigé.
+    let unlocked = false;
+    if (p.as === "admin" && ADMIN_CODE) {
+      if (!isAdminEmail(user)) return sendJson(res, 403, { error: "Ce compte n'est pas un compte administrateur." });
+      if (String(p.code || "") !== ADMIN_CODE) return sendJson(res, 401, { error: "Code administrateur incorrect." });
+      unlocked = true;
+    }
     const token = await createSession(user.id); setSessionCookie(res, token);
-    sendJson(res, 200, { user: publicUser(user) });
+    if (unlocked) ADMIN_UNLOCKED.add(token);
+    const u2 = Object.assign({}, user, { _adminUnlocked: unlocked || !ADMIN_CODE });
+    sendJson(res, 200, { user: publicUser(u2) });
   } catch (e) { sendJson(res, 500, { error: e.message || "Erreur serveur." }); }
 }
-async function handleLogout(req, res) { const t = parseCookies(req)[SESSION_COOKIE]; await deleteSession(t); clearSessionCookie(res); sendJson(res, 200, { ok: true }); }
+async function handleLogout(req, res) { const t = parseCookies(req)[SESSION_COOKIE]; if (t) ADMIN_UNLOCKED.delete(t); await deleteSession(t); clearSessionCookie(res); sendJson(res, 200, { ok: true }); }
 async function handleMe(req, res) { sendJson(res, 200, { user: publicUser(await currentUser(req)) }); }
 
 async function handlePlan(req, res) {
@@ -1226,6 +1273,39 @@ async function handleAdminSetAnimator(req, res) {
   await setUserAnimator(target.id, grant);
   sendJson(res, 200, { ok: true, email: target.email, name: target.name || null, animator: grant });
 }
+// ---- Certification cultivateur (gère son propre stock, en autonomie, après approbation de l'admin) ----
+function isCertifiedUser(u) { return !!u && (!!u.certified || isAnimator(u)); }
+async function handleCertRequestGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  if (isCertifiedUser(user)) return sendJson(res, 200, { certified: true, request: null });
+  const r = await getCertRequestByUser(user.id);
+  sendJson(res, 200, { certified: false, request: r ? { status: r.status, created_at: r.created_at } : null });
+}
+async function handleCertRequestCreate(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Connectez-vous d'abord." });
+  if (isCertifiedUser(user)) return sendJson(res, 400, { error: "Vous êtes déjà certifié (ou animateur/administrateur)." });
+  if (userProfile(user) === "client") return sendJson(res, 400, { error: "La certification est réservée aux cultivateurs, pas aux comptes client." });
+  if (!rateOk("certreq:" + user.id, 5, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de demandes aujourd'hui. Réessayez demain." });
+  const existing = await getCertRequestByUser(user.id);
+  if (existing && existing.status === "en_attente") return sendJson(res, 200, { ok: true, status: "en_attente", already: true });
+  const rec = { id: newId(), user_id: user.id, name: user.name || null, email: user.email, region: user.region || null, status: "en_attente", created_at: new Date().toISOString(), decided_at: null };
+  await addCertRequest(rec);
+  sendJson(res, 200, { ok: true, status: "en_attente" });
+}
+async function handleAdminCertRequests(req, res) {
+  const u = await currentUser(req); if (!isAdmin(u)) return sendJson(res, 403, { error: "Réservé à l'administrateur." });
+  const pending = await listCertRequests("en_attente");
+  sendJson(res, 200, { requests: pending.map((r) => ({ id: r.id, name: r.name || null, email: r.email, region: r.region || null, created_at: r.created_at })) });
+}
+async function handleAdminCertDecide(req, res) {
+  const u = await currentUser(req); if (!isAdmin(u)) return sendJson(res, 403, { error: "Réservé à l'administrateur." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const r = await getCertRequest(String(p.id || "")); if (!r) return sendJson(res, 404, { error: "Demande introuvable." });
+  const approve = !(p.approve === false || p.approve === "false" || p.approve === 0);
+  if (approve) await setUserCertified(r.user_id, true);
+  await updateCertRequest(r.id, { status: approve ? "acceptée" : "refusée", decided_at: new Date().toISOString() });
+  sendJson(res, 200, { ok: true, status: approve ? "acceptée" : "refusée", email: r.email });
+}
 
 async function handleArduino(req, res) {
   if (!API_KEY) return sendJson(res, 500, { error: "Clé IA manquante (ANTHROPIC_API_KEY)." });
@@ -1329,6 +1409,7 @@ function serveStatic(req, res) {
   if (urlPath === "/tableau" || urlPath === "/dashboard") urlPath = "/tableau.html";
   if (urlPath === "/quality") urlPath = "/quality.html";
   if (urlPath === "/stock") urlPath = "/stock.html";
+  if (urlPath === "/boutique") urlPath = "/boutique.html";
   if (urlPath === "/comprendre") urlPath = "/comprendre.html";
   if (urlPath === "/conseiller" || urlPath === "/chat") urlPath = "/conseiller.html";
   if (urlPath === "/cooperative" || urlPath === "/coop") urlPath = "/cooperative.html";
@@ -1554,7 +1635,7 @@ const QG_PERMS = {
 function qualityRole(u) {
   if (!u) return null;
   const e = normEmail(u.email);
-  if (ADMIN_EMAILS.includes(e)) return "admin";
+  if (isAdmin(u)) return "admin";
   if (QG_AUDITORS.includes(e)) return "auditeur";
   if (QG_VIEWERS.includes(e)) return "lecteur";
   return null;
@@ -2061,8 +2142,8 @@ const STOCK_PERMS = {
 function stockRole(u) {
   if (!u) return null;
   const e = normEmail(u.email);
-  if (u.isAdmin || ADMIN_EMAILS.includes(e) || STOCK_ADMINS.includes(e)) return "admin";
-  if (u.animator || STOCK_OPERATORS.includes(e)) return "operateur";
+  if (isAdmin(u) || STOCK_ADMINS.includes(e)) return "admin";
+  if (u.animator || u.certified || STOCK_OPERATORS.includes(e)) return "operateur"; // animateur OU cultivateur certifié
   if (STOCK_VIEWERS.includes(e)) return "lecteur";
   return null;
 }
@@ -2508,6 +2589,17 @@ async function handleStockPublicProducts(req, res) {
 function handleStockPublicOrder(req, res) {
   return sendJson(res, 503, { error: "Les commandes en ligne ne sont pas encore activées. Cette fonctionnalité sera ouverte après configuration (décision commerciale et moyens de paiement)." });
 }
+// Boutique client (utilisateur connecté) : voir les produits disponibles. Lecture seule.
+async function handleShopProducts(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Connectez-vous pour voir la boutique." });
+  try {
+    const products = await stkAll("stock_products");
+    const movements = await stkAll("stock_movements");
+    const producers = await stkAll("stock_producers"); const pr = {}; for (const p of producers) pr[p.id] = p;
+    const rows = products.map(p => { const on = stockOnHand(movements, p.id); const prod = p.producer_id ? pr[p.producer_id] : null; return { name: p.name, category: p.category || null, unit: p.unit, price: Number(p.price || 0), image: p.image || null, available: on > 0 ? on : 0, producer: (prod && prod.consent_public) ? prod.name : null }; }).filter(r => r.available > 0).sort((a, b) => a.name.localeCompare(b.name));
+    sendJson(res, 200, { products: rows, user: { name: user.name || null } });
+  } catch (e) { console.error("shop:", e.message); sendJson(res, 500, { error: "Boutique indisponible pour le moment." }); }
+}
 
 // ---------- Routeur ----------
 const server = http.createServer((req, res) => {
@@ -2583,6 +2675,11 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && url === "/api/admin/animator-requests/decide") return handleAdminAnimDecide(req, res);
   if (req.method === "GET" && url === "/api/animator/request") return handleAnimRequestGet(req, res);
   if (req.method === "POST" && url === "/api/animator/request") return handleAnimRequestCreate(req, res);
+  if (req.method === "GET" && url === "/api/certify/request") return handleCertRequestGet(req, res);
+  if (req.method === "POST" && url === "/api/certify/request") return handleCertRequestCreate(req, res);
+  if (req.method === "GET" && url === "/api/admin/certify-requests") return handleAdminCertRequests(req, res);
+  if (req.method === "POST" && url === "/api/admin/certify-requests/decide") return handleAdminCertDecide(req, res);
+  if (req.method === "GET" && url === "/api/shop/products") return handleShopProducts(req, res);
   if (req.method === "GET" && url === "/api/quality/overview") return handleQualityOverview(req, res);
   if (req.method === "GET" && url === "/api/quality/audit") return handleQualityAuditGet(req, res);
   if (req.method === "POST" && url === "/api/quality/audit") return handleQualityAudit(req, res);

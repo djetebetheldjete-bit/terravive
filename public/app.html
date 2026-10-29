@@ -424,6 +424,7 @@
       <label style="font-size:.8rem;color:var(--soft);font-weight:600;">E-mail</label><input id="auEmail" type="email" placeholder="vous@exemple.com" autocomplete="username">
       <label style="font-size:.8rem;color:var(--soft);font-weight:600;">Mot de passe</label>
       <div class="pw-wrap"><input id="auPass" type="password" placeholder="au moins 6 caractères" autocomplete="current-password"><button type="button" class="pw-eye" id="auPassEye" aria-label="Afficher le mot de passe" aria-pressed="false" title="Afficher le mot de passe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+      <div id="codeWrap" style="display:none;margin-top:12px;"><label style="font-size:.8rem;color:var(--soft);font-weight:600;">Code administrateur</label><input id="auCode" type="password" placeholder="Code secret de l'administrateur" autocomplete="off"></div>
       <div class="err" id="authErr"></div>
       <button class="btn primary" id="authGo" type="button" style="width:100%;">Créer mon compte</button>
       <div class="switch" id="authSwitch">Déjà un compte ? <button class="link" id="switchLink" type="button">Se connecter</button></div>
@@ -490,6 +491,8 @@
     if(params.get("auto")==="1" && me){ try{ generate(false); }catch(e){} }
   }
   function render(){
+    // Un compte « client » n'a pas accès à l'app agronomique : on l'oriente vers la boutique.
+    if(me && me.profile==="client" && !me.isAdmin && !me.animator && !me.certified){ location.replace("/boutique"); return; }
     if(me){
       $("loginBtn").style.display="none"; $("logoutBtn").style.display="inline-block";
       $("acct").style.display="flex"; $("acctName").textContent = me.name; $("av").textContent=(me.name||"?").charAt(0).toUpperCase();
@@ -516,6 +519,7 @@
     $("authTitle").textContent = titles[accountType][reg?"reg":"log"];
     $("authIntro").textContent = intros[accountType][reg?"reg":"log"];
     $("nameWrap").style.display = reg? "block":"none"; $("regionWrap").style.display = reg? "block":"none";
+    $("codeWrap").style.display = (accountType==="admin") ? "block":"none"; var ac=$("auCode"); if(ac) ac.value="";
     $("authGo").textContent = reg? "Créer mon compte":"Se connecter";
     $("authGo").disabled=false;
     // L'administrateur n'a pas d'inscription ; les autres profils gardent la bascule.
@@ -532,7 +536,10 @@
     const email=$("auEmail").value.trim(), pass=$("auPass").value;
     if(!email||!pass){ err.textContent="Renseignez l'e-mail et le mot de passe."; return; }
     const url = wasRegister ? "/api/auth/register" : "/api/auth/login";
-    const body = wasRegister ? { name:$("auName").value, region:$("auRegion").value, email, password:pass } : { email, password:pass };
+    const profile = accountType==="client" ? "client" : "cultivateur";
+    const body = wasRegister
+      ? { name:$("auName").value, region:$("auRegion").value, email, password:pass, profile }
+      : { email, password:pass, as:accountType, code: (accountType==="admin" ? ($("auCode")?$("auCode").value:"") : undefined) };
     $("authGo").disabled=true;
     try{
       const r = await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});

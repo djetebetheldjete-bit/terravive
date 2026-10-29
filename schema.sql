@@ -16,6 +16,8 @@ create table if not exists trv_users (
 
 -- Statut « animateur » accordé par le propriétaire (true = peut créer/animer une coopérative)
 alter table trv_users add column if not exists animator boolean default false;
+alter table trv_users add column if not exists certified boolean default false;   -- cultivateur certifié (gère son stock)
+alter table trv_users add column if not exists profile text default 'cultivateur'; -- 'client' | 'cultivateur'
 
 -- Sessions de connexion (jeton aléatoire)
 create table if not exists trv_sessions (
@@ -184,6 +186,20 @@ create table if not exists trv_anim_requests (
 );
 create index if not exists trv_anim_requests_status_idx on trv_anim_requests (status, created_at desc);
 create index if not exists trv_anim_requests_user_idx on trv_anim_requests (user_id);
+
+-- Demandes de certification cultivateur (maîtrise de Terravive), décidées par l'administrateur.
+create table if not exists trv_cert_requests (
+  id text primary key,
+  user_id text,
+  name text,
+  email text,
+  region text,
+  status text,                -- 'en_attente' | 'acceptée' | 'refusée'
+  created_at timestamptz default now(),
+  decided_at timestamptz
+);
+create index if not exists trv_cert_requests_status_idx on trv_cert_requests (status, created_at desc);
+create index if not exists trv_cert_requests_user_idx on trv_cert_requests (user_id);
 
 
 -- Terravive Quality Guard : historique des audits administratifs
