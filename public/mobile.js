@@ -218,7 +218,11 @@
     cardify(); var main = document.querySelector("main, .main") || document.body;
     var t = null; var mo2 = new MutationObserver(function () { clearTimeout(t); t = setTimeout(cardify, 80); }); mo2.observe(main, { childList: true, subtree: true });
     window.addEventListener("scroll", onScroll, { passive: true }); document.addEventListener("focusin", onFocusIn); document.addEventListener("focusout", onFocusOut); document.addEventListener("keydown", onKey);
-    loadMe(function () { if (me && me.profile === "client" && els.nav) { els.nav.style.display = "none"; document.body.classList.add("m-nobar"); } });
+    loadMe(function () {
+      if (me && me.profile === "client" && els.nav) { els.nav.style.display = "none"; document.body.classList.add("m-nobar"); }
+      /* accueil : une personne déjà connectée voit « Mon tableau de bord », pas « Se connecter » */
+      if (me && els.cta) els.cta.innerHTML = '<a href="/app">Nouveau plan</a><a class="primary" href="/tableau">Mon tableau de bord</a>';
+    });
   }
   function destroy() {
     if (!built) return; built = false; document.body.classList.remove("m-on", "m-cta-on", "m-nobar", "m-hide-nav", "m-kb", "m-quality", "m-sheet-open");
