@@ -69,18 +69,39 @@
   .foot{ text-align:center; color:var(--faint); font-size:.85rem; padding:32px 22px 48px; max-width:1120px; margin:0 auto; }
   .foot a{ color:var(--deep); }
 
-  /* ---- Bande vitrine : logo + services qui défilent ---- */
-  .vitrine{ max-width:1120px; margin:4px auto 0; padding:13px 20px; display:flex; align-items:center; gap:15px; flex-wrap:wrap;
-    background:linear-gradient(100deg,var(--surface2),#eaf3e7); border:1px solid var(--line); border-radius:14px; box-shadow:0 6px 20px rgba(20,50,30,.06); }
-  .vitrine .vlogo{ display:flex; align-items:center; gap:10px; font-family:var(--f-display); font-weight:700; color:var(--deep); font-size:1.18rem; flex:0 0 auto; }
-  .vitrine .vlogo img{ width:34px; height:34px; object-fit:contain; display:block; }
-  .vitrine .vsep{ width:1px; height:26px; background:var(--line); flex:0 0 auto; }
-  .vitrine .vtxt{ font-size:1.12rem; color:var(--soft); font-weight:600; min-width:0; display:flex; align-items:baseline; }
-  .rot{ color:var(--leaf); white-space:nowrap; border-bottom:3px solid var(--sun); padding-bottom:1px; }
-  .rot .car{ display:inline-block; width:2px; height:1em; background:var(--leaf); margin-left:3px; vertical-align:-2px; animation:tvCaret 1s step-end infinite; }
-  @keyframes tvCaret{ 50%{ opacity:0; } }
-  @media(max-width:560px){ .vitrine{ gap:10px; } .vitrine .vtxt{ font-size:1rem; } .vitrine .vlogo{ font-size:1.05rem; } }
-
+  /* ---- Hero vitrine (grand, style ESBAT) ---- */
+  .heroX{ position:relative; overflow:hidden; color:#fff; background:linear-gradient(135deg,#0b2c18 0%,#154f2b 55%,#2E7D46 100%); }
+  .heroX .hx-grid{ position:absolute; inset:-50%; background-image:linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px); background-size:44px 44px; transform:perspective(600px) rotateX(55deg) translateY(-8%); transform-origin:center top; opacity:.7; animation:hxGrid 24s linear infinite; -webkit-mask-image:linear-gradient(#000 30%,transparent 80%); mask-image:linear-gradient(#000 30%,transparent 80%); }
+  @keyframes hxGrid{ to{ background-position:0 44px,44px 0; } }
+  .heroX .blob{ position:absolute; border-radius:50%; filter:blur(60px); animation:hxFloat 15s ease-in-out infinite; pointer-events:none; }
+  .heroX .blob.b1{ width:340px; height:340px; background:#E7B24A; right:-70px; top:-70px; opacity:.26; }
+  .heroX .blob.b2{ width:300px; height:300px; background:#39b56a; left:-70px; bottom:0; opacity:.34; animation-delay:-6s; }
+  @keyframes hxFloat{ 0%,100%{ transform:translate(0,0) scale(1); } 50%{ transform:translate(26px,-22px) scale(1.12); } }
+  .hxwrap{ position:relative; z-index:2; max-width:1120px; margin:0 auto; padding:54px 22px 58px; display:flex; align-items:center; gap:30px; }
+  .hxL{ flex:1 1 auto; min-width:0; }
+  .hxR{ flex:0 0 clamp(230px,32vw,390px); display:grid; place-items:center; position:relative; }
+  @media(max-width:820px){ .hxwrap{ flex-direction:column; text-align:center; padding:38px 22px 44px; } .hxR{ flex-basis:auto; width:min(74vw,300px); } .btns{ justify-content:center; } .tag{ margin-inline:auto; } }
+  .heroX .tag{ display:inline-flex; align-items:center; gap:8px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.22); padding:6px 13px; border-radius:999px; font-size:.77rem; font-weight:600; letter-spacing:.02em; margin-bottom:18px; color:#eafaef; }
+  .heroX .tag i{ width:7px; height:7px; border-radius:50%; background:#8ff0b0; animation:hxPing 2.2s infinite; }
+  @keyframes hxPing{ 0%{ box-shadow:0 0 0 0 rgba(143,240,176,.6);} 70%,100%{ box-shadow:0 0 0 7px transparent; } }
+  .heroX h1{ font-family:var(--f-display); font-size:clamp(30px,5.3vw,52px); line-height:1.12; letter-spacing:-.01em; color:#fff; margin:0 0 16px; text-align:left; min-height:2.3em; }
+  @media(max-width:820px){ .heroX h1{ text-align:center; } }
+  .heroX h1 .tw{ color:#F3C25B; border-right:3px solid #F3C25B; padding-right:3px; animation:hxCaret 1s step-end infinite; }
+  @keyframes hxCaret{ 50%{ border-color:transparent; } }
+  .heroX .lead{ font-size:1.07rem; color:rgba(255,255,255,.85); max-width:46ch; margin:0 0 26px; }
+  @media(max-width:820px){ .heroX .lead{ margin-inline:auto; } }
+  .heroX .btns{ display:flex; gap:12px; flex-wrap:wrap; }
+  .btn.gold{ background:#E7B24A; color:#2a1d04; border:none; } .btn.gold:hover{ background:#d89f33; color:#2a1d04; }
+  .btn.light{ background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.42); } .btn.light:hover{ background:rgba(255,255,255,.2); }
+  .btn.lg{ padding:13px 24px; font-size:1rem; }
+  .heroLogo{ position:relative; display:grid; place-items:center; width:100%; }
+  .heroLogo::before{ content:""; position:absolute; width:82%; aspect-ratio:1; border-radius:50%; background:radial-gradient(circle,rgba(255,255,255,.4),rgba(255,255,255,.08) 55%,transparent 70%); }
+  .heroLogo::after{ content:""; position:absolute; inset:0% 9%; border:1px dashed rgba(255,255,255,.3); border-radius:50%; animation:hxSpin 42s linear infinite; }
+  @keyframes hxSpin{ to{ transform:rotate(360deg); } }
+  .heroLogo img{ position:relative; width:min(80%,300px); filter:drop-shadow(0 16px 30px rgba(0,0,0,.3)); animation:hxBob 6s ease-in-out infinite; }
+  @keyframes hxBob{ 50%{ transform:translateY(-10px); } }
+  .heroLogo .hln{ position:relative; margin-top:4px; font-family:var(--f-display); font-size:1.5rem; font-weight:700; color:#fff; letter-spacing:.02em; }
+  @media(prefers-reduced-motion:reduce){ .hx-grid,.heroX .blob,.heroLogo img,.heroLogo::after,.heroX .tag i{ animation:none !important; } .heroX h1 .tw{ border-right:none; } }
   /* ---- Trois profils (accordéon) ---- */
   .roles{ max-width:1120px; margin:0 auto; padding:6px 22px 0; display:grid; gap:14px; }
   .role{ background:var(--surface); border:1px solid var(--line); border-radius:15px; overflow:hidden; transition:box-shadow .25s ease, border-color .25s ease; }
@@ -132,33 +153,28 @@
     <a href="/app" class="btn">Créer mon plan</a>
   </div>
 
-  <div class="vitrine" aria-label="Nos services">
-    <span class="vlogo"><img src="/logo.png" alt="Terravive"> Terravive</span>
-    <span class="vsep" aria-hidden="true"></span>
-    <span class="vtxt">pour&nbsp;<span class="rot" id="rotw">planifier vos cultures</span></span>
-  </div>
-
-  <div class="hero">
-    <div>
-      <div class="kicker">Agriculture durable · accompagnée par l'IA</div>
-      <h1>Cultivez mieux, durablement, guidé pas à pas.</h1>
-      <p class="lead">Décrivez votre parcelle. En quelques secondes, une intelligence agronomique bâtit avec vous un <strong>plan de culture durable</strong> : calendrier, fertilisation naturelle, gestion de l'eau, protection biologique. Et reste à vos côtés toute la saison.</p>
-      <div class="cta">
-        <a href="/app" class="btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20V11"/><path d="M12 11c0-3.3 2.4-5.6 5.5-5.6 0 3.3-2.4 5.6-5.5 5.6z"/><path d="M12 13.4c-2.6 0-4.5-1.8-4.5-4.4 2.6 0 4.5 1.8 4.5 4.4z"/></svg>
-          Créer mon plan gratuitement
-        </a>
-        <a href="#comment" class="btn ghost">Comment ça marche</a>
+  <section class="heroX">
+    <span class="hx-grid" aria-hidden="true"></span>
+    <span class="blob b1" aria-hidden="true"></span>
+    <span class="blob b2" aria-hidden="true"></span>
+    <div class="hxwrap">
+      <div class="hxL">
+        <span class="tag"><i aria-hidden="true"></i> Agriculture durable · accompagnée par l'IA</span>
+        <h1>Un seul outil pour<br><span class="tw" id="rotw">votre itinéraire de culture</span></h1>
+        <p class="lead">Itinéraire de culture, conseiller agricole, diagnostic par photo, suivi satellite, coopérative et boutique : tout Terravive pour cultiver mieux, durablement, guidé pas à pas.</p>
+        <div class="btns">
+          <a href="/app" class="btn gold lg">Créer mon plan gratuitement</a>
+          <a href="#comment" class="btn light lg">Comment ça marche</a>
+        </div>
+      </div>
+      <div class="hxR">
+        <div class="heroLogo">
+          <img src="/logo.png" alt="Terravive">
+          <span class="hln">Terravive</span>
+        </div>
       </div>
     </div>
-    <div class="heroart">
-      <h3>De votre parcelle à votre récolte</h3>
-      <div class="step"><span class="n">1</span><div>Vous décrivez : culture, région, sol, saison, objectif.</div></div>
-      <div class="step"><span class="n">2</span><div>L'IA génère un plan durable, clair et adapté à vos moyens.</div></div>
-      <div class="step"><span class="n">3</span><div>Vous cultivez, et posez vos questions au conseiller à tout moment.</div></div>
-      <div class="step"><span class="n">4</span><div>Vous récoltez — en préservant votre sol et votre eau.</div></div>
-    </div>
-  </div>
+  </section>
 
   <section id="comment" style="padding-bottom:10px;">
     <h2>Un seul outil, pour chacun son usage</h2>
@@ -248,7 +264,7 @@
 (function(){
   "use strict";
   // Titre qui défile sur les services (comme une vitrine)
-  var MOTS = ["planifier vos cultures","interroger votre conseiller agricole","diagnostiquer vos plantes par photo","surveiller votre parcelle par satellite","piloter vos capteurs connectés","animer votre coopérative","vendre vos récoltes"];
+  var MOTS = ["votre itin\u00e9raire de culture","votre conseiller agricole","votre diagnostic par photo","votre suivi satellite","votre coop\u00e9rative","vos capteurs connect\u00e9s","votre boutique"];
   var el = document.getElementById("rotw");
   var reduce=false; try{ reduce=matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){}
   if(el && !reduce){
@@ -256,14 +272,14 @@
     function tick(){
       var w=MOTS[wi];
       ci += del ? -1 : 1;
-      el.innerHTML = w.slice(0,ci) + '<span class="car"></span>';
+      el.textContent = w.slice(0,ci);
       var wait = del ? 34 : 70;
       if(!del && ci===w.length){ del=true; wait=1700; }
       else if(del && ci===0){ del=false; wi=(wi+1)%MOTS.length; wait=320; }
       setTimeout(tick, wait);
     }
     setTimeout(tick, 900);
-  } else if(el){ el.innerHTML = MOTS[0]; }
+  } else if(el){ el.textContent = MOTS[0]; }
 
   // Accordéon des profils : un seul ouvert à la fois
   var roles = [].slice.call(document.querySelectorAll("#roles .role"));
