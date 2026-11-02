@@ -36,3 +36,23 @@ Ce qu'ils ajoutent :
 - Survol discret des cartes, tuiles et boutons ; micro-retour au clic.
 
 Fichiers touchés en plus : `public/*.html` (2 lignes ajoutées), `public/sw.js` (version `terravive-v5`).
+
+---
+
+# Terravive — accueil vitrine + sections repliables (v3)
+
+## Accueil (public, avant connexion)
+- Titre qui défile sur les services : « Terravive, pour planifier vos cultures / interroger votre
+  conseiller / diagnostiquer vos plantes / surveiller par satellite / piloter vos capteurs /
+  animer votre coopérative / vendre vos récoltes… » (effet machine à écrire, comme ESBAT).
+- Trois profils en accordéon (un seul ouvert à la fois), chacun montrant ses services AVANT la
+  connexion : Cultivateur & animateur, Client, Administrateur.
+
+## Tableau de bord — grandes sections repliables
+Sept grands blocs sont pliés par défaut (seul le titre + une flèche) et se déroulent au clic :
+Espace formateur, Propriétaire — animateurs désignés, Devenir cultivateur certifié,
+Humidité du sol — tendance, Dernières mesures de la parcelle, Indice de durabilité, Ma station connectée.
+L'état (ouvert/fermé) est mémorisé par navigateur. La carte satellite, la météo et l'accès rapide
+restent toujours visibles. Tout est dans `anims.css` / `anims.js`.
+
+Service worker : version `terravive-v6`.

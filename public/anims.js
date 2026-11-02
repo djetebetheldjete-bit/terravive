@@ -100,7 +100,48 @@
   }
 
   /* ---------- observation des contenus injectés par l'appli ---------- */
-  function scan() { reveal(document); revealCounts(document); }
+
+  /* ---------- repli des grandes sections (page tableau de bord) ---------- */
+  var FOLD_TITLES = [
+    "Espace formateur", "Propriétaire — animateurs", "Devenir cultivateur certifié",
+    "Humidité du sol — tendance", "Dernières mesures de la parcelle",
+    "Indice de durabilité", "Ma station connectée"
+  ];
+  function foldKey(t) { return "tv-fold:" + t.slice(0, 44); }
+  function directH2(card) { for (var i = 0; i < card.children.length; i++) { var c = card.children[i]; if (c.tagName === "H2" && c.classList.contains("ct")) return c; } return null; }
+  function setupFold() {
+    if (path !== "/tableau") return;
+    var scope = document.querySelector(".main") || document;
+    [].slice.call(scope.querySelectorAll(".card")).forEach(function (card) {
+      if (card.__tvFold) return;
+      var h = directH2(card); if (!h) return;
+      var title = h.textContent.trim();
+      if (!FOLD_TITLES.some(function (x) { return title.indexOf(x) >= 0; })) return;
+      card.__tvFold = 1; card.classList.add("fold");
+      var inner = document.createElement("div"); inner.className = "fold-inner";
+      var body = document.createElement("div"); body.className = "fold-body"; body.appendChild(inner);
+      var n = h.nextSibling; while (n) { var nx = n.nextSibling; inner.appendChild(n); n = nx; }
+      card.appendChild(body);
+      // enveloppe le titre pour un alignement constant (titre à gauche, flèche à droite)
+      var ti = document.createElement("span"); ti.className = "fold-ti";
+      var tn = h.firstChild; while (tn) { var tnx = tn.nextSibling; ti.appendChild(tn); tn = tnx; }
+      h.appendChild(ti);
+      var ar = document.createElement("span"); ar.className = "fold-ar"; ar.setAttribute("aria-hidden", "true");
+      ar.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>'; h.appendChild(ar);
+      h.setAttribute("role", "button"); h.setAttribute("tabindex", "0");
+      var open = false; try { open = localStorage.getItem(foldKey(title)) === "1"; } catch (e) {}
+      card.classList.toggle("open", open); h.setAttribute("aria-expanded", open ? "true" : "false");
+      function toggle() {
+        open = !open; card.classList.toggle("open", open); h.setAttribute("aria-expanded", open ? "true" : "false");
+        try { localStorage.setItem(foldKey(title), open ? "1" : "0"); } catch (e) {}
+        if (open) { revealCounts(card); drawCharts(card); }
+      }
+      h.addEventListener("click", toggle);
+      h.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+    });
+  }
+
+  function scan() { reveal(document); revealCounts(document); setupFold(); }
   var pending = null;
   function schedule() { clearTimeout(pending); pending = setTimeout(scan, 90); }
 

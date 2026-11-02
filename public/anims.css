@@ -87,3 +87,26 @@
   .tv-pulse::after, .tv-skel::after { animation: none !important; }
   .card, .tile, .btn { transition: none !important; }
 }
+
+/* ============================================================
+   REPLI DES SECTIONS (tableau de bord) — réduit la longueur
+   Les grands titres restent visibles ; on déroule au clic.
+   ============================================================ */
+.fold > h2.ct { cursor: pointer; display: flex; align-items: center; gap: 10px; justify-content: space-between; text-align: left; user-select: none; -webkit-user-select: none; transition: color .2s ease; }
+.fold .fold-ti { flex: 1 1 auto; min-width: 0; }
+.fold > h2.ct:hover { color: var(--leaf, #2E7D46); }
+.fold > h2.ct:focus-visible { outline: 3px solid var(--leaf, #2E7D46); outline-offset: 3px; border-radius: 6px; }
+.fold .fold-ar { flex: 0 0 auto; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--leaf, #2E7D46); transition: transform .32s cubic-bezier(.3, .8, .3, 1), background .2s ease; }
+.fold .fold-ar svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.fold.open .fold-ar { transform: rotate(180deg); }
+.fold > h2.ct:hover .fold-ar { background: color-mix(in srgb, var(--leaf, #2E7D46) 15%, transparent); }
+.fold-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .34s cubic-bezier(.3, .8, .3, 1); }
+.fold.open > .fold-body { grid-template-rows: 1fr; }
+.fold-inner { overflow: hidden; min-height: 0; }
+.fold:not(.open) > h2.ct { margin-bottom: 0; }
+/* petit indice « replié » : un aperçu discret sous le titre quand c'est fermé */
+.fold:not(.open) > h2.ct::before { content: ""; }
+@media (prefers-reduced-motion: reduce) {
+  .fold-body { transition: none; }
+  .fold .fold-ar { transition: none; }
+}
