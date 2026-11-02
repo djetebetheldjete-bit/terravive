@@ -7,7 +7,7 @@
  *  - Les requêtes POST (générer un plan, chat, enregistrer…) ne sont jamais mises en cache :
  *    hors-ligne elles échouent proprement (l'app affiche déjà un message).
  */
-const VERSION = "terravive-v3";
+const VERSION = "terravive-v4";
 const SHELL = [
   "/accueil", "/app", "/tableau", "/arduino", "/comprendre", "/conseiller", "/cooperative", "/diagnostic",
   "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/logo.png", "/favicon-32.png", "/pwa.js", "/mobile.css", "/mobile.js"
@@ -51,5 +51,8 @@ self.addEventListener("fetch", (e) => {
 
   if (req.mode === "navigate") { e.respondWith(networkFirst(req)); return; }
   if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) { e.respondWith(networkFirst(req)); return; }
+  // Code de l'appli (JS/CSS de même origine) : réseau d'abord, pour que chaque mise à jour arrive
+  // sans attendre un changement de version ; hors-ligne, on retombe sur le cache.
+  if (url.origin === self.location.origin && /\.(js|css)$/.test(url.pathname)) { e.respondWith(networkFirst(req)); return; }
   e.respondWith(cacheFirst(req));
 });
