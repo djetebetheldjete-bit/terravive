@@ -69,10 +69,17 @@
   .foot{ text-align:center; color:var(--faint); font-size:.85rem; padding:32px 22px 48px; max-width:1120px; margin:0 auto; }
   .foot a{ color:var(--deep); }
 
-  /* ---- Titre qui défile sur les services ---- */
+  /* ---- Bande vitrine : logo + services qui défilent ---- */
+  .vitrine{ max-width:1120px; margin:4px auto 0; padding:13px 20px; display:flex; align-items:center; gap:15px; flex-wrap:wrap;
+    background:linear-gradient(100deg,var(--surface2),#eaf3e7); border:1px solid var(--line); border-radius:14px; box-shadow:0 6px 20px rgba(20,50,30,.06); }
+  .vitrine .vlogo{ display:flex; align-items:center; gap:10px; font-family:var(--f-display); font-weight:700; color:var(--deep); font-size:1.18rem; flex:0 0 auto; }
+  .vitrine .vlogo img{ width:34px; height:34px; object-fit:contain; display:block; }
+  .vitrine .vsep{ width:1px; height:26px; background:var(--line); flex:0 0 auto; }
+  .vitrine .vtxt{ font-size:1.12rem; color:var(--soft); font-weight:600; min-width:0; display:flex; align-items:baseline; }
   .rot{ color:var(--leaf); white-space:nowrap; border-bottom:3px solid var(--sun); padding-bottom:1px; }
-  .rot .car{ display:inline-block; width:2px; height:.95em; background:var(--leaf); margin-left:3px; vertical-align:-2px; animation:tvCaret 1s step-end infinite; }
+  .rot .car{ display:inline-block; width:2px; height:1em; background:var(--leaf); margin-left:3px; vertical-align:-2px; animation:tvCaret 1s step-end infinite; }
   @keyframes tvCaret{ 50%{ opacity:0; } }
+  @media(max-width:560px){ .vitrine{ gap:10px; } .vitrine .vtxt{ font-size:1rem; } .vitrine .vlogo{ font-size:1.05rem; } }
 
   /* ---- Trois profils (accordéon) ---- */
   .roles{ max-width:1120px; margin:0 auto; padding:6px 22px 0; display:grid; gap:14px; }
@@ -125,10 +132,16 @@
     <a href="/app" class="btn">Créer mon plan</a>
   </div>
 
+  <div class="vitrine" aria-label="Nos services">
+    <span class="vlogo"><img src="/logo.png" alt="Terravive"> Terravive</span>
+    <span class="vsep" aria-hidden="true"></span>
+    <span class="vtxt">pour&nbsp;<span class="rot" id="rotw">planifier vos cultures</span></span>
+  </div>
+
   <div class="hero">
     <div>
       <div class="kicker">Agriculture durable · accompagnée par l'IA</div>
-      <h1>Terravive, pour <span class="rot" id="rotw">planifier vos cultures</span><br>durablement, guidé pas à pas.</h1>
+      <h1>Cultivez mieux, durablement, guidé pas à pas.</h1>
       <p class="lead">Décrivez votre parcelle. En quelques secondes, une intelligence agronomique bâtit avec vous un <strong>plan de culture durable</strong> : calendrier, fertilisation naturelle, gestion de l'eau, protection biologique. Et reste à vos côtés toute la saison.</p>
       <div class="cta">
         <a href="/app" class="btn">
