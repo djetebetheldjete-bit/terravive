@@ -1,0 +1,258 @@
+/* ============================================================
+   Terravive — couche MOBILE (≤ 860 px)
+   Principes UI/UX appliqués :
+   · Zone du pouce  : navigation principale en barre basse (Fitts, Hoober)
+   · Cibles tactiles : ≥ 44 px (Apple HIG / WCAG 2.5.5)
+   · Hiérarchie     : un titre de page + une action principale par écran
+   · Divulgation progressive : le secondaire va dans « Plus »
+   · Retour d'état  : indicateur actif, appui visible, transitions courtes
+   · Saisie         : champs 16 px (pas de zoom iOS), clavier = barre masquée
+   · Accessibilité  : contraste via variables de thème, focus visible,
+                      prefers-reduced-motion respecté
+   Toutes les couleurs viennent des variables de thème existantes
+   (nature / clair / sombre / terre) : rien n'est codé en dur.
+   ============================================================ */
+
+/* ---------- 0. Corrections de débordement (toujours actives sur mobile) ---------- */
+@media (max-width: 860px) {
+  html, body { max-width: 100%; overflow-x: hidden; }
+  img, svg, video, canvas { max-width: 100%; }
+  select, input, textarea { max-width: 100%; }
+  pre, code { white-space: pre-wrap; word-break: break-word; }
+}
+
+/* ---------- 1. Variables & garde-fous ---------- */
+@media (max-width: 860px) {
+  :root { --m-bar: 64px; --m-top: 54px; --m-r: 16px; --m-ease: cubic-bezier(.2,.8,.2,1); }
+  body.m-on { padding-bottom: calc(var(--m-bar) + env(safe-area-inset-bottom, 0px) + 12px); -webkit-tap-highlight-color: transparent; }
+  body.m-on.m-nobar { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
+  body.m-on.m-cta-on { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ---------- 2. Barre supérieure compacte (logo + titre de la page) ---------- */
+@media (max-width: 860px) {
+  /* variantes : .top (accueil, app, arduino) · .top > .topin (conseiller, coop, diag, comprendre) */
+  body.m-on .top { min-height: var(--m-top); padding-top: max(8px, env(safe-area-inset-top, 0px)); transition: box-shadow .25s; }
+  body.m-on .top.m-scrolled, body.m-on .side.m-scrolled { box-shadow: 0 6px 18px rgba(0,0,0,.10); }
+  body.m-on .top .topin, body.m-on .top.m-flat { padding: 8px 16px; gap: 10px; }
+  body.m-on .top { gap: 10px; padding-left: 16px; padding-right: 16px; }
+  body.m-on:not(.m-cta-on) .top .brand, body.m-on:not(.m-cta-on) .top .brand a { font-size: 0 !important; gap: 0 !important; flex: 0 0 auto; }
+  body.m-on.m-cta-on .top .brand { font-size: 1.25rem; gap: 10px; }
+  body.m-on .top .brand .emblem, body.m-on .top .brand .em { width: 34px; height: 34px; }
+  body.m-on .top .grow, body.m-on .top .spacer { flex: 1 1 auto; }
+  /* le secondaire quitte la barre (il est dans la barre basse / « Plus ») */
+  body.m-on .top a.btn:not(.m-keep), body.m-on .top a.navlink, body.m-on .top select,
+  body.m-on .top #logoutBtn, body.m-on .top .acct #acctName, body.m-on .top #who { display: none !important; }
+  body.m-on .top #loginBtn { min-height: 40px; padding: 0 16px; }
+  body.m-on .top .m-title { font: 700 1.05rem/1.2 Georgia, "Times New Roman", serif; color: var(--deep, var(--ink)); margin-right: auto; padding-left: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.m-on .top .brand + .m-title { margin-left: 4px; }
+}
+
+/* ---------- 3. Barre de navigation basse (zone du pouce) ---------- */
+.m-nav, .m-sheet, .m-backdrop, .m-cta { display: none; }
+@media (max-width: 860px) {
+  body.m-on .m-nav {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 900;
+    height: calc(var(--m-bar) + env(safe-area-inset-bottom, 0px)); padding: 6px 6px env(safe-area-inset-bottom, 0px);
+    background: color-mix(in srgb, var(--surface, #fff) 94%, transparent); -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px);
+    border-top: 1px solid var(--line, #ddd); box-shadow: 0 -8px 24px rgba(0,0,0,.06);
+    transition: transform .3s var(--m-ease);
+  }
+  body.m-on.m-hide-nav .m-nav, body.m-on.m-kb .m-nav { transform: translateY(110%); }
+  .m-item {
+    flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    background: none; border: 0; padding: 4px 2px; color: var(--soft, #667); cursor: pointer; text-decoration: none; position: relative;
+    font: 600 11px/1.1 "Segoe UI", system-ui, Arial, sans-serif; letter-spacing: .01em; -webkit-user-select: none; user-select: none;
+    transition: color .2s, transform .15s;
+  }
+  .m-item .m-ic { position: relative; width: 56px; height: 30px; display: grid; place-items: center; border-radius: 15px; transition: background .25s var(--m-ease); }
+  .m-item .m-ic::before { content: ""; position: absolute; inset: 0; border-radius: 15px; background: var(--leaf, #2e7d46); opacity: 0; transform: scaleX(.4); transition: opacity .25s, transform .3s var(--m-ease); }
+  .m-item svg { position: relative; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .m-item span.m-lb { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .m-item:active { transform: scale(.92); }
+  .m-item[aria-current="page"] { color: var(--deep, var(--ink)); }
+  .m-item[aria-current="page"] .m-ic::before { opacity: .16; transform: scaleX(1); }
+  .m-item[aria-current="page"] svg { stroke-width: 2.2; color: var(--leaf, #2e7d46); }
+  .m-item:focus-visible { outline: 3px solid var(--leaf, #2e7d46); outline-offset: -3px; border-radius: 14px; }
+  .m-badge { position: absolute; top: 2px; right: calc(50% - 22px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--bad, #c0392b); color: #fff; font-size: 10px; line-height: 16px; text-align: center; }
+}
+
+/* ---------- 4. Feuille « Plus » (bottom sheet) ---------- */
+@media (max-width: 860px) {
+  body.m-on .m-backdrop { display: block; position: fixed; inset: 0; z-index: 940; background: rgba(10, 24, 16, .5); opacity: 0; pointer-events: none; transition: opacity .28s; }
+  body.m-on .m-backdrop.on { opacity: 1; pointer-events: auto; }
+  body.m-on .m-sheet {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 950; max-height: 86vh; overflow-y: auto; overscroll-behavior: contain;
+    background: var(--surface, #fff); color: var(--ink); border-radius: 22px 22px 0 0; padding: 8px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -14px 40px rgba(0,0,0,.22); transform: translateY(105%); transition: transform .34s var(--m-ease); will-change: transform;
+  }
+  body.m-on .m-sheet.on { transform: translateY(0); }
+  .m-sheet.m-drag { transition: none; }
+  .m-grip { width: 40px; height: 5px; border-radius: 3px; background: var(--line, #ccc); margin: 4px auto 12px; touch-action: none; }
+  .m-sheet h3 { font: 700 .78rem/1 "Segoe UI", system-ui, sans-serif; letter-spacing: .09em; text-transform: uppercase; color: var(--soft); margin: 14px 4px 10px; }
+  .m-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .m-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 84px; padding: 12px 6px; text-align: center; text-decoration: none; color: var(--ink);
+    background: var(--surface2, #f5f9f3); border: 1px solid var(--line); border-radius: var(--m-r); font: 600 12.5px/1.2 "Segoe UI", system-ui, sans-serif; cursor: pointer;
+    opacity: 0; transform: translateY(14px); transition: transform .15s, background .2s; }
+  .m-sheet.on .m-tile { animation: m-pop .38s var(--m-ease) forwards; animation-delay: calc(var(--i, 0) * 45ms + 120ms); }
+  .m-tile:active { transform: scale(.95) !important; }
+  .m-tile svg { width: 24px; height: 24px; fill: none; stroke: var(--leaf, #2e7d46); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .m-acct { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: var(--m-r); background: var(--surface2); }
+  .m-av { width: 42px; height: 42px; border-radius: 50%; background: var(--leaf, #2e7d46); color: #fff; display: grid; place-items: center; font: 700 1.05rem Georgia, serif; flex: 0 0 auto; }
+  .m-acct b { display: block; font-size: .98rem; } .m-acct small { color: var(--soft); }
+  .m-row { display: flex; gap: 10px; margin-top: 10px; }
+  .m-row > * { flex: 1 1 0; }
+  .m-sheet select, .m-sheet .m-btn { min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 .95rem "Segoe UI", system-ui, sans-serif; padding: 0 12px; width: 100%; }
+  .m-sheet .m-btn { cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; }
+  .m-sheet .m-btn.primary { background: var(--leaf, #2e7d46); border-color: var(--leaf, #2e7d46); color: #fff; }
+  .m-sheet .m-btn.danger { color: var(--bad, #c0392b); }
+  .m-list { display: flex; flex-direction: column; gap: 8px; }
+  .m-list .m-btn { justify-content: flex-start; padding: 0 16px; }
+  .m-list .m-btn svg { width: 20px; height: 20px; fill: none; stroke: var(--leaf); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  body.m-sheet-open { overflow: hidden; }
+}
+@keyframes m-pop { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+
+/* ---------- 5. Appel à l'action collant (page d'accueil publique) ---------- */
+@media (max-width: 860px) {
+  body.m-on .m-cta { display: flex; gap: 10px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 900; padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--surface, #fff) 94%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(0,0,0,.08);
+    transform: translateY(0); animation: m-slide-up .5s var(--m-ease) .4s backwards; }
+  .m-cta a { flex: 1 1 0; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 14px; font: 700 .98rem "Segoe UI", system-ui, sans-serif; text-decoration: none; border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
+  .m-cta a.primary { flex: 1.7 1 0; background: var(--leaf, #2e7d46); color: #fff; border-color: var(--leaf, #2e7d46); box-shadow: 0 6px 16px color-mix(in srgb, var(--leaf, #2e7d46) 40%, transparent); }
+  .m-cta a:active { transform: scale(.97); }
+}
+@keyframes m-slide-up { from { transform: translateY(110%); } to { transform: none; } }
+
+/* ---------- 6. Formulaires : cibles ≥ 44 px, saisie sans zoom iOS ---------- */
+@media (max-width: 860px) {
+  body.m-on input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), body.m-on select, body.m-on textarea { font-size: 16px !important; min-height: 46px; border-radius: 12px; }
+  body.m-on textarea { min-height: 96px; line-height: 1.45; font-family: inherit; }
+  body.m-on input[type=checkbox], body.m-on input[type=radio] { width: 22px; height: 22px; }
+  body.m-on button, body.m-on .btn, body.m-on a.btn { min-height: 44px; }
+  body.m-on .btn.small, body.m-on .btn.sm, body.m-on button.small { min-height: 40px; }
+  body.m-on label { line-height: 1.35; }
+  body.m-on .btn:active, body.m-on button:active { transform: scale(.98); }
+  /* bouton principal d'un formulaire : pleine largeur, atteignable au pouce */
+  body.m-on form .btn.primary, body.m-on .panel > .btn.primary:only-of-type, body.m-on #sendBtn { justify-content: center; }
+  body.m-on #pwForm .btn, body.m-on .formbar .btn { width: 100%; }
+}
+
+/* ---------- 7. Tableaux → cartes lisibles (au lieu du défilement horizontal) ---------- */
+@media (max-width: 860px) {
+  body.m-on table.m-cards { min-width: 0 !important; width: 100%; border-collapse: separate; border-spacing: 0; }
+  body.m-on table.m-cards thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  body.m-on table.m-cards tbody, body.m-on table.m-cards tr, body.m-on table.m-cards td { display: block; width: 100%; }
+  body.m-on table.m-cards tr { background: var(--surface); border: 1px solid var(--line); border-radius: var(--m-r); margin: 0 0 10px; padding: 6px 14px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+  body.m-on table.m-cards td { display: flex; justify-content: space-between; align-items: center; gap: 14px; text-align: right; border: 0 !important; border-bottom: 1px dashed var(--line) !important; padding: 10px 0 !important; font-size: .92rem; }
+  body.m-on table.m-cards td:last-child { border-bottom: 0 !important; }
+  body.m-on table.m-cards td::before { content: attr(data-label); flex: 0 0 38%; text-align: left; font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--soft); }
+  body.m-on table.m-cards td:not([data-label])::before, body.m-on table.m-cards td[data-label=""]::before { display: none; }
+  body.m-on table.m-cards td[data-label=""], body.m-on table.m-cards td:not([data-label]) { justify-content: flex-end; }
+  body.m-on table.m-cards td[colspan] { justify-content: center; text-align: center; }
+  body.m-on .table-wrap { overflow: visible; }
+}
+
+/* ---------- 8. Fenêtres modales → feuilles plein pouce ---------- */
+@media (max-width: 860px) {
+  body.m-on .modal-bg { align-items: flex-end !important; padding: 0 !important; }
+  body.m-on .modal-bg > .modal, body.m-on .modal-bg > div:not(.m-sheet) {
+    width: 100% !important; max-width: none !important; margin: 0 !important; max-height: 92vh; overflow-y: auto; border-radius: 22px 22px 0 0 !important;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); animation: m-slide-up .32s var(--m-ease);
+  }
+}
+
+/* ---------- 9. Page d'accueil publique ---------- */
+@media (max-width: 860px) {
+  body.m-on .hero { padding: 26px 18px 18px !important; gap: 22px !important; }
+  body.m-on .hero h1 { font-size: clamp(1.75rem, 8.2vw, 2.3rem) !important; line-height: 1.12; }
+  body.m-on .hero .lead { font-size: 1.02rem !important; line-height: 1.55; }
+  body.m-on .hero .kicker { font-size: .72rem; letter-spacing: .12em; }
+  body.m-on .hero .btn, body.m-on .hero .cta a { width: 100%; justify-content: center; }
+  body.m-on .m-reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s var(--m-ease), transform .6s var(--m-ease); transition-delay: calc(var(--i, 0) * 70ms); }
+  body.m-on .m-reveal.m-in { opacity: 1; transform: none; }
+}
+
+/* ---------- 10. Tableau de bord (page /tableau) ---------- */
+@media (max-width: 860px) {
+  body.m-on .shell { display: block; }
+  body.m-on .side { position: sticky; top: 0; z-index: 40; flex-direction: row; align-items: center; padding: max(8px, env(safe-area-inset-top, 0px)) 16px 8px; gap: 10px; min-height: var(--m-top); transition: box-shadow .25s; }
+  body.m-on .side .brand { padding: 0; font-size: 1.1rem; flex: 1 1 auto; }
+  body.m-on .side .menu, body.m-on .side .foot { display: none !important; }
+  body.m-on .main { padding: 16px 14px 28px; }
+  body.m-on .head { gap: 8px; margin-bottom: 14px; }
+  body.m-on .head h1 { font-size: 1.45rem; }
+  body.m-on .head .theme-wrap, body.m-on .head select.theme, body.m-on .head .theme { display: none !important; }
+  body.m-on .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  body.m-on .tile { padding: 12px 12px 10px; border-radius: 14px; }
+  body.m-on .tile .ic { width: 34px; height: 34px; margin-bottom: 6px; }
+  body.m-on .tile .ic svg { width: 19px; height: 19px; }
+  body.m-on .tile .val { font-size: 1.55rem; }
+  body.m-on .tile .lab { font-size: .76rem; }
+  body.m-on .tile .meta { font-size: .72rem; }
+  body.m-on .card { padding: 14px; border-radius: 14px; }
+  body.m-on .grid { gap: 12px; }
+  body.m-on .wx-days { gap: 6px; }
+}
+
+/* ---------- 11. Stock & Quality (barre latérale → barre basse / pastilles) ---------- */
+@media (max-width: 860px) {
+  body.m-on .layout { display: block; }
+  body.m-on .sidebar { padding: max(8px, env(safe-area-inset-top, 0px)) 16px 8px; flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 10px; position: sticky; top: 0; z-index: 40; min-height: var(--m-top); }
+  body.m-on .sidebar .brand { padding: 0; margin: 0; gap: 8px; }
+  body.m-on .sidebar .brand img { width: 32px; height: 32px; }
+  body.m-on .sidebar .brand strong { font-size: 1.1rem; }
+  body.m-on .sidebar .brand small { display: none; }
+  body.m-on .sidebar .nav, body.m-on .sidebar .sidebar-foot { display: none !important; }
+  body.m-on.m-quality .sidebar { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; gap: 8px; }
+  body.m-on.m-quality .sidebar::-webkit-scrollbar { display: none; }
+  body.m-on.m-quality .sidebar .brand { flex: 0 0 auto; margin-right: 4px; }
+  body.m-on.m-quality .sidebar .brand div { display: none; }
+  body.m-on.m-quality .sidebar .nav { display: inline-flex !important; flex: 0 0 auto; width: auto; min-height: 40px; padding: 8px 14px; font-size: 13px; border-radius: 999px; white-space: nowrap; }
+  body.m-on .main { padding: 16px 14px 28px; }
+  body.m-on .top .title, body.m-on header.top .title { font-size: 1.5rem; }
+  body.m-on header.top { margin-bottom: 14px; gap: 10px; }
+  body.m-on .toolbar { display: flex; flex-wrap: wrap; gap: 10px; }
+  body.m-on .toolbar label { flex: 1 1 140px; }
+  body.m-on .toolbar input[type=date] { width: 100% !important; display: block !important; }
+  body.m-on .metric { font-size: 1.45rem; }
+  body.m-on .card { padding: 14px; border-radius: 14px; }
+}
+
+/* ---------- 12. Itinéraire (/app), Conseiller, Diagnostic, Coopérative, Arduino ---------- */
+@media (max-width: 860px) {
+  body.m-on main, body.m-on .wrap { padding-left: 14px; padding-right: 14px; }
+  body.m-on .wrap { gap: 14px; }
+  body.m-on .panel, body.m-on .card { border-radius: 16px; }
+  body.m-on h1 { line-height: 1.15; }
+  /* conseiller : zone de saisie toujours à portée, sans débordement */
+  body.m-on .compose, body.m-on .composer, body.m-on .askbar, body.m-on .inputrow, body.m-on .chatbar { display: flex; gap: 8px; align-items: flex-end; }
+  body.m-on .compose > *, body.m-on .composer > *, body.m-on .askbar > *, body.m-on .inputrow > *, body.m-on .chatbar > * { min-width: 0; }
+  body.m-on .compose textarea, body.m-on .composer textarea, body.m-on .askbar textarea, body.m-on .inputrow textarea, body.m-on .chatbar textarea, body.m-on .compose input, body.m-on .composer input { flex: 1 1 auto; min-width: 0; width: auto; }
+  body.m-on #sendBtn { flex: 0 0 auto; min-width: 52px; }
+  body.m-on .grid2, body.m-on .modegrid { grid-template-columns: 1fr !important; }
+}
+
+/* ---------- 13. Boutons flottants de pwa.js : au-dessus de la barre ---------- */
+@media (max-width: 860px) {
+  body.m-on #trv-install { bottom: calc(var(--m-bar) + env(safe-area-inset-bottom, 0px) + 12px) !important; right: 12px !important; }
+  body.m-on #trv-offline { bottom: calc(var(--m-bar) + env(safe-area-inset-bottom, 0px) + 12px) !important; }
+}
+
+/* ---------- 14. Entrée douce des blocs (vivant, sans gêner) ---------- */
+@media (max-width: 860px) and (prefers-reduced-motion: no-preference) {
+  body.m-on main > *, body.m-on .main > *, body.m-on .wrap > * { animation: m-rise .5s var(--m-ease) both; }
+  body.m-on main > *:nth-child(2), body.m-on .main > *:nth-child(2), body.m-on .wrap > *:nth-child(2) { animation-delay: .06s; }
+  body.m-on main > *:nth-child(3), body.m-on .main > *:nth-child(3) { animation-delay: .12s; }
+  body.m-on main > *:nth-child(n+4), body.m-on .main > *:nth-child(n+4) { animation-delay: .18s; }
+  body.m-on .kpis > * { animation: m-rise .5s var(--m-ease) both; }
+  body.m-on .kpis > *:nth-child(2) { animation-delay: .05s; } body.m-on .kpis > *:nth-child(3) { animation-delay: .1s; } body.m-on .kpis > *:nth-child(4) { animation-delay: .15s; }
+}
+@keyframes m-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+/* ---------- 15. Accessibilité : mouvement réduit ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .m-nav, .m-sheet, .m-backdrop, .m-item, .m-tile, .m-cta, .m-reveal { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-delay: 0s !important; }
+  body.m-on .m-reveal { opacity: 1; transform: none; }
+  .m-sheet.on .m-tile { opacity: 1; transform: none; }
+}
