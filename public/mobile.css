@@ -48,6 +48,9 @@
   body.m-on .top .brand + .m-title { margin-left: 4px; }
 }
 
+/* le sélecteur de thème de l'accueil reste visible et compact sur mobile */
+@media (max-width: 860px) { body.m-on .top .themepick { display: flex !important; } body.m-on .top .themepick .tlab { display: none; } body.m-on .top .themepick .th { width: 20px; height: 20px; } }
+
 /* ---------- 3. Barre de navigation basse (zone du pouce) ---------- */
 .m-nav, .m-sheet, .m-backdrop, .m-cta { display: none; }
 @media (max-width: 860px) {

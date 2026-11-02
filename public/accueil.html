@@ -12,6 +12,7 @@
 <meta property="og:description" content="Un plan de culture durable personnalisé pour votre parcelle, guidé par l'intelligence artificielle.">
 <meta property="og:url" content="https://terravive.onrender.com/">
 <meta name="robots" content="index, follow">
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("trv-theme")||"nature");}catch(e){}</script>
 <style>
   :root{
     --leaf:#2E7D46; --deep:#174D2B; --deeper:#103C21; --earth:#6E4A2C;
@@ -20,6 +21,11 @@
     --f-display:Georgia,'Times New Roman',serif;
     --f-body:"Segoe UI",system-ui,Roboto,Helvetica,Arial,sans-serif;
   }
+  /* ---- Thèmes (mêmes que l'application) ---- */
+  :root[data-theme="clair"]{ --leaf:#2f855a; --deep:#276749; --deeper:#1b4733; --sun:#b7791f; --line:#e6e9ec; --bg:#f3f5f7; --surface:#ffffff; --surface2:#f7f9fb; --ink:#1a2430; --soft:#5a6675; --faint:#95a0ae; }
+  :root[data-theme="sombre"]{ --leaf:#5bbf84; --deep:#8fd6a9; --deeper:#0c1f15; --sun:#e0b25a; --line:#223228; --bg:#0e1712; --surface:#15241b; --surface2:#1a2c21; --ink:#e7f1ea; --soft:#a6b7ad; --faint:#7c8d83; }
+  :root[data-theme="terre"]{ --leaf:#7a6a3a; --deep:#5c4a22; --deeper:#3a3016; --sun:#c7892f; --line:#e6ddcb; --bg:#f4efe3; --surface:#fffdf8; --surface2:#f7f1e5; --ink:#2a2416; --soft:#6b6150; --faint:#9a8f78; }
+  body{ transition:background .25s ease, color .25s ease; }
   *{ box-sizing:border-box; }
   html,body{ margin:0; }
   body{ font-family:var(--f-body); color:var(--ink); background:var(--bg); line-height:1.58; }
@@ -38,6 +44,15 @@
   .btn.sun{ background:var(--sun); color:#2a1d04; }
   .btn.sun:hover{ background:#a9741f; color:#fff; }
   .btn svg{ width:18px; height:18px; }
+
+  /* ---- Sélecteur de thème (pastilles de couleur) ---- */
+  .themepick{ display:flex; align-items:center; gap:7px; margin-right:4px; }
+  .themepick .tlab{ font-size:.78rem; color:var(--soft); font-weight:600; margin-right:2px; }
+  .themepick .th{ width:22px; height:22px; border-radius:50%; border:2px solid var(--line); background:var(--c); cursor:pointer; padding:0; transition:transform .15s ease, box-shadow .15s ease; }
+  .themepick .th:hover{ transform:scale(1.14); }
+  .themepick .th:focus-visible{ outline:2px solid var(--leaf); outline-offset:2px; }
+  .themepick .th.on{ box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--leaf); }
+  @media(max-width:560px){ .themepick .tlab{ display:none; } }
 
   /* ---- Héros ---- */
   .hero{ max-width:1120px; margin:0 auto; padding:40px 22px 24px; display:grid; grid-template-columns:1.1fr .9fr; gap:38px; align-items:center; }
@@ -64,7 +79,7 @@
   .card h4{ margin:14px 0 6px; color:var(--ink); font-size:1.05rem; }
   .card p{ margin:0; color:var(--soft); font-size:.93rem; }
   .pillars{ background:var(--surface); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
-  .band{ background:linear-gradient(162deg,var(--surface2),#e9f2e6); border:1px solid var(--line); border-radius:16px; padding:36px; text-align:center; }
+  .band{ background:linear-gradient(162deg,var(--surface2),var(--surface)); border:1px solid var(--line); border-radius:16px; padding:36px; text-align:center; }
   .band h2{ margin-bottom:10px; }
   .foot{ text-align:center; color:var(--faint); font-size:.85rem; padding:32px 22px 48px; max-width:1120px; margin:0 auto; }
   .foot a{ color:var(--deep); }
@@ -149,6 +164,13 @@
       Terravive
     </div>
     <span class="grow"></span>
+    <div class="themepick" id="themepick" role="group" aria-label="Choisir le thème">
+      <span class="tlab">Thème</span>
+      <button type="button" class="th" data-th="nature" title="Nature" aria-label="Thème Nature" style="--c:#2E7D46"></button>
+      <button type="button" class="th" data-th="clair" title="Clair" aria-label="Thème Clair" style="--c:#dfe7ea"></button>
+      <button type="button" class="th" data-th="sombre" title="Sombre" aria-label="Thème Sombre" style="--c:#13241b"></button>
+      <button type="button" class="th" data-th="terre" title="Terre" aria-label="Thème Terre" style="--c:#b5793a"></button>
+    </div>
     <a href="/app" class="btn ghost">Se connecter</a>
     <a href="/app" class="btn">Créer mon plan</a>
   </div>
@@ -280,6 +302,16 @@
     }
     setTimeout(tick, 900);
   } else if(el){ el.textContent = MOTS[0]; }
+
+  // Sélecteur de thème (mémorisé, partagé avec l'application)
+  (function(){
+    var pick=document.getElementById("themepick"); if(!pick) return;
+    function current(){ try{ return localStorage.getItem("trv-theme")||"nature"; }catch(e){ return "nature"; } }
+    function mark(t){ [].forEach.call(pick.querySelectorAll(".th"), function(b){ b.classList.toggle("on", b.dataset.th===t); b.setAttribute("aria-pressed", b.dataset.th===t?"true":"false"); }); }
+    function setTheme(t){ document.documentElement.setAttribute("data-theme", t); try{ localStorage.setItem("trv-theme", t); }catch(e){} mark(t); }
+    [].forEach.call(pick.querySelectorAll(".th"), function(b){ b.addEventListener("click", function(){ setTheme(b.dataset.th); }); });
+    mark(current());
+  })();
 
   // Accordéon des profils : un seul ouvert à la fois
   var roles = [].slice.call(document.querySelectorAll("#roles .role"));
