@@ -18,3 +18,21 @@ Ils ne s'activent que sur écran ≤ 860 px : l'affichage ordinateur est stricte
 ## Fichiers modifiés
 `public/*.html` (1 ligne CSS + 1 ligne JS ajoutées avant `</head>`, `viewport-fit=cover`),
 `public/sw.js` (version `terravive-v3` + mise en cache de `mobile.css`/`mobile.js`).
+
+---
+
+# Terravive — couche animations (v2)
+
+Deux fichiers ajoutés : `public/anims.css` et `public/anims.js`, chargés par toutes les pages.
+Ils fonctionnent sur ordinateur ET téléphone, et se désactivent si la personne a réduit les
+animations sur son appareil (`prefers-reduced-motion`). Aucune dépendance, aucune donnée modifiée.
+
+Ce qu'ils ajoutent :
+- Apparition douce des cartes/sections au défilement (fondu + légère montée).
+- Entrée en cascade du héro de l'accueil et des 4 étapes.
+- Compteurs qui montent (tuiles du tableau de bord, indicateurs du stock) ; se ré-animent
+  quand l'appli met la valeur à jour (capteur toutes les 60 s, stock…).
+- Tracé progressif des courbes (graphique d'humidité).
+- Survol discret des cartes, tuiles et boutons ; micro-retour au clic.
+
+Fichiers touchés en plus : `public/*.html` (2 lignes ajoutées), `public/sw.js` (version `terravive-v5`).
