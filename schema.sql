@@ -99,6 +99,22 @@ create table if not exists trv_parcels (
 );
 create index if not exists trv_parcels_user_idx on trv_parcels (user_id, created_at desc);
 
+-- Sol & racines d'une parcelle : estimation satellite (iSDAsoil / SoilGrids) + correction terrain,
+-- culture en place et date de semis. Une ligne par parcelle. (Ajouté en v7 : exécutez ce bloc
+-- sur une base existante, il ne touche pas aux autres tables.)
+create table if not exists trv_parcel_soil (
+  parcel_id text primary key,
+  user_id text,
+  crop text,
+  sown_at date,
+  estimate text,              -- JSON : {source, texture, sand, silt, clay, stones, bedrock_cm, ph, oc_gkg, n_gkg, p_ppm, k_ppm, fetched_at}
+  estimate_error text,
+  manual text,                -- JSON : {texture, depth_cm, stones, at} (test du bocal, fosse)
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+create index if not exists trv_parcel_soil_user_idx on trv_parcel_soil (user_id, updated_at desc);
+
 -- Coopératives (relais humain + base achats groupés / mise en marché)
 create table if not exists trv_coops (
   id text primary key,

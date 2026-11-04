@@ -141,6 +141,11 @@
         <p class="hint">Décrivez votre parcelle. L'IA agronome bâtit un itinéraire technique complet, tourné vers l'agroécologie. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></p>
         <label>Que voulez-vous cultiver ? *</label>
         <input id="crop" placeholder="ex. tomate, maïs, cacao, gombo…" maxlength="120">
+        <div id="parcelPick" style="display:none;">
+          <label>Parcelle enregistrée <span style="color:var(--faint);font-weight:400;">(facultatif — pour adapter l'itinéraire à la nature de son sol)</span></label>
+          <select id="parcelSel"><option value="">— aucune —</option></select>
+          <div id="parcelSoilNote" class="hint" style="margin-top:4px;"></div>
+        </div>
         <div class="row2">
           <div><label>Région / localité</label><input id="region" placeholder="ex. Yamoussoukro" maxlength="120"></div>
           <div><label>Surface</label><input id="area" placeholder="ex. 500 m², 1 ha" maxlength="80"></div>
@@ -476,7 +481,35 @@
     try{ const r = await fetch("/api/auth/me"); me = (await r.json()).user || null; }catch(e){ me=null; }
     render();
     handleCropDeepLink();
+    loadParcelOptions();
   }
+  // ---- Parcelle enregistrée : données de sol (estimation satellite + test de terrain) ----
+  const TEX_TO_OPTION={ sand:"Sableux", loamy_sand:"Sablo-limoneux", sandy_loam:"Sablo-limoneux", loam:"Argilo-limono-sableux (terre franche)", silt_loam:"Limoneux", silt:"Limoneux", sandy_clay_loam:"Sablo-argileux", clay_loam:"Argilo-limoneux", silty_clay_loam:"Limono-argileux", sandy_clay:"Argilo-sableux", silty_clay:"Argilo-limoneux", clay:"Argileux" };
+  async function loadParcelOptions(){
+    if(!me || !$("parcelSel")) return;
+    try{
+      const r=await fetch("/api/parcels"); const d=await r.json(); if(!r.ok) return;
+      const list=d.parcels||[]; if(!list.length) return;
+      $("parcelSel").innerHTML='<option value="">— aucune —</option>'+list.map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.name)+(p.soil&&p.soil.analyzed?' — sol analysé':'')+'</option>'; }).join("");
+      $("parcelPick").style.display="block";
+      let want=""; try{ want=new URLSearchParams(location.search).get("parcelle")||""; }catch(e){}
+      if(want && list.some(function(p){ return p.id===want; })){ $("parcelSel").value=want; onParcelPick(); }
+    }catch(e){}
+  }
+  async function onParcelPick(){
+    const id=$("parcelSel").value, note=$("parcelSoilNote"); note.textContent="";
+    if(!id) return;
+    try{
+      const r=await fetch("/api/parcels/soil?id="+encodeURIComponent(id)); const d=await r.json();
+      const f=r.ok?d.fiche:null;
+      if(!f || !(f.estimate||f.manual)){ note.innerHTML='Le sol de cette parcelle n\'a pas encore été analysé. Ouvrez « Sol &amp; racines » dans votre <a href="/tableau" style="color:var(--leaf);font-weight:600;">tableau de bord</a> pour l\'estimer.'; return; }
+      const a=f.advice||{};
+      if(a.texture && $("soil") && !$("soil").value){ const lbl=TEX_TO_OPTION[a.texture.key]; if(lbl) $("soil").value=lbl; }
+      if(f.estimate && f.estimate.ph!=null && $("ph") && !$("ph").value.trim()){ $("ph").value=String(Math.round(f.estimate.ph*10)/10).replace(".",","); }
+      note.textContent="Données de sol ajoutées à la demande : "+(a.texture?a.texture.label.toLowerCase():"texture inconnue")+(a.soil&&a.soil.depthCm!=null&&!a.soil.depthCapped?", sol ≈ "+Math.round(a.soil.depthCm)+" cm":"")+(f.chem&&f.chem.length?", fertilité estimée":"")+". L'itinéraire sera généré pour ce sol (nouvelle génération).";
+    }catch(e){}
+  }
+  if($("parcelSel")) $("parcelSel").addEventListener("change", onParcelPick);
   // Arrive depuis « Quoi planter ? » (/app?culture=Concombre) : on pré-remplit la culture
   // et on amène la personne droit au formulaire d'itinéraire technique.
   let deepLinkDone=false;
@@ -610,7 +643,7 @@
     const btn=$("genBtn"); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Génération de l\'itinéraire…';
     var rb=document.getElementById("regenBtn"); if(rb){ rb.disabled=true; rb.innerHTML='<span class="spin"></span> Génération…'; }
     try{
-      const body={ crop, region:$("region").value, area:$("area").value, soil:$("soil").value, ph:$("ph").value, season:$("season").value, mode:($("mode")?$("mode").value:""), structure:($("structure")?$("structure").value:""), goal:$("goal").value, notes:$("notes").value, fresh:fresh };
+      const body={ parcel_id:($("parcelSel")&&$("parcelSel").value)||undefined, crop, region:$("region").value, area:$("area").value, soil:$("soil").value, ph:$("ph").value, season:$("season").value, mode:($("mode")?$("mode").value:""), structure:($("structure")?$("structure").value:""), goal:$("goal").value, notes:$("notes").value, fresh:fresh };
       const r=await fetch("/api/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
       const d=await r.json();
       if(!r.ok){ err.textContent=d.error||"La génération a échoué."; }

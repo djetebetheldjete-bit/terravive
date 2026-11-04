@@ -13,6 +13,9 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const SOL = require("./lib/sol");
+const SOL_SRC = require("./lib/sol-sources");
+const { esp32Sketch } = require("./lib/esp32-sketch");
 
 // ---------- Configuration ----------
 function loadEnv(file) {
@@ -81,7 +84,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [] }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.parcelSoil) s.parcelSoil = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, parcelSoil: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [] }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -262,6 +265,30 @@ async function deleteParcel(userId, id) {
   const s = loadStore(); const p = s.parcels[id]; if (p && p.user_id === userId) { delete s.parcels[id]; saveStore(s); }
 }
 // Garde-fou : une « zone » valide = { bbox:[o,s,e,n] } OU { polygon:[[lng,lat],...] }.
+// ---------- Sol & racines d'une parcelle (estimation satellite + correction terrain) ----------
+// Table séparée de trv_parcels : si la migration n'est pas encore faite, seule cette
+// fonction est indisponible (les parcelles continuent de fonctionner normalement).
+async function getParcelSoil(parcelId) {
+  if (USE_DB) { try { const r = await sb(`/trv_parcel_soil?parcel_id=eq.${encodeURIComponent(parcelId)}&select=*&limit=1`); const x = r && r[0]; if (x) { ["estimate", "manual"].forEach((k) => { if (typeof x[k] === "string") { try { x[k] = JSON.parse(x[k]); } catch (e) { x[k] = null; } } }); } return x || null; } catch (e) { console.error("getParcelSoil:", e.message); return null; } }
+  return loadStore().parcelSoil[parcelId] || null;
+}
+async function listParcelSoilForUser(userId) {
+  if (USE_DB) { try { const r = (await sb(`/trv_parcel_soil?user_id=eq.${encodeURIComponent(userId)}&select=*&order=updated_at.desc`)) || []; r.forEach((x) => ["estimate", "manual"].forEach((k) => { if (typeof x[k] === "string") { try { x[k] = JSON.parse(x[k]); } catch (e) { x[k] = null; } } })); return r; } catch (e) { return []; } }
+  return Object.values(loadStore().parcelSoil).filter((x) => x.user_id === userId).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+}
+async function saveParcelSoil(rec) {
+  if (USE_DB) {
+    const row = Object.assign({}, rec, { estimate: rec.estimate ? JSON.stringify(rec.estimate) : null, manual: rec.manual ? JSON.stringify(rec.manual) : null });
+    await sb(`/trv_parcel_soil?on_conflict=parcel_id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([row]) });
+    return;
+  }
+  const s = loadStore(); s.parcelSoil[rec.parcel_id] = rec; saveStore(s);
+}
+async function deleteParcelSoil(userId, parcelId) {
+  if (USE_DB) { try { await sb(`/trv_parcel_soil?parcel_id=eq.${encodeURIComponent(parcelId)}&user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); } catch (e) {} return; }
+  const s = loadStore(); const x = s.parcelSoil[parcelId]; if (x && x.user_id === userId) { delete s.parcelSoil[parcelId]; saveStore(s); }
+}
+
 function cleanZone(z) {
   if (!z || typeof z !== "object") return null;
   if (Array.isArray(z.bbox) && z.bbox.length === 4 && z.bbox.every((n) => typeof n === "number" && isFinite(n))) return { bbox: z.bbox.map(Number) };
@@ -741,7 +768,7 @@ function parseArea(raw) {
   haStr = haStr.replace(/\.?0+$/, "");
   return { ok: true, ha, m2, haStr };
 }
-function planUserMessage(p) {
+function planUserMessage(p, soilBlock) {
   const a = parseArea(p.area);
   let surfaceLine;
   if (a.ok) {
@@ -762,7 +789,11 @@ ${surfaceLine}
 - Structure de culture souhaitée : ${p.structure || "non précisée"}
 - Objectif principal : ${p.goal || "produire durablement"}
 - Moyens / contraintes : ${p.notes || "aucun détail supplémentaire"}
-
+${soilBlock ? `
+Données de sol de MA parcelle (calculées par l'application ; les valeurs « estimation » viennent de cartes satellitaires — iSDAsoil/SoilGrids — et restent à confirmer sur le terrain) :
+${soilBlock}
+UTILISE ces données pour adapter le travail du sol, la fertilisation, l'irrigation (dose et fréquence) et le choix des pratiques ; quand une valeur est une estimation, rappelle en une phrase de la vérifier (test du bocal, observation d'une fosse, analyse de sol) avant une décision coûteuse. N'invente aucune autre valeur d'analyse.
+` : ""}
 Rédige mon itinéraire technique de culture complet.`;
 }
 // Langues locales proposées (traduction best-effort par l'IA).
@@ -882,7 +913,23 @@ async function handlePlan(req, res) {
   const crop = String(p.crop || "").trim().slice(0, 120);
   if (!crop) return sendJson(res, 400, { error: "Indiquez au moins la culture souhaitée." });
   const clean = { crop, region: String(p.region || "").slice(0, 120), area: String(p.area || "").slice(0, 80), soil: String(p.soil || "").slice(0, 80), ph: String(p.ph || "").slice(0, 40), season: String(p.season || "").slice(0, 80), mode: String(p.mode || "").slice(0, 80), structure: String(p.structure || "").slice(0, 80), goal: String(p.goal || "").slice(0, 120), notes: String(p.notes || "").slice(0, 500) };
-  const fresh = p.fresh === true || p.fresh === "1" || p.fresh === 1;
+  let fresh = p.fresh === true || p.fresh === "1" || p.fresh === 1;
+  // Données de sol d'une parcelle enregistrée (facultatif) : l'itinéraire devient propre à CE sol,
+  // donc on ne ressert pas un itinéraire partagé du secteur.
+  let soilBlock = "";
+  if (p.parcel_id) {
+    try {
+      const rec = await getParcelSoil(String(p.parcel_id));
+      const parcel = rec && rec.user_id === user.id ? await findUserParcel(user.id, rec.parcel_id) : null;
+      if (parcel && (rec.estimate || rec.manual)) {
+        const f = await buildSoilFiche(parcel, Object.assign({}, rec, { crop: crop, sown_at: rec.crop && rec.crop.toLowerCase() === crop.toLowerCase() ? rec.sown_at : null }));
+        soilBlock = SOL.adviceForPrompt(f.advice, f.chem);
+        if (!clean.soil && f.advice.texture) clean.soil = f.advice.texture.label + (f.advice.soil.textureFrom === "terrain" ? " (confirmé sur le terrain)" : " (estimation satellite)");
+        if (!clean.ph && rec.estimate && rec.estimate.ph != null) clean.ph = "≈ " + (Math.round(rec.estimate.ph * 10) / 10) + " (estimation satellite)";
+        if (soilBlock) fresh = true;
+      }
+    } catch (e) { console.error("plan/soil:", e.message); }
+  }
 
   // 1) RÉUTILISATION : un itinéraire existe-t-il déjà pour cette culture dans ce secteur ?
   //    Si oui (et que la personne n'a pas demandé expressément un nouveau), on le ressert
@@ -897,7 +944,7 @@ async function handlePlan(req, res) {
   // 2) GÉNÉRATION par l'IA (compte dans la limite journalière et dans le coût).
   if (!rateOk("plan:" + user.id, 20, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Vous avez généré beaucoup de plans aujourd'hui. Reprenez plus tard." });
   try {
-    const content = await callClaude(planSystem(), [{ role: "user", content: planUserMessage(clean) }], null, PLAN_MAX_TOKENS);
+    const content = await callClaude(planSystem(), [{ role: "user", content: planUserMessage(clean, soilBlock) }], null, PLAN_MAX_TOKENS);
     const rec = { id: newId(), user_id: user.id, title: crop + (clean.region ? " — " + clean.region : ""), crop, region: clean.region || null, area: clean.area || null, soil: clean.soil || null, season: clean.season || null, goal: clean.goal || null, notes: clean.notes || null, content, created_at: new Date().toISOString() };
     await savePlan(rec);
     sendJson(res, 200, { plan: rec, reused: false });
@@ -916,7 +963,12 @@ async function handleParcelsList(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
   const rows = await listParcelsForUser(user.id);
   // Normalise geom (texte JSON en base, objet en local) pour renvoyer toujours un objet zone.
-  const parcels = (rows || []).map((p) => { let z = p.geom; if (typeof z === "string") { try { z = JSON.parse(z); } catch (e) { z = null; } } return { id: p.id, name: p.name, zone: cleanZone(z), created_at: p.created_at }; }).filter((p) => p.zone);
+  const soils = {}; (await listParcelSoilForUser(user.id)).forEach((x) => { soils[x.parcel_id] = x; });
+  const parcels = (rows || []).map((p) => {
+    let z = p.geom; if (typeof z === "string") { try { z = JSON.parse(z); } catch (e) { z = null; } }
+    const so = soils[p.id];
+    return { id: p.id, name: p.name, zone: cleanZone(z), created_at: p.created_at, soil: so ? { crop: so.crop || null, sown_at: so.sown_at || null, analyzed: !!(so.estimate || so.manual) } : null };
+  }).filter((p) => p.zone);
   sendJson(res, 200, { parcels });
 }
 async function handleParcelSave(req, res) {
@@ -935,7 +987,120 @@ async function handleParcelDelete(req, res) {
   let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
   if (!p.id) return sendJson(res, 400, { error: "Parcelle manquante." });
   await deleteParcel(user.id, String(p.id));
+  await deleteParcelSoil(user.id, String(p.id));
   sendJson(res, 200, { ok: true });
+}
+// --- Sol, racines et arrosage d'une parcelle ---
+function parseIsoDate(v) {
+  const x = String(v || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(x)) return null;
+  return isFinite(Date.parse(x + "T00:00:00Z")) ? x : null;
+}
+async function findUserParcel(userId, id) {
+  const rows = await listParcelsForUser(userId);
+  const p = (rows || []).find((x) => x.id === id);
+  if (!p) return null;
+  let z = p.geom; if (typeof z === "string") { try { z = JSON.parse(z); } catch (e) { z = null; } }
+  const zone = cleanZone(z);
+  return zone ? { id: p.id, name: p.name, zone } : null;
+}
+async function buildSoilFiche(parcel, rec) {
+  const center = SOL_SRC.zoneCenter(parcel.zone);
+  const et0 = center ? await SOL_SRC.fetchEt0(center.lat, center.lon) : null;
+  const advice = SOL.soilAdvice({ estimate: rec.estimate, manual: rec.manual, crop: rec.crop, sownAt: rec.sown_at, et0 });
+  return {
+    parcel: { id: parcel.id, name: parcel.name }, center: center ? { lat: Math.round(center.lat * 1e5) / 1e5, lon: Math.round(center.lon * 1e5) / 1e5 } : null,
+    crop: rec.crop || null, sown_at: rec.sown_at || null,
+    estimate: rec.estimate || null, estimate_error: rec.estimate_error || null, manual: rec.manual || null,
+    advice, chem: SOL.interpretChem(rec.estimate), updated_at: rec.updated_at || null
+  };
+}
+const SOIL_SAVE_ERROR = "Enregistrement impossible. Si vous utilisez Supabase, exécutez la partie « trv_parcel_soil » de schema.sql.";
+async function handleParcelSoilGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const id = new URL(req.url, "http://x").searchParams.get("id") || "";
+  const parcel = await findUserParcel(user.id, id);
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const rec = await getParcelSoil(id);
+  if (!rec || rec.user_id !== user.id) return sendJson(res, 200, { fiche: null, parcel: { id: parcel.id, name: parcel.name } });
+  sendJson(res, 200, { fiche: await buildSoilFiche(parcel, rec) });
+}
+// POST { id, crop?, sown_at?, refresh? } : estime le sol (une fois, ou à la demande) et calcule la fiche.
+async function handleParcelSoil(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const parcel = await findUserParcel(user.id, String(p.id || ""));
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const now = new Date().toISOString();
+  let rec = await getParcelSoil(parcel.id);
+  if (rec && rec.user_id !== user.id) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  rec = Object.assign({ parcel_id: parcel.id, user_id: user.id, crop: null, sown_at: null, estimate: null, estimate_error: null, manual: null, created_at: now }, rec || {});
+  if (p.crop !== undefined) rec.crop = String(p.crop || "").trim().slice(0, 60) || null;
+  if (p.sown_at !== undefined) {
+    if (p.sown_at === "" || p.sown_at == null) rec.sown_at = null;
+    else { const d = parseIsoDate(p.sown_at); if (!d) return sendJson(res, 400, { error: "Date de semis invalide (format AAAA-MM-JJ)." }); rec.sown_at = d; }
+  }
+  const needEstimate = p.refresh === true || !rec.estimate;
+  if (needEstimate) {
+    if (!rateOk("soil:" + user.id, 20, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Beaucoup d'analyses de sol aujourd'hui. Reprenez demain." });
+    // Les services de cartes de sol limitent le nombre d'appels (SoilGrids : 5/minute).
+    if (!rateOk("soil-ext", 4, 60 * 1000)) return sendJson(res, 429, { error: "Le service de données de sol est très sollicité. Réessayez dans une minute." });
+    const c = SOL_SRC.zoneCenter(parcel.zone);
+    try { rec.estimate = await SOL_SRC.estimateSoil(c.lat, c.lon); rec.estimate_error = null; }
+    catch (e) { rec.estimate_error = e.message; console.error("estimateSoil:", e.message); }
+  }
+  rec.updated_at = now;
+  try { await saveParcelSoil(rec); } catch (e) { console.error("saveParcelSoil:", e.message); return sendJson(res, 500, { error: SOIL_SAVE_ERROR }); }
+  sendJson(res, 200, { fiche: await buildSoilFiche(parcel, rec) });
+}
+// POST { id, texture, depth_cm, stones } : correction de terrain (test du bocal, fosse). Vide = on efface.
+async function handleParcelSoilManual(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const parcel = await findUserParcel(user.id, String(p.id || ""));
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const texture = p.texture ? SOL.normalizeTexture(p.texture) : null;
+  if (p.texture && !texture) return sendJson(res, 400, { error: "Texture inconnue." });
+  const numOrNull = (v, min, max, label) => {
+    if (v === "" || v == null) return { v: null };
+    const n = Number(String(v).replace(",", "."));
+    if (!isFinite(n) || n < min || n > max) return { err: label + " : valeur entre " + min + " et " + max + " attendue." };
+    return { v: Math.round(n) };
+  };
+  const dep = numOrNull(p.depth_cm, 5, 300, "Profondeur"); if (dep.err) return sendJson(res, 400, { error: dep.err });
+  const sto = numOrNull(p.stones, 0, 90, "Cailloux"); if (sto.err) return sendJson(res, 400, { error: sto.err });
+  const now = new Date().toISOString();
+  let rec = await getParcelSoil(parcel.id);
+  if (rec && rec.user_id !== user.id) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  rec = Object.assign({ parcel_id: parcel.id, user_id: user.id, crop: null, sown_at: null, estimate: null, estimate_error: null, created_at: now }, rec || {});
+  rec.manual = (texture || dep.v != null || sto.v != null) ? { texture, depth_cm: dep.v, stones: sto.v, at: now } : null;
+  rec.updated_at = now;
+  try { await saveParcelSoil(rec); } catch (e) { console.error("saveParcelSoil:", e.message); return sendJson(res, 500, { error: SOIL_SAVE_ERROR }); }
+  sendJson(res, 200, { fiche: await buildSoilFiche(parcel, rec) });
+}
+// Conseil de la parcelle la plus récemment analysée (seuil d'arrosage de la station).
+async function latestSoilAdvice(userId, parcelId) {
+  const recs = (await listParcelSoilForUser(userId)).filter((r) => (r.estimate || r.manual) && (!parcelId || r.parcel_id === parcelId));
+  for (const rec of recs) {
+    const parcel = await findUserParcel(userId, rec.parcel_id);
+    if (!parcel) continue;
+    const f = await buildSoilFiche(parcel, rec);
+    if (f.advice && f.advice.sensor) return { parcel_id: parcel.id, parcel_name: parcel.name, crop: rec.crop || null, threshold_pct: f.advice.sensor.threshold_pct, sensor_depth_cm: f.advice.sensor.depth_cm, second_depth_cm: f.advice.sensor.second_depth_cm, dose_l_m2: f.advice.irrigation && f.advice.irrigation.dose_l_m2 != null ? f.advice.irrigation.dose_l_m2 : null };
+  }
+  return null;
+}
+// GET /api/station/sketch[?parcel=id] : programme ESP32 pré-rempli (clé, adresse, seuil de la parcelle).
+async function handleStationSketch(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const st = await getOrCreateStation(user.id);
+  if (!st) return sendJson(res, 500, { error: "Impossible de préparer la station." });
+  const parcelId = new URL(req.url, "http://x").searchParams.get("parcel") || null;
+  let adv = null; try { adv = await latestSoilAdvice(user.id, parcelId); } catch (e) {}
+  const proto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() || (req.socket && req.socket.encrypted ? "https" : "http");
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").replace(/[^A-Za-z0-9.:\-]/g, "");
+  const text = esp32Sketch({ origin: (proto === "https" ? "https" : "http") + "://" + host, key: st.device_key, threshold: adv ? adv.threshold_pct : null, sensorDepth: adv ? adv.sensor_depth_cm : null, parcelName: adv ? adv.parcel_name : null });
+  res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "content-disposition": 'attachment; filename="terravive_station_esp32.ino"', "cache-control": "no-store" });
+  res.end(text);
 }
 // --- Coopérative ---
 async function coopPublic(coop) { return coop ? { id: coop.id, name: coop.name, region: coop.region || null, code: coop.code, created_at: coop.created_at } : null; }
@@ -1392,7 +1557,9 @@ async function handleDashboard(req, res) {
   const region = (user.region) || (plans[0] && plans[0].region) || "";
   const weather = await fetchWeather(region);
   const latest = readings[0] || null;
+  let soilAdvice = null; try { soilAdvice = await latestSoilAdvice(user.id); } catch (e) {}
   sendJson(res, 200, {
+    soilAdvice,
     user: { name: user.name, region: user.region || null },
     counts: { plans: plans.length, devices: devices.length, readings: readings.length },
     latest,
@@ -2700,6 +2867,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url === "/api/parcels") return handleParcelsList(req, res);
   if (req.method === "POST" && url === "/api/parcels") return handleParcelSave(req, res);
   if (req.method === "POST" && url === "/api/parcels/delete") return handleParcelDelete(req, res);
+  if (req.method === "GET" && url === "/api/parcels/soil") return handleParcelSoilGet(req, res);
+  if (req.method === "POST" && url === "/api/parcels/soil") return handleParcelSoil(req, res);
+  if (req.method === "POST" && url === "/api/parcels/soil/manual") return handleParcelSoilManual(req, res);
   if (req.method === "GET" && url === "/api/coop/me") return handleCoopMe(req, res);
   if (req.method === "POST" && url === "/api/coop/create") return handleCoopCreate(req, res);
   if (req.method === "POST" && url === "/api/coop/join") return handleCoopJoin(req, res);
@@ -2721,6 +2891,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && url === "/api/ingest") return handleIngest(req, res);
   if (req.method === "POST" && url === "/api/readings/clear") return handleReadingsClear(req, res);
   if (req.method === "GET" && url === "/api/station") return handleStation(req, res);
+  if (req.method === "GET" && url === "/api/station/sketch") return handleStationSketch(req, res);
   if (req.method === "GET" && url === "/api/dashboard") return handleDashboard(req, res);
   if (req.method === "GET" && url === "/api/weather") return handleWeather(req, res);
   if (req.method === "POST" && url === "/api/arduino") return handleArduino(req, res);

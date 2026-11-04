@@ -18,6 +18,19 @@ Même principe que la plateforme Bâtisseur, appliqué à l'agriculture et au d�
 - **Espace admin** : liste des inscrits et nombre de plans.
 - **Zéro dépendance** : Node.js 18+ (http, fs, crypto). Stockage Supabase **ou** fichiers locaux.
 
+## Sol, racines et station connectée (v7)
+
+- **Sol & racines** (tableau de bord → une parcelle enregistrée → « Sol & racines ») : nature du sol estimée
+  par carte satellitaire (**iSDAsoil 30 m**, repli **SoilGrids 250 m**), profondeur du sol, fertilité estimée,
+  profondeur **utile** des racines selon la culture et son stade, **dose et fréquence d'arrosage** (méthode FAO-56,
+  ET0 Open-Meteo), **profondeur du capteur** et **seuil d'arrosage**. Correction possible par un test de terrain
+  (test du bocal, profondeur observée), qui l'emporte toujours sur l'estimation.
+- **Itinéraire adapté au sol** : dans le formulaire, choisissez une parcelle enregistrée ; ses données de sol sont transmises à l'IA.
+- **Station ESP32** : programme généré par le serveur (`/api/station/sketch`), pré-rempli avec la clé, l'adresse
+  et le seuil de la parcelle ; humidité du sol + DHT22 (air) + niveau de cuve (JSN-SR04T), HTTPS, nouvelles tentatives.
+  Alerte d'arrosage et de cuve vide dans « Dernières mesures ».
+- Guide complet : [`docs/SOL-ET-STATION.md`](docs/SOL-ET-STATION.md). Tests : `npm test`.
+
 ## Installation locale
 
 ```bash
@@ -32,7 +45,9 @@ Sans base de données, les comptes et plans sont stockés dans `data/store.json`
 1. Poussez ce dossier sur GitHub.
 2. Sur Render : « New + » → « Web Service » → sélectionnez le dépôt (Render lit `render.yaml`).
 3. Renseignez `ANTHROPIC_API_KEY` et `ADMIN_EMAILS` (et, en option, `SUPABASE_URL` + `SUPABASE_KEY`).
-4. Si vous utilisez Supabase : exécutez `schema.sql` dans le SQL Editor.
+4. Si vous utilisez Supabase : exécutez `schema.sql` dans le SQL Editor (sur une base existante, le bloc
+   `trv_parcel_soil` suffit pour la v7).
+5. Facultatif mais recommandé : `ISDA_USERNAME` + `ISDA_PASSWORD` (compte gratuit iSDAsoil) pour les cartes de sol à 30 m.
 
 ## Sécurité
 

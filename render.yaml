@@ -19,3 +19,7 @@ services:
         sync: false            # facultatif
       - key: SUPABASE_KEY
         sync: false            # facultatif
+      - key: ISDA_USERNAME
+        sync: false            # facultatif : compte iSDAsoil (cartes de sol 30 m)
+      - key: ISDA_PASSWORD
+        sync: false            # facultatif

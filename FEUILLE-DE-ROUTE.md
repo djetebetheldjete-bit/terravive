@@ -2,7 +2,7 @@
 
 > Ce document garde la mémoire du projet : ce qui est **fait**, ce qu'on **construit maintenant** (faisable par logiciel seul), et ce qu'on **ajoutera plus tard** quand on aura les équipements, les données ou les partenariats nécessaires. Rien ne se perd : chaque idée mise de côté est notée ici avec *ce qui manque pour l'activer*.
 
-_Dernière mise à jour : 16 octobre 2026._
+_Dernière mise à jour : 4 novembre 2026._
 
 ---
 
@@ -18,6 +18,8 @@ _Dernière mise à jour : 16 octobre 2026._
 - **Mode hors-ligne installable (PWA)** : l'app s'installe sur le téléphone et fonctionne en faible connexion.
 - **Voix** : lecture à voix haute et dictée (fiable en français).
 - **Diagnostic des maladies par photo** : le cultivateur photographie une plante, l'IA propose une cause probable et des solutions durables.
+- **Sol & racines (v7)** : nature du sol estimée par satellite (iSDAsoil 30 m, repli SoilGrids), profondeur du sol, fertilité estimée (pH, carbone, N, P, K), profondeur racinaire utile selon la culture et son stade, dose et fréquence d'arrosage (FAO-56 + ET0 Open-Meteo), profondeur du capteur et seuil d'arrosage. Correction par test de terrain (bocal, fosse). Données transmises à l'IA pour un itinéraire adapté au sol.
+- **Station ESP32 prête à brancher (v7)** : programme généré par le serveur (clé, adresse, seuil de la parcelle), humidité du sol + air (DHT22) + niveau de cuve (JSN-SR04T), HTTPS, reprise Wi-Fi, nouvelles tentatives si le serveur dort ; vérifié par compilation (ESP32, cœur Arduino 3.0.7). Alertes « arroser » et « cuve presque vide » dans le tableau de bord.
 
 ---
 
@@ -46,7 +48,9 @@ Ces éléments ne demandent **aucun équipement** : juste du développement. On 
 
 | Fonction visée | Ce qu'elle apporterait | Ce qui manque pour l'activer |
 |---|---|---|
-| **Capteurs réels au champ (ESP32 / Arduino)** : humidité du sol, température, pluviométrie en direct | Arrosage au bon moment, alertes précises, données propres à la parcelle | **Matériel** : cartes ESP32/capteurs + un petit forfait data. (La page « Automatisation » existe déjà en simulation ; il restera à brancher les vraies mesures via `/api/ingest`.) |
+| **Capteurs réels au champ (ESP32 / Arduino)** : humidité du sol, température, niveau de cuve en direct | Arrosage au bon moment, alertes précises, données propres à la parcelle | **Matériel seulement** : ESP32 + sonde capacitive (+ DHT22, JSN-SR04T) + boîtier étanche + alimentation + petit forfait data. Le logiciel est prêt (v7) : premier test terrain à faire. Ensuite : pluviomètre à auget, alertes par SMS. |
+| **Sentinel-1 (radar) — humidité de surface sous les nuages** | Suivi de l'humidité même en saison des pluies, quand l'optique (Sentinel-2) est aveugle | **Développement côté Vertea** (Google Earth Engine) + calibration avec les mesures des stations ESP32. |
+| **Sentinel-3 — température de surface régionale** | Alertes chaleur et tendances de végétation à l'échelle d'un secteur / d'une coopérative (300 m – 1 km : trop grossier pour une parcelle) | **Développement côté Vertea** ; priorité basse. |
 | **Drones** : cartographie fine, repérage des zones faibles, pulvérisation ciblée | Diagnostic à grande échelle, économie d'intrants | **Équipement** (drone + caméra) et autorisation de vol. L'analyse satellite couvre déjà une partie du besoin en attendant. |
 | **Prix de marché en direct** | Savoir où et à combien vendre, automatiquement | **Source de données fiable** : partenariat avec un marché/observatoire des prix, ou une API. Sans ça, on reste sur des fourchettes saisies à la main (§2.2). |
 | **SMS / USSD** pour les cultivateurs **sans smartphone** | Toucher ceux qui n'ont qu'un téléphone simple, directement | **Passerelle SMS** (opérateur local ou service type Twilio) = abonnement payant. En attendant, le **relais humain** (l'animateur) joue ce rôle. |
