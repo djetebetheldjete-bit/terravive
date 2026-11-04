@@ -648,7 +648,7 @@
     (a.warnings||[]).forEach(w=>{ h+='<div class="valert warn" style="margin-top:6px;">'+esc(w)+'</div>'; });
     // Chimie estimée
     if(f.chem&&f.chem.length){
-      h+='<div style="margin-top:10px;font-weight:700;font-size:.85rem;">Fertilité estimée (0–20 cm)</div><div class="vchips" style="margin-top:6px;">'
+      h+='<div style="margin-top:10px;font-weight:700;font-size:.85rem;">Fertilité estimée ('+(e&&/SoilGrids/.test(e.source||"")?"0–30 cm":"0–20 cm")+')</div><div class="vchips" style="margin-top:6px;">'
         + f.chem.map(c=>chip(c.k, esc(String(c.v)), c.t)).join("") + '</div>';
       f.chem.filter(c=>c.note).forEach(c=>{ h+='<div class="muted" style="font-size:.82rem;margin-top:4px;">'+esc(c.note)+'</div>'; });
       h+='<div class="muted" style="font-size:.78rem;margin-top:4px;">Valeurs issues de cartes (modèles d\'apprentissage + échantillons de sol) : utiles pour s\'orienter, elles ne remplacent pas une analyse de laboratoire avant une fertilisation coûteuse.</div>';
