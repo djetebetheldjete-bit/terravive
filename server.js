@@ -2830,7 +2830,7 @@ async function denyIfClient(req, res, url, method) {
 const server = http.createServer(async (req, res) => {
   const url = (req.url || "").split("?")[0];
   // Point de contrôle de santé (pour un moniteur d'uptime : garde le service éveillé et signale les pannes).
-  if (req.method === "GET" && (url === "/healthz" || url === "/api/health")) return sendJson(res, 200, { ok: true, service: "terravive", time: new Date().toISOString(), uptime_s: Math.round(process.uptime()), db: USE_DB ? "supabase" : "local" });
+  if (req.method === "GET" && (url === "/healthz" || url === "/api/health")) return sendJson(res, 200, { ok: true, service: "terravive", time: new Date().toISOString(), uptime_s: Math.round(process.uptime()), db: USE_DB ? "supabase" : "local", sol: SOL_SRC.isdaConfigured() ? "isda" : "soilgrids (ISDA_USERNAME/ISDA_PASSWORD absents)" });
   // Un compte « client » ne peut atteindre que la boutique et l'authentification.
   if (await denyIfClient(req, res, url, req.method)) return;
   // ---- Terravive Stock ----
@@ -2930,6 +2930,7 @@ server.listen(PORT, () => {
   console.log(`\n  Terravive — agriculture durable accompagnée par l'IA`);
   console.log(`  http://localhost:${PORT}`);
   console.log(`  Modèle : ${MODEL} · Clés API : ${API_KEYS.length}`);
-  console.log(`  Mémoire : ${USE_DB ? "Supabase" : "fichiers locaux"}`);
+  console.log(`  Mémoire : ${USE_DB ? "Supabase" : "fichiers locaux"}
+  Cartes de sol : ${SOL_SRC.isdaConfigured() ? "iSDAsoil (compte configuré)" : "SoilGrids (ISDA_USERNAME / ISDA_PASSWORD absents)"}`);
   console.log(`  Admin : ${ADMIN_EMAILS.length ? ADMIN_EMAILS.join(", ") : "(définir ADMIN_EMAILS)"}\n`);
 });
