@@ -30,23 +30,37 @@
     try { return n.toLocaleString("fr-FR", { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
     catch (e) { return dec ? n.toFixed(dec) : String(Math.round(n)); }
   }
+  // Chaque animation porte un jeton : une nouvelle valeur écrite par l'appli annule l'animation
+  // en cours. Le texte écrit par l'animation elle-même est mémorisé (__tvShown) pour que
+  // l'observateur de changements ne la prenne pas pour une nouvelle valeur (sinon chaque
+  // image relançait une animation depuis 0 et le compteur restait bloqué à « 0 % »).
+  function writeOwn(el, txt) { el.__tvShown = txt; el.textContent = txt; }
   function countUp(el) {
     if (el.__tvRun) return;
     var info = parseNum(el.textContent); if (!info || info.val === 0 && !/\d/.test(el.textContent)) { return; }
     // nombres trop grands ou identiques : pas d'animation
     if (Math.abs(info.val) > 1e12) return;
-    if (el.__tvLast === info.val) return;
+    if (el.__tvLast === info.val) { el.__tvShown = el.textContent; return; }
     el.__tvLast = info.val; el.__tvRun = true;
+    var tok = (el.__tvTok || 0) + 1; el.__tvTok = tok;
+    var finalTxt = el.textContent;
     el.classList.add("tv-count");
-    if (REDUCED) { el.__tvRun = false; return; }
+    if (REDUCED) { el.__tvShown = finalTxt; el.__tvRun = false; return; }
     var from = 0, to = info.val, dur = Math.min(1500, 500 + Math.abs(to) * 2), t0 = null;
     function step(ts) {
+      if (el.__tvTok !== tok) return;              // une valeur plus récente a pris la main
       if (!t0) t0 = ts; var p = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - p, 3);
       var cur = from + (to - from) * e;
-      el.textContent = info.pre + fmt(cur, info.dec) + info.post;
-      if (p < 1) requestAnimationFrame(step); else { el.textContent = info.pre + fmt(to, info.dec) + info.post; el.__tvRun = false; }
+      if (p < 1) { writeOwn(el, info.pre + fmt(cur, info.dec) + info.post); requestAnimationFrame(step); }
+      else { writeOwn(el, finalTxt); el.__tvRun = false; }
     }
     requestAnimationFrame(step);
+  }
+  // Appelé quand le texte d'un compteur change : on ignore nos propres écritures.
+  function onCountChanged(c) {
+    if (c.textContent === c.__tvShown) return;
+    c.__tvRun = false; c.__tvTok = (c.__tvTok || 0) + 1;
+    if (isCountable(c)) countUp(c); else c.__tvShown = c.textContent;
   }
 
   var COUNT_SEL = ".tile .val, .metric, #liveRow .val, .kpi .v, .tv-num";
@@ -155,8 +169,8 @@
       var touchedCounts = false;
       for (var i = 0; i < muts.length; i++) {
         var t = muts[i].target;
-        if (t && t.nodeType === 1 && t.matches && t.matches(COUNT_SEL)) { touchedCounts = true; t.__tvRun = false; if (isCountable(t)) countUp(t); }
-        else if (t && t.parentElement && t.parentElement.matches && t.parentElement.matches(COUNT_SEL)) { var c = t.parentElement; c.__tvRun = false; if (isCountable(c)) countUp(c); }
+        if (t && t.nodeType === 1 && t.matches && t.matches(COUNT_SEL)) { touchedCounts = true; onCountChanged(t); }
+        else if (t && t.parentElement && t.parentElement.matches && t.parentElement.matches(COUNT_SEL)) { onCountChanged(t.parentElement); }
       }
       if (!touchedCounts) schedule(); else schedule();
     });
