@@ -158,6 +158,14 @@ async function t(name, fn) { try { await fn(); passed++; console.log("  ok  " + 
     assert.ok(Math.abs((await src.fetchEt0(6.8, -5.3, f)) - 4.2) < 1e-9);
     await src.fetchEt0(6.8, -5.3, f); assert.strictEqual(f.calls.length, 1);
   });
+  await t("fetchEt0 : une erreur n'est pas gardée en cache, nouvel essai", async () => {
+    src._resetForTests();
+    let n = 0;
+    const f = async () => { n++; return n <= 2 ? { ok: false, status: 429, json: async () => ({ error: true, reason: "quota" }) } : { ok: true, status: 200, json: async () => ({ daily: { et0_fao_evapotranspiration: [4, 4, 4] } }) }; };
+    assert.strictEqual(await src.fetchEt0(5.1, -4.0, f), null);   // 2 essais ratés
+    assert.strictEqual(n, 2);
+    assert.strictEqual(await src.fetchEt0(5.1, -4.0, f), 4);      // pas de « null » en cache : on redemande
+  });
   await t("zoneCenter", () => {
     assert.deepStrictEqual(src.zoneCenter({ bbox: [-5.3, 6.8, -5.2, 6.9] }), { lon: -5.25, lat: 6.85 });
   });

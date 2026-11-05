@@ -54,6 +54,7 @@
   /* ===== Mise en page : barre latérale + contenu ===== */
   .shell{ display:grid; grid-template-columns:230px 1fr; min-height:100vh; }
   @media(max-width:860px){ .shell{ grid-template-columns:1fr; } .side{ position:sticky; top:0; z-index:40; } .side .menu{ display:none; } }
+  @media(min-width:861px){ .side{ position:sticky; top:0; height:100vh; overflow-y:auto; } }
   .side{ background:var(--sidebar); color:var(--sidebar-ink); padding:18px 14px; display:flex; flex-direction:column; gap:6px; }
   .side .brand{ display:flex; align-items:center; gap:10px; font-family:var(--f-display); font-size:19px; color:#fff; font-weight:700; padding:4px 6px 14px; }
   .side .brand .emblem{ width:34px; height:34px; flex:0 0 auto; }
@@ -65,7 +66,7 @@
   .menu a.active{ background:var(--sidebar-active); color:var(--sidebar-active-ink); }
   .side .foot{ margin-top:auto; font-size:.8rem; opacity:.8; padding:10px 8px 2px; }
 
-  .main{ padding:22px 26px 48px; max-width:1180px; }
+  .main{ padding:22px 26px 48px; max-width:1400px; }
   @media(max-width:560px){ .main{ padding:16px; } }
   .head{ display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
   .head h1{ font-family:var(--f-display); font-size:1.6rem; color:var(--deep); margin:0; }
@@ -121,7 +122,14 @@
   .leaflet-container{ background:var(--surface2); font:inherit; }
   .maprow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:12px; }
   .maprow select.sel{ font-family:inherit; font-size:.88rem; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); cursor:pointer; }
-  .vchips{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .cols > .wide{ grid-column:1 / -1; }
+  #soilOut:empty{ display:none; }
+  .soilgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px; }
+  .chemgrid{ display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:6px; }
+  @media(max-width:700px){ .soilgrid, .chemgrid{ grid-template-columns:repeat(2,1fr); } }
+  .soiltext{ max-width:920px; }
+  #soilOut input, #soilOut select{ font:inherit; font-size:.95rem; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); }
+  .vchips{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; margin-top:12px; }
   .vchip{ background:var(--surface2); border:1px solid var(--line); border-radius:11px; padding:10px 12px; min-width:92px; }
   .vchip .l{ font-size:.72rem; color:var(--soft); } .vchip .v{ font-family:var(--f-display); font-size:1.25rem; color:var(--ink); }
   .valert{ border-radius:11px; padding:11px 13px; margin-top:12px; font-size:.9rem; border:1px solid var(--line); }
@@ -240,13 +248,8 @@
             <button class="btn primary" id="certAsk" type="button" style="margin-top:8px;display:none;">Demander la certification</button>
           </div>
 
-          <div class="card">
-            <h2 class="ct">Humidité du sol — tendance</h2>
-            <div class="muted" id="chartSub">En attente des premières mesures de votre capteur.</div>
-            <div class="chartwrap section-gap" id="chartWrap"><div class="muted" style="padding:30px 0;text-align:center;" id="chartEmpty">Aucune mesure pour l'instant. Branchez votre station (voir « Ma station » à droite).</div></div>
-          </div>
 
-          <div class="card section-gap">
+          <div class="card">
             <h2 class="ct">Ma parcelle — surveillance satellite</h2>
             <div class="muted" id="mapSub">Repérez votre champ (recherche ou GPS), puis dessinez votre parcelle (outil rectangle ou polygone, en haut à gauche de la carte) et lancez une analyse satellite via Vertea.</div>
             <div class="maprow" style="margin-top:10px;">
@@ -269,37 +272,11 @@
               <button class="btn" id="btnSaveParcel" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M5 3h12l2 2v16l-7-4-7 4z"/></svg> Enregistrer la parcelle</button>
             </div>
             <div id="parcelList" class="section-gap"></div>
-            <div id="soilOut" class="section-gap"></div>
             <div class="muted section-gap" id="vStatus" style="min-height:1em;"></div>
             <div id="vOut"></div>
           </div>
 
-          <div class="card section-gap">
-            <h2 class="ct">Dernières mesures de la parcelle</h2>
-            <div class="grid kpis" style="margin-top:12px;grid-template-columns:repeat(4,1fr);gap:10px;" id="liveRow">
-              <div class="tile" style="box-shadow:none;"><div class="lab">Sol</div><div class="val" id="lSoil" style="font-size:1.4rem;">—</div></div>
-              <div class="tile" style="box-shadow:none;"><div class="lab">Air (temp.)</div><div class="val" id="lTemp" style="font-size:1.4rem;">—</div></div>
-              <div class="tile" style="box-shadow:none;"><div class="lab">Air (humid.)</div><div class="val" id="lHum" style="font-size:1.4rem;">—</div></div>
-              <div class="tile" style="box-shadow:none;"><div class="lab">Cuve</div><div class="val" id="lLevel" style="font-size:1.4rem;">—</div></div>
-            </div>
-            <div id="liveAlert"></div>
-            <div class="maprow" style="justify-content:space-between;">
-              <span class="muted" id="liveWhen"></span>
-              <button class="btn" id="clearMeas" type="button" style="display:none;">Effacer mes mesures</button>
-            </div>
-          </div>
 
-          <div class="card section-gap" id="durCard">
-            <h2 class="ct">Indice de durabilité de mon exploitation</h2>
-            <div class="muted">Auto-évaluation inspirée du cadre des agrosystèmes durables — trois piliers : environnemental, économique, social. Répondez en quelques clics ; si vous avez lancé la Santé (NDVI), elle est prise en compte automatiquement. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></div>
-            <div id="durForm" class="section-gap"></div>
-            <div class="maprow" style="align-items:center;">
-              <label class="muted" for="durArea">Surface (ha, pour le bilan carbone) :</label>
-              <input id="durArea" class="sel" style="width:110px;" placeholder="ex. 1" inputmode="decimal" autocomplete="off">
-              <button class="btn primary" id="durCalc" type="button">Calculer mon indice</button>
-            </div>
-            <div id="durOut" class="section-gap"></div>
-          </div>
 
           <div class="tipbar">
             <span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 1 4 10.5c-.7.7-1 1.2-1 2.5H9c0-1.3-.3-1.8-1-2.5A6 6 0 0 1 12 3z"/></svg></span>
@@ -332,6 +309,25 @@
           </div>
 
           <div class="card section-gap">
+            <h2 class="ct">Dernières mesures de la parcelle</h2>
+            <div class="grid kpis" style="margin-top:12px;grid-template-columns:repeat(4,1fr);gap:10px;" id="liveRow">
+              <div class="tile" style="box-shadow:none;"><div class="lab">Sol</div><div class="val" id="lSoil" style="font-size:1.4rem;">—</div></div>
+              <div class="tile" style="box-shadow:none;"><div class="lab">Air (temp.)</div><div class="val" id="lTemp" style="font-size:1.4rem;">—</div></div>
+              <div class="tile" style="box-shadow:none;"><div class="lab">Air (humid.)</div><div class="val" id="lHum" style="font-size:1.4rem;">—</div></div>
+              <div class="tile" style="box-shadow:none;"><div class="lab">Cuve</div><div class="val" id="lLevel" style="font-size:1.4rem;">—</div></div>
+            </div>
+            <div id="liveAlert"></div>
+            <div class="maprow" style="justify-content:space-between;">
+              <span class="muted" id="liveWhen"></span>
+              <button class="btn" id="clearMeas" type="button" style="display:none;">Effacer mes mesures</button>
+            </div>
+          </div>
+          <div class="card section-gap">
+            <h2 class="ct">Humidité du sol — tendance</h2>
+            <div class="muted" id="chartSub">En attente des premières mesures de votre capteur.</div>
+            <div class="chartwrap section-gap" id="chartWrap"><div class="muted" style="padding:30px 0;text-align:center;" id="chartEmpty">Aucune mesure pour l'instant. Branchez votre station (voir « Ma station » à droite).</div></div>
+          </div>
+          <div class="card section-gap">
             <h2 class="ct">Accès rapide</h2>
             <div class="list">
               <a href="/app"><span>Nouvel itinéraire de culture</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
@@ -343,6 +339,18 @@
             <div id="recentPlans" class="list section-gap"></div>
           </div>
         </div>
+        <div id="soilOut" class="wide"></div>
+          <div class="card wide" id="durCard">
+            <h2 class="ct">Indice de durabilité de mon exploitation</h2>
+            <div class="muted">Auto-évaluation inspirée du cadre des agrosystèmes durables — trois piliers : environnemental, économique, social. Répondez en quelques clics ; si vous avez lancé la Santé (NDVI), elle est prise en compte automatiquement. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></div>
+            <div id="durForm" class="section-gap"></div>
+            <div class="maprow" style="align-items:center;">
+              <label class="muted" for="durArea">Surface (ha, pour le bilan carbone) :</label>
+              <input id="durArea" class="sel" style="width:110px;" placeholder="ex. 1" inputmode="decimal" autocomplete="off">
+              <button class="btn primary" id="durCalc" type="button">Calculer mon indice</button>
+            </div>
+            <div id="durOut" class="section-gap"></div>
+          </div>
       </div>
     </div>
   </main>
@@ -581,12 +589,12 @@
   async function openSoil(id){
     soilParcelId=id;
     const p=myParcels.find(x=>x.id===id);
-    $("soilOut").innerHTML='<div class="muted">Chargement de la fiche sol…</div>';
+    $("soilOut").innerHTML='<div class="card muted">Chargement de la fiche sol…</div>';
     try{
       const r=await fetch("/api/parcels/soil?id="+encodeURIComponent(id)); const d=await r.json();
-      if(!r.ok){ $("soilOut").innerHTML='<div class="valert warn">'+esc(d.error||"Erreur.")+'</div>'; return; }
+      if(!r.ok){ $("soilOut").innerHTML='<div class="card"><div class="valert warn">'+esc(d.error||"Erreur.")+'</div></div>'; return; }
       if(d.fiche) renderSoil(d.fiche); else renderSoilStart(p);
-    }catch(e){ $("soilOut").innerHTML='<div class="valert warn">Serveur injoignable.</div>'; }
+    }catch(e){ $("soilOut").innerHTML='<div class="card"><div class="valert warn">Serveur injoignable.</div></div>'; }
     try{ $("soilOut").scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){}
   }
   function soilForm(crop, sown){
@@ -597,8 +605,8 @@
       +'<button class="btn primary" id="soilCalc" type="button">Calculer</button></div>';
   }
   function renderSoilStart(p){
-    $("soilOut").innerHTML='<div class="card" style="box-shadow:none;margin:0;">'
-      +'<h3 style="margin:0 0 4px;font-size:1rem;">Sol &amp; racines — '+esc(p?p.name:"parcelle")+'</h3>'
+    $("soilOut").innerHTML='<div class="card">'
+      +'<h2 class="ct" style="margin:0 0 4px;">Sol &amp; racines — '+esc(p?p.name:"parcelle")+'</h2>'
       +'<div class="muted" style="font-size:.86rem;">Terravive estime la nature du sol de cette parcelle à partir de cartes satellitaires (iSDAsoil 30 m, ou SoilGrids), calcule la profondeur utile des racines de votre culture, la dose et la fréquence d\'arrosage, et où placer votre capteur. Ce sont des estimations : vous pourrez les corriger avec un test de terrain.</div>'
       +soilForm("", "")+'<div class="muted" id="soilMsg" style="margin-top:6px;"></div></div>';
     bindSoilCalc(false);
@@ -622,15 +630,15 @@
   function renderSoil(f){
     const a=f.advice||{}, so=a.soil||{}, e=f.estimate, m=f.manual||{};
     const srcLbl=function(from){ return from==="terrain"?"terrain":(from?"estimation":""); };
-    let h='<div class="card" style="box-shadow:none;margin:0;">'
-      +'<h3 style="margin:0 0 4px;font-size:1rem;">Sol &amp; racines — '+esc(f.parcel.name)+'</h3>';
+    let h='<div class="card">'
+      +'<h2 class="ct" style="margin:0 0 4px;">Sol &amp; racines — '+esc(f.parcel.name)+'</h2>';
     // Source
     if(e) h+='<div class="muted" style="font-size:.8rem;">Estimation : '+esc(e.source||"")+(e.fetched_at?' · '+fmtDate(e.fetched_at):'')+(e.note?' · '+esc(e.note):'')+(f.center?' · point '+f.center.lat+', '+f.center.lon:'')+'</div>';
     if(f.estimate_error) h+='<div class="valert warn" style="margin-top:6px;">Estimation satellite indisponible pour l\'instant ('+esc(f.estimate_error)+'). Vous pouvez saisir votre test de terrain ci-dessous : les calculs fonctionneront.</div>';
     h+=soilForm(f.crop, f.sown_at);
     h+='<div class="maprow" style="margin-top:4px;"><button class="btn" id="soilRefresh" type="button" title="Relire les cartes de sol">Ré-estimer le sol</button><span class="muted" id="soilMsg"></span></div>';
     // Chiffres clés
-    h+='<div class="vchips" style="margin-top:10px;">';
+    h+='<div class="soilgrid">';
     h+=chip("Texture", a.texture?esc(a.texture.label):"inconnue", srcLbl(so.textureFrom));
     h+=chip("Profondeur du sol", so.depthCm==null?"inconnue":(so.depthCapped?"≥ 200 cm":Math.round(so.depthCm)+" cm"), srcLbl(so.depthFrom));
     if(a.roots) h+=chip("Racines utiles", Math.round(a.roots.effective_m*100)+" cm", "max culture ≈ "+Math.round(a.roots.max_m*100)+" cm");
@@ -640,24 +648,23 @@
       h+=chip("Dose / arrosage", a.irrigation.dose_l_m2+" L/m²", "≈ "+a.irrigation.dose_l_100m2.toLocaleString("fr-FR")+" L pour 100 m²");
       h+=chip("Fréquence (sans pluie)", a.irrigation.interval_days?("tous les "+a.irrigation.interval_days+" j"):"—", a.irrigation.etc_mm_j?("besoin ≈ "+a.irrigation.etc_mm_j+" mm/j"):"météo indisponible");
     }
-    if(a.sensor) h+=chip("Capteur", a.sensor.depth_cm+" cm", a.sensor.second_depth_cm?("2ᵉ sonde : "+a.sensor.second_depth_cm+" cm"):"");
-    if(a.sensor&&a.sensor.threshold_pct!=null) h+=chip("Arroser sous", a.sensor.threshold_pct+" %", "humidité du capteur");
+    if(a.sensor) h+=chip("Capteur à", a.sensor.depth_cm+" cm", (a.sensor.threshold_pct!=null?("arroser sous "+a.sensor.threshold_pct+" %"):"")+(a.sensor.second_depth_cm?(" · 2ᵉ sonde "+a.sensor.second_depth_cm+" cm"):""));
     h+='</div>';
     if(a.summary) h+='<div class="valert ok" style="margin-top:8px;">'+esc(a.summary)+'</div>';
     if(a.irrigation&&a.irrigation.paddy) h+='<div class="valert" style="margin-top:6px;">'+esc(a.irrigation.note)+'</div>';
     (a.warnings||[]).forEach(w=>{ h+='<div class="valert warn" style="margin-top:6px;">'+esc(w)+'</div>'; });
     // Chimie estimée
     if(f.chem&&f.chem.length){
-      h+='<div style="margin-top:10px;font-weight:700;font-size:.85rem;">Fertilité estimée ('+(e&&/SoilGrids/.test(e.source||"")?"0–30 cm":"0–20 cm")+')</div><div class="vchips" style="margin-top:6px;">'
+      h+='<div style="margin-top:14px;font-weight:700;font-size:.85rem;">Fertilité estimée ('+(e&&/SoilGrids/.test(e.source||"")?"0–30 cm":"0–20 cm")+')</div><div class="chemgrid">'
         + f.chem.map(c=>chip(c.k, esc(String(c.v)), c.t)).join("") + '</div>';
       f.chem.filter(c=>c.note).forEach(c=>{ h+='<div class="muted" style="font-size:.82rem;margin-top:4px;">'+esc(c.note)+'</div>'; });
       h+='<div class="muted" style="font-size:.78rem;margin-top:4px;">Valeurs issues de cartes (modèles d\'apprentissage + échantillons de sol) : utiles pour s\'orienter, elles ne remplacent pas une analyse de laboratoire avant une fertilisation coûteuse.</div>';
     }
     // Explication
-    h+='<div style="margin-top:10px;font-size:.84rem;line-height:1.55;" class="muted"><b>Comment c\'est calculé (méthode FAO-56)</b> : la <b>texture</b> donne l\'eau que le sol garde par mètre ; les <b>racines</b> de la culture descendent avec le temps, mais s\'arrêtent sur la roche ou une cuirasse ; réserve = eau par mètre × profondeur utile. On arrose quand la plante a consommé la part facilement utilisable, avec une dose qui la remplit, sans gaspiller l\'eau qui descendrait sous les racines. Le capteur se place au cœur de la zone des racines actives. Vérifiez toujours l\'état réel du sol et la pluie récente.</div>';
+    h+='<div style="margin-top:10px;font-size:.84rem;line-height:1.55;" class="muted soiltext"><b>Comment c\'est calculé (méthode FAO-56)</b> : la <b>texture</b> donne l\'eau que le sol garde par mètre ; les <b>racines</b> de la culture descendent avec le temps, mais s\'arrêtent sur la roche ou une cuirasse ; réserve = eau par mètre × profondeur utile. On arrose quand la plante a consommé la part facilement utilisable, avec une dose qui la remplit, sans gaspiller l\'eau qui descendrait sous les racines. Le capteur se place au cœur de la zone des racines actives. Vérifiez toujours l\'état réel du sol et la pluie récente.</div>';
     // Correction terrain
     h+='<details style="margin-top:10px;"'+((!a.texture||f.estimate_error)?' open':'')+'><summary style="cursor:pointer;font-weight:700;color:var(--leaf);">Corriger avec un test de terrain (recommandé)</summary>'
-      +'<div class="muted" style="font-size:.84rem;line-height:1.55;margin-top:6px;"><b>Test du bocal</b> : remplissez un bocal transparent au tiers de terre prise à 10–20 cm, complétez d\'eau (+ une pincée de sel), secouez 2 minutes, laissez reposer 24 h. Le <b>sable</b> tombe en premier (en bas, en 1 minute), puis le <b>limon</b> (en 2 heures), l\'<b>argile</b> en dernier (en haut). Comparez les épaisseurs. <b>Test du boudin</b> : une terre humide qui fait un boudin fin et souple est argileuse ; qui s\'effrite, sableuse. <b>Profondeur</b> : creusez un trou ou enfoncez une barre à mine jusqu\'à rencontrer la roche ou la cuirasse (carapace dure, souvent rouge).</div>'
+      +'<div class="muted soiltext" style="font-size:.84rem;line-height:1.55;margin-top:6px;"><b>Test du bocal</b> : remplissez un bocal transparent au tiers de terre prise à 10–20 cm, complétez d\'eau (+ une pincée de sel), secouez 2 minutes, laissez reposer 24 h. Le <b>sable</b> tombe en premier (en bas, en 1 minute), puis le <b>limon</b> (en 2 heures), l\'<b>argile</b> en dernier (en haut). Comparez les épaisseurs. <b>Test du boudin</b> : une terre humide qui fait un boudin fin et souple est argileuse ; qui s\'effrite, sableuse. <b>Profondeur</b> : creusez un trou ou enfoncez une barre à mine jusqu\'à rencontrer la roche ou la cuirasse (carapace dure, souvent rouge).</div>'
       +'<div class="maprow" style="align-items:flex-end;">'
       +'<label class="muted" style="flex:1;min-width:170px;font-size:.82rem;">Texture observée<select class="sel" id="manTex" style="width:100%;margin-top:4px;">'+TEXTURE_OPTIONS.map(o=>'<option value="'+o[0]+'"'+((m.texture||"")===o[0]?' selected':'')+'>'+esc(o[1])+'</option>').join("")+'</select></label>'
       +'<label class="muted" style="width:130px;font-size:.82rem;">Profondeur (cm)<input class="sel" id="manDepth" inputmode="numeric" value="'+(m.depth_cm!=null?m.depth_cm:"")+'" placeholder="ex. 60" style="width:100%;margin-top:4px;"></label>'
