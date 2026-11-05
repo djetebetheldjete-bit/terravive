@@ -54,7 +54,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
 
 // ---------- Utilitaires HTTP ----------
-const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".ico": "image/x-icon", ".png": "image/png", ".svg": "image/svg+xml", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml; charset=utf-8", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".webmanifest": "application/manifest+json; charset=utf-8", ".json": "application/json; charset=utf-8" };
+const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".ico": "image/x-icon", ".png": "image/png", ".svg": "image/svg+xml", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml; charset=utf-8", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".webmanifest": "application/manifest+json; charset=utf-8", ".json": "application/json; charset=utf-8", ".mp4": "video/mp4", ".webm": "video/webm", ".vtt": "text/vtt; charset=utf-8" };
 function sendJson(res, code, obj) { res.writeHead(code, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(obj)); }
 function readBody(req) { return new Promise((resolve, reject) => { let b = ""; req.on("data", (c) => { b += c; if (b.length > 6e6) req.destroy(); }); req.on("end", () => resolve(b)); req.on("error", reject); }); }
 function normEmail(s) { return String(s || "").trim().toLowerCase(); }
@@ -1588,6 +1588,9 @@ function serveStatic(req, res) {
   const safe = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(PUBLIC_DIR, safe);
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end("Accès interdit"); }
+  // Vidéos : envoi en flux, avec prise en charge des requêtes partielles (Range) — indispensable
+  // pour la lecture sur iPhone/Safari et pour avancer dans la vidéo sans tout télécharger.
+  if (/\.(mp4|webm)$/i.test(filePath)) return serveMedia(req, res, filePath);
   fs.readFile(filePath, (err, content) => {
     if (err) { res.writeHead(404); return res.end("Page introuvable"); }
     res.writeHead(200, { "content-type": MIME[path.extname(filePath)] || "application/octet-stream" });
@@ -1595,6 +1598,29 @@ function serveStatic(req, res) {
   });
 }
 
+function serveMedia(req, res, filePath) {
+  fs.stat(filePath, (err, st) => {
+    if (err || !st.isFile()) { res.writeHead(404); return res.end("Fichier introuvable"); }
+    const type = MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream";
+    const base = { "content-type": type, "accept-ranges": "bytes", "cache-control": "public, max-age=86400" };
+    const wantDownload = /[?&]dl=1(&|$)/.test(req.url || "");
+    if (wantDownload) base["content-disposition"] = 'attachment; filename="' + path.basename(filePath) + '"';
+    const range = req.headers.range;
+    const m = range && /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+    if (m && (m[1] !== "" || m[2] !== "")) {
+      let start, end;
+      if (m[1] === "") { const n = Math.min(Number(m[2]), st.size); start = st.size - n; end = st.size - 1; }  // derniers n octets
+      else { start = Number(m[1]); end = m[2] === "" ? st.size - 1 : Math.min(Number(m[2]), st.size - 1); }
+      if (!(start >= 0 && start <= end && start < st.size)) { res.writeHead(416, { "content-range": "bytes */" + st.size }); return res.end(); }
+      res.writeHead(206, Object.assign(base, { "content-range": `bytes ${start}-${end}/${st.size}`, "content-length": end - start + 1 }));
+      if (req.method === "HEAD") return res.end();
+      return fs.createReadStream(filePath, { start, end }).on("error", () => res.destroy()).pipe(res);
+    }
+    res.writeHead(200, Object.assign(base, { "content-length": st.size }));
+    if (req.method === "HEAD") return res.end();
+    fs.createReadStream(filePath).on("error", () => res.destroy()).pipe(res);
+  });
+}
 
 // ---------- Quality Guard (contrôles déterministes, sans modification automatique) ----------
 // Détecte un pH déclaré inconnu/non précisé, quelle que soit la ponctuation entre

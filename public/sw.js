@@ -7,7 +7,7 @@
  *  - Les requêtes POST (générer un plan, chat, enregistrer…) ne sont jamais mises en cache :
  *    hors-ligne elles échouent proprement (l'app affiche déjà un message).
  */
-const VERSION = "terravive-v10";
+const VERSION = "terravive-v11";
 const SHELL = [
   "/accueil", "/app", "/tableau", "/arduino", "/comprendre", "/conseiller", "/cooperative", "/diagnostic",
   "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/logo.png", "/favicon-32.png", "/pwa.js", "/mobile.css", "/mobile.js", "/anims.css", "/anims.js"
@@ -49,6 +49,8 @@ self.addEventListener("fetch", (e) => {
   let url;
   try { url = new URL(req.url); } catch (err) { return; }
 
+  // Vidéos : jamais interceptées ni mises en cache (lecture par morceaux « Range », exigée par Safari/iPhone).
+  if (url.origin === self.location.origin && (url.pathname.startsWith("/media/") || /\.(mp4|webm|vtt)$/.test(url.pathname))) return;
   if (req.mode === "navigate") { e.respondWith(networkFirst(req)); return; }
   if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) { e.respondWith(networkFirst(req)); return; }
   // Code de l'appli (JS/CSS de même origine) : réseau d'abord, pour que chaque mise à jour arrive

@@ -85,6 +85,16 @@
   .foot a{ color:var(--deep); }
 
   /* ---- Hero vitrine (grand, style ESBAT) ---- */
+  /* Vidéo de présentation */
+  .demo{ max-width:1120px; margin:0 auto; padding:34px 22px 6px; }
+  .demo h2{ margin-bottom:6px; }
+  .demo .vwrap{ position:relative; border-radius:16px; overflow:hidden; background:#0b2c18; box-shadow:0 18px 50px rgba(16,60,33,.18); aspect-ratio:16/9; }
+  .demo video{ display:block; width:100%; height:100%; background:#0b2c18; }
+  .demo .vbar{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:14px; }
+  .demo .lang{ display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .demo .lang button{ font:inherit; font-weight:600; font-size:.9rem; padding:9px 16px; border:none; background:var(--surface); color:var(--deep); cursor:pointer; }
+  .demo .lang button[aria-pressed="true"]{ background:var(--leaf); color:#fff; }
+  .demo .credit{ font-size:.8rem; color:var(--faint); margin-top:10px; }
   .heroX{ position:relative; overflow:hidden; color:#fff; background:linear-gradient(135deg,#0b2c18 0%,#154f2b 55%,#2E7D46 100%); }
   .heroX .hx-grid{ position:absolute; inset:-50%; background-image:linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px); background-size:44px 44px; transform:perspective(600px) rotateX(55deg) translateY(-8%); transform-origin:center top; opacity:.7; animation:hxGrid 24s linear infinite; -webkit-mask-image:linear-gradient(#000 30%,transparent 80%); mask-image:linear-gradient(#000 30%,transparent 80%); }
   @keyframes hxGrid{ to{ background-position:0 44px,44px 0; } }
@@ -186,7 +196,7 @@
         <p class="lead">Itinéraire de culture, conseiller agricole, diagnostic par photo, suivi satellite, coopérative et boutique : tout Terravive pour cultiver mieux, durablement, guidé pas à pas.</p>
         <div class="btns">
           <a href="/app" class="btn gold lg">Créer mon plan gratuitement</a>
-          <a href="#comment" class="btn light lg">Comment ça marche</a>
+          <a href="#video" class="btn light lg">Voir la démo (1 min 30)</a>
         </div>
       </div>
       <div class="hxR">
@@ -196,6 +206,26 @@
         </div>
       </div>
     </div>
+  </section>
+
+
+  <section class="demo" id="video" aria-labelledby="videoTitle">
+    <h2 id="videoTitle">Terravive en une minute et demie</h2>
+    <p class="sub">Du sol de la parcelle à l'alerte d'arrosage : une démonstration réelle de l'application, avec la voix off.</p>
+    <div class="vwrap">
+      <video id="demoVideo" controls playsinline preload="metadata" poster="/media/terravive-demo-fr.jpg">
+        <source id="demoSrc" src="/media/terravive-demo-fr.mp4" type="video/mp4">
+        Votre navigateur ne lit pas cette vidéo : <a href="/media/terravive-demo-fr.mp4?dl=1">téléchargez-la</a>.
+      </video>
+    </div>
+    <div class="vbar">
+      <div class="lang" role="group" aria-label="Langue de la vidéo">
+        <button type="button" data-vlang="fr" aria-pressed="true">Français</button>
+        <button type="button" data-vlang="en" aria-pressed="false">English</button>
+      </div>
+      <a class="btn ghost" id="demoDl" href="/media/terravive-demo-fr.mp4?dl=1" download="terravive-demo-fr.mp4">Télécharger la vidéo (MP4, 5 Mo)</a>
+    </div>
+    <p class="credit">Voix de synthèse : Piper, voix française SIWIS (licence CC BY 4.0) et voix anglaise Kathleen (CC0). Musique composée pour Terravive.</p>
   </section>
 
   <section id="comment" style="padding-bottom:10px;">
@@ -321,6 +351,23 @@
       var isOpen = r.classList.contains("open");
       roles.forEach(function(x){ x.classList.remove("open"); var h=x.querySelector(".rhead"); if(h) h.setAttribute("aria-expanded","false"); });
       if(!isOpen){ r.classList.add("open"); head.setAttribute("aria-expanded","true"); }
+    });
+  });
+})();
+</script>
+<script>
+(function(){
+  var v=document.getElementById("demoVideo"); if(!v) return;
+  var src=document.getElementById("demoSrc"), dl=document.getElementById("demoDl");
+  var SIZE={fr:"5 Mo", en:"5 MB"}, LBL={fr:"Télécharger la vidéo (MP4, ", en:"Download the video (MP4, "};
+  document.querySelectorAll("[data-vlang]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var L=b.getAttribute("data-vlang"); if(src.getAttribute("src").indexOf("-"+L+".mp4")>0) return;
+      var playing=!v.paused;
+      src.setAttribute("src","/media/terravive-demo-"+L+".mp4"); v.setAttribute("poster","/media/terravive-demo-"+L+".jpg"); v.load();
+      if(playing){ var p=v.play(); if(p&&p.catch) p.catch(function(){}); }
+      dl.href="/media/terravive-demo-"+L+".mp4?dl=1"; dl.setAttribute("download","terravive-demo-"+L+".mp4"); dl.textContent=LBL[L]+SIZE[L]+")";
+      document.querySelectorAll("[data-vlang]").forEach(function(x){ x.setAttribute("aria-pressed", x===b?"true":"false"); });
     });
   });
 })();
