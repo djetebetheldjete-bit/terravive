@@ -122,7 +122,10 @@
   .leaflet-container{ background:var(--surface2); font:inherit; }
   .maprow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:12px; }
   .maprow select.sel{ font-family:inherit; font-size:.88rem; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); cursor:pointer; }
-  .cols > .wide{ grid-column:1 / -1; }
+  .wide{ width:100%; }
+  /* Colonne de droite qui accompagne le défilement : plus de grand vide à côté de la parcelle */
+  @media(min-width:861px){ #rightCol{ position:sticky; top:16px; } }
+
   #soilOut:empty{ display:none; }
   .soilgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px; }
   .chemgrid{ display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:6px; }
@@ -285,7 +288,7 @@
         </div>
 
         <!-- Colonne latérale -->
-        <div>
+        <div id="rightCol">
           <div class="card">
             <div class="maprow" style="justify-content:space-between;margin-top:0;">
               <h2 class="ct" style="margin:0;">Météo</h2>
@@ -339,8 +342,9 @@
             <div id="recentPlans" class="list section-gap"></div>
           </div>
         </div>
-        <div id="soilOut" class="wide"></div>
-          <div class="card wide" id="durCard">
+      </div>
+        <div id="soilOut" class="wide section-gap"></div>
+          <div class="card wide section-gap" id="durCard">
             <h2 class="ct">Indice de durabilité de mon exploitation</h2>
             <div class="muted">Auto-évaluation inspirée du cadre des agrosystèmes durables — trois piliers : environnemental, économique, social. Répondez en quelques clics ; si vous avez lancé la Santé (NDVI), elle est prise en compte automatiquement. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></div>
             <div id="durForm" class="section-gap"></div>
@@ -351,7 +355,7 @@
             </div>
             <div id="durOut" class="section-gap"></div>
           </div>
-      </div>
+
     </div>
   </main>
 </div>
@@ -1128,6 +1132,17 @@
   { const b=$("durCalc"); if(b) b.addEventListener("click", durCalc); }
 
   load();
+</script>
+<script>
+// La colonne de droite « colle » à l'écran pendant le défilement. Si elle est plus haute que
+// la fenêtre, on la fait coller par le BAS (top négatif) pour qu'on puisse quand même tout lire.
+(function(){
+  var el=document.getElementById("rightCol"); if(!el) return;
+  function fit(){ if(innerWidth<=860){ el.style.top=""; return; } el.style.top=Math.min(16, innerHeight-el.offsetHeight-16)+"px"; }
+  addEventListener("resize", fit); addEventListener("load", fit);
+  if(window.ResizeObserver) new ResizeObserver(fit).observe(el);
+  fit();
+})();
 </script>
 </body>
 </html>
