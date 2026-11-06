@@ -79,7 +79,7 @@ async function load(){
   }
   $('grid').innerHTML=d.products.map(p=>`<article class="card${demo?' demo':''}">
     ${demo?'<span class="demo-tag">Exemple</span>':''}
-    ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy">`:'<div class="ph" aria-hidden="true">🥬</div>'}
+    ${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy">`:'<div class="ph" aria-hidden="true"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="opacity:.55"><path d="M5 19c0-8.4 5.3-13.6 14-14-.4 8.7-5.6 14-14 14z"/><path d="M5 19l7.6-7.6"/></svg></div>'}
     <div class="body">
       <div class="name">${esc(p.name)}</div>
       <div class="cat">${esc(p.category||'Produit')}</div>
