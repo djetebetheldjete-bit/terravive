@@ -129,3 +129,16 @@ Non exécuté ici : le chemin Supabase/production réel (clé + réseau) et l'as
 
 ### Tests réellement exécutés (chemin local)
 Banc de vérifications **42/42** · Intégration fonctionnalités **29/29** (rôles, notifications, journal, exports, comparaison, tableau de bord) · Intégration cycle de base **31/31** · Suite QA ITK **33/33**. Non exécuté : Supabase/production réel et IA avec vraie clé.
+
+
+## v0.9 (Terravive v8.0) — provenance des chiffres et fiche de preuve
+
+Le principe du Quality Guard (« ne jamais présenter une hypothèse comme une mesure ») est étendu aux chiffres calculés par l'application.
+
+- **Cinq niveaux, partout les mêmes** (`lib/impact.js`, `NATURES`) : **Mesuré** (noté dans le carnet de champ), **Déclaré** (référence « avant » saisie à la main), **Estimé satellite** (images ou cartes de sol), **Estimé (calcul)** (modèle à hypothèses écrites), **Hypothèse** (à confirmer). Chaque valeur du bilan est un objet `{ v, unit, nature, source }`.
+- **Rien n'est inventé** : sans saisie, l'indicateur est absent et la liste « Données manquantes » dit quoi ajouter (surface, récolte, arrosage, référence). Tests : « rien d'inventé quand il manque des données ».
+- **Hypothèses écrites et visibles** : le carbone apporté par le compost affiche ses trois hypothèses (50 % de matière sèche, 30 % de carbone, 10 à 20 % stocké durablement).
+- **Fiche de preuve imprimable** (tableau de bord → Carnet de champ → Bilan d'impact → Fiche de preuve) : chaque chiffre de la parcelle (bilan et fiche sol), sa valeur, son niveau, sa source ou méthode, une case « vérifié » ; puis hypothèses, données manquantes, et cadre de validation (nom de l'agronome, date, signature, remarques).
+- **Indice de durabilité** : deux réponses peuvent être pré-remplies d'après le carnet (matière organique, engrais chimiques), avec l'étiquette « d'après le carnet » ; l'utilisateur garde la main. Le carbone « par pratiques déclarées » est désormais étiqueté « Hypothèse ».
+
+Limite : la fiche de preuve n'est pas un contrôle automatique de cohérence agronomique ; elle prépare la validation humaine.

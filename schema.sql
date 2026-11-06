@@ -42,6 +42,8 @@ create table if not exists trv_plans (
   created_at timestamptz default now()
 );
 create index if not exists trv_plans_user_idx on trv_plans (user_id, created_at desc);
+-- v7.9 : fiche pratique terrain (JSON), gardée avec l'itinéraire pour ne pas la régénérer
+alter table trv_plans add column if not exists fiche text;
 
 -- Projets d'automatisation agricole (Arduino) générés
 create table if not exists trv_devices (
@@ -78,6 +80,9 @@ create table if not exists trv_readings (
   created_at timestamptz default now()
 );
 create index if not exists trv_readings_user_idx on trv_readings (user_id, created_at desc);
+-- v8.0 : origine de la mesure (capteur, manuel, toucher) et observation
+alter table trv_readings add column if not exists source text;
+alter table trv_readings add column if not exists note text;
 
 -- Journal des questions posées au conseiller (pour voir ce que les cultivateurs cherchent à comprendre)
 create table if not exists trv_questions (
@@ -128,6 +133,21 @@ create table if not exists trv_field_log (
   created_at timestamptz default now()
 );
 create index if not exists trv_field_log_parcel_idx on trv_field_log (user_id, parcel_id, date desc);
+-- v8.0 : saison / campagne et type d'intrant dans le carnet ; référence « avant » par parcelle
+alter table trv_field_log add column if not exists season text;
+alter table trv_field_log add column if not exists product text;
+create index if not exists trv_field_log_user_idx on trv_field_log (user_id, date);
+create table if not exists trv_parcel_ref (
+  parcel_id text primary key,
+  user_id text,
+  label text,                 -- ex. « Saison 2025 avant Terravive »
+  water_l numeric,            -- totaux d'une saison complète, saisis à la main (nature : déclaré)
+  compost_kg numeric,
+  chem_kg numeric,
+  yield_kg numeric,
+  note text,
+  updated_at timestamptz default now()
+);
 
 -- Coopératives (relais humain + base achats groupés / mise en marché)
 create table if not exists trv_coops (

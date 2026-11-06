@@ -1,4 +1,4 @@
-# Sol, racines et station connectée — guide (Terravive v7, complété en v7.8)
+# Sol, racines et station connectée — guide (Terravive v7, complété jusqu'en v8.0)
 
 ## 1. Mise en service (une fois)
 
@@ -11,7 +11,10 @@
    Sans compte, Terravive utilise **SoilGrids** (ISRIC, 250 m), dont l'API « bêta » est parfois en pause :
    la fiche le signale et propose la correction par test de terrain.
 3. **v7.8 — carnet de champ** : exécutez aussi le bloc `trv_field_log` de `schema.sql`.
-4. Vérifiez : `npm test` (40 tests, sans réseau).
+4. **v7.9 — fiche terrain** : exécutez `alter table trv_plans add column if not exists fiche text;`
+   (sans cette colonne, la fiche fonctionne mais est regénérée après chaque redémarrage du serveur).
+5. **v8.0 — bilan d'impact, station manuelle** : exécutez les lignes « v8.0 » de `schema.sql` (colonnes `season`, `product`, `source`, `note` et table `trv_parcel_ref`). Sans elles, le carnet et la saisie manuelle fonctionnent mais sans saison, produit ni origine (message d'avertissement), et la référence « avant » ne s'enregistre pas.
+6. Vérifiez : `npm test` (54 tests, sans réseau) et `node test-stock.js`.
 
 ## 2. Ce que calcule la fiche « Sol & racines »
 
@@ -64,6 +67,13 @@ Notes techniques :
 | GET | `/api/fieldlog?parcel=` | Carnet de champ de la parcelle + totaux (v7.8) |
 | POST | `/api/fieldlog` | `{parcel_id, date, kind, qty?, note?}` : ajoute une entrée (v7.8) |
 | DELETE | `/api/fieldlog?id=` | Supprime une entrée (seulement les siennes) (v7.8) |
+| POST | `/api/plan/fiche` | `{id, parcel_id?, refresh?}` : fiche pratique terrain de l'itinéraire (v7.9) |
+| GET | `/api/impact?parcel=` | Bilan d'impact de la parcelle (saisons, comparaisons, économies, carbone, données manquantes) (v8.0) |
+| GET | `/api/impact/csv?parcel=` | Bilan en tableur CSV (v8.0) |
+| POST | `/api/impact/ref` | `{parcel_id, label?, water_l?, compost_kg?, chem_kg?, yield_kg?}` : référence « avant » ; tout vide = effacer (v8.0) |
+| GET | `/api/impact/summary` | Saison en cours, toutes parcelles : pré-remplissage de l'indice de durabilité (v8.0) |
+| GET | `/api/coop/impact` | Bilan agrégé de la coopérative — animateur seulement (v8.0) |
+| POST | `/api/station/manual` | `{soil? ou soil_touch?, temp?, hum?, level?, note?}` : mesure saisie à la main (v8.0) |
 
 Limites : 20 estimations de sol par utilisateur et par jour ; 4 appels par minute vers les services de cartes
 (respect de l'usage raisonnable de SoilGrids).
@@ -93,3 +103,35 @@ Aucune API, aucun compte, aucun envoi automatique. Le numéro saisi reste dans l
 semis, récolte (kg), observation. Totaux par parcelle, ramenés à la surface (L/m², kg/m², t/ha),
 export tableur CSV (séparateur « ; », compatible Excel en français). Sert de preuve d'impact pour un
 pilote terrain et de base de traçabilité.
+
+## 6. Nouveauté v7.9 — fiche pratique terrain
+
+Dès qu'un itinéraire technique s'affiche, Terravive prépare sa **fiche pratique terrain** (`lib/fiche.js`) :
+l'essentiel en 5 points, le calendrier des travaux à cocher, les quantités, l'arrosage, ce qu'il faut
+surveiller (signe → action), la sécurité, la récolte, le matériel à préparer et ce qu'il faut noter dans
+le carnet de champ.
+
+- **Source unique : l'itinéraire.** L'IA reformule l'ITK dans un format JSON fixe, avec l'interdiction
+  d'inventer des doses, des produits ou des dates. Le serveur vérifie et nettoie la réponse (listes
+  plafonnées, textes tronqués, émojis retirés) et refait un essai si elle est illisible.
+- **Chiffres de la parcelle** : si une parcelle est choisie dans le formulaire, un encadré ajoute les valeurs
+  calculées par l'application (surface, arrosage, capteur, compost, chaux), sans passer par l'IA.
+- **Coût maîtrisé** : la fiche est générée une seule fois par itinéraire, puis gardée (colonne
+  `trv_plans.fiche`, sinon mémoire du serveur). Limite : 30 fiches par compte et par jour.
+- **Sur le terrain** : cases cochées gardées sur le téléphone, impression A4 en noir et blanc avec cases
+  et zone « Mes notes », envoi WhatsApp (version texte courte), copie.
+- **Accès** : la fiche d'un itinéraire n'est donnée qu'à son auteur, ou pour l'itinéraire partagé du secteur.
+
+## 7. Nouveautés v8.0 — bilan d'impact, preuve, test terrain, alertes
+
+- **Carnet par saison** : chaque entrée a une saison (par défaut d'après la date : grande saison mars–juillet,
+  petite saison août–novembre, saison sèche décembre–février ; libre, ex. « Campagne tomate 2026 »), un produit
+  pour les intrants, et un nouveau type « Incident ».
+- **Bilan d'impact** (`lib/impact.js`) : totaux par saison ramenés à la surface ; comparaison avec la référence
+  « avant » saisie (Déclaré) ou, à défaut, la saison précédente (Mesuré) ; eau économisée et engrais évité
+  (écart × surface, Estimé (calcul)) ; kg récoltés par m³ d'eau d'arrosage (pluie non comptée).
+- **Coopérative** : l'animateur voit la saison en cours de chaque parcelle suivie de ses membres, avec totaux,
+  CSV et version imprimable pour un bailleur. Les membres voient seulement leurs propres données.
+- **Station manuelle** : valeur d'un appareil (Déclaré) ou test au toucher (sec ≈ 15 %, frais ≈ 40 %,
+  humide ≈ 65 %, détrempé ≈ 90 % : Hypothèse). Le tableau de bord garde la dernière valeur connue de chaque grandeur.
+- **Alertes** « arroser » et « cuve presque vide » : bouton WhatsApp et lecture à voix haute (voix du téléphone).

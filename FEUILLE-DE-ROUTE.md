@@ -2,7 +2,7 @@
 
 > Ce document garde la mémoire du projet : ce qui est **fait**, ce qu'on **construit maintenant** (faisable par logiciel seul), et ce qu'on **ajoutera plus tard** quand on aura les équipements, les données ou les partenariats nécessaires. Rien ne se perd : chaque idée mise de côté est notée ici avec *ce qui manque pour l'activer*.
 
-_Dernière mise à jour : 4 novembre 2026._
+_Dernière mise à jour : 6 novembre 2026 (v8.0)._
 
 ---
 
@@ -19,6 +19,12 @@ _Dernière mise à jour : 4 novembre 2026._
 - **Voix** : lecture à voix haute et dictée (fiable en français).
 - **Diagnostic des maladies par photo** : le cultivateur photographie une plante, l'IA propose une cause probable et des solutions durables.
 - **Sol & racines (v7)** : nature du sol estimée par satellite (iSDAsoil 30 m, repli SoilGrids), profondeur du sol, fertilité estimée (pH, carbone, N, P, K), profondeur racinaire utile selon la culture et son stade, dose et fréquence d'arrosage (FAO-56 + ET0 Open-Meteo), profondeur du capteur et seuil d'arrosage. Correction par test de terrain (bocal, fosse). Données transmises à l'IA pour un itinéraire adapté au sol.
+- **Carnet par saison et bilan d'impact (v8.0)** : saisons / campagnes, type d'intrant, incidents ; comparaison « avant / maintenant » avec une référence saisie (déclarée) ou la saison précédente (mesurée) ; eau économisée, engrais évité, rendement, kg récoltés par m³ d'eau ; carbone apporté par le compost (calcul à hypothèses écrites) ; export PDF et CSV par parcelle ; bilan agrégé de la coopérative pour un bailleur (animateur). L'indice de durabilité est pré-rempli d'après le carnet.
+- **Provenance des chiffres et fiche de preuve (v8.0)** : chaque chiffre du bilan porte son niveau (Mesuré, Déclaré, Estimé satellite, Estimé (calcul), Hypothèse) ; fiche imprimable listant chiffres, sources, hypothèses et données manquantes, avec cases de validation pour un agronome.
+- **Outillage du premier test terrain (v8.0)** : saisie manuelle de la station (valeur d'un appareil ou test au toucher, signalé approximatif) qui déclenche les mêmes alertes ; fiche de collecte terrain imprimable (interventions, récoltes, retour du cultivateur) à reporter dans le carnet.
+- **Alertes partageables (v8.0)** : « arroser » et « cuve presque vide » envoyées sur WhatsApp en un clic, ou lues à voix haute par l'animateur pour les cultivateurs sans smartphone.
+- **Coopérative : matériel partagé et achats groupés** : registre du matériel avec demandes de réservation (acceptée / refusée / terminée) ; achats groupés avec collecte des besoins et total par article. Vérifiés par test en v8.0.
+- **Fiche pratique terrain (v7.9)** : version courte et imprimable de chaque itinéraire (calendrier à cocher, quantités, signes à surveiller, matériel, sécurité), chiffres de la parcelle ajoutés, envoi WhatsApp.
 - **Fertilisation, partage et carnet (v7.8)** : plan de compost et de correction du sol calculé pour la parcelle (dose, total, brouettes, pH, N-P-K), envoi du conseil au producteur par WhatsApp (sans API), carnet de champ avec totaux et export CSV pour mesurer l'impact.
 - **Station ESP32 prête à brancher (v7)** : programme généré par le serveur (clé, adresse, seuil de la parcelle), humidité du sol + air (DHT22) + niveau de cuve (JSN-SR04T), HTTPS, reprise Wi-Fi, nouvelles tentatives si le serveur dort ; vérifié par compilation (ESP32, cœur Arduino 3.0.7). Alertes « arroser » et « cuve presque vide » dans le tableau de bord.
 
@@ -28,10 +34,9 @@ _Dernière mise à jour : 4 novembre 2026._
 
 Ces éléments ne demandent **aucun équipement** : juste du développement. On les fait dans l'ordre.
 
-### 2.1 Approfondir la coopérative — matériel partagé + achats groupés
-- **Matériel partagé** : un registre du matériel de la coopérative (tracteur, pulvérisateur, motopompe…) que les membres peuvent réserver/emprunter entre eux.
-- **Achats groupés** : regrouper les besoins en intrants (semences, engrais, etc.) pour peser dans la négociation et acheter moins cher.
-- *Faisable intégralement en logiciel.* **→ Prochaine construction.**
+### 2.1 Modèle économique — prochaine construction
+- Abonnement coopérative, marge sur achats groupés, rapport d'impact pour bailleurs (s'appuie sur le bilan v8.0).
+- Juste la structure de données et un écran de synthèse ; **pas de paiement en ligne** tant que le mobile money n'est pas intégré (§3).
 
 ### 2.2 Débouchés / « vendre ensemble » — REPORTÉ (voir §3)
 - Décision : reporté, car même la version « fourchettes de prix saisies à la main » n'a de valeur que reliée à de vraies informations de marché (acheteurs, prix). On le reprendra quand on aura une source de données ou des contacts d'acheteurs.
@@ -49,7 +54,7 @@ Ces éléments ne demandent **aucun équipement** : juste du développement. On 
 
 | Fonction visée | Ce qu'elle apporterait | Ce qui manque pour l'activer |
 |---|---|---|
-| **Capteurs réels au champ (ESP32 / Arduino)** : humidité du sol, température, niveau de cuve en direct | Arrosage au bon moment, alertes précises, données propres à la parcelle | **Matériel seulement** : ESP32 + sonde capacitive (+ DHT22, JSN-SR04T) + boîtier étanche + alimentation + petit forfait data. Le logiciel est prêt (v7) : premier test terrain à faire. Ensuite : pluviomètre à auget, alertes par SMS. |
+| **Capteurs réels au champ (ESP32 / Arduino)** : humidité du sol, température, niveau de cuve en direct | Arrosage au bon moment, alertes précises, données propres à la parcelle | **Point d'extension prêt (v8.0)** : chaque mesure porte son origine (`source` : capteur, manuel, toucher) ; un pluviomètre ou une sonde pourra ajouter sa propre origine sans changer les écrans. **Matériel seulement** : ESP32 + sonde capacitive (+ DHT22, JSN-SR04T) + boîtier étanche + alimentation + petit forfait data. Le logiciel est prêt (v7) : premier test terrain à faire. Ensuite : pluviomètre à auget, alertes par SMS. |
 | **Sentinel-1 (radar) — humidité de surface sous les nuages** | Suivi de l'humidité même en saison des pluies, quand l'optique (Sentinel-2) est aveugle | **Développement côté Vertea** (Google Earth Engine) + calibration avec les mesures des stations ESP32. |
 | **Sentinel-3 — température de surface régionale** | Alertes chaleur et tendances de végétation à l'échelle d'un secteur / d'une coopérative (300 m – 1 km : trop grossier pour une parcelle) | **Développement côté Vertea** ; priorité basse. |
 | **Drones** : cartographie fine, repérage des zones faibles, pulvérisation ciblée | Diagnostic à grande échelle, économie d'intrants | **Équipement** (drone + caméra) et autorisation de vol. L'analyse satellite couvre déjà une partie du besoin en attendant. |

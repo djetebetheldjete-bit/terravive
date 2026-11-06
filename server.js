@@ -17,6 +17,8 @@ const SOL = require("./lib/sol");
 const SOL_SRC = require("./lib/sol-sources");
 const { esp32Sketch } = require("./lib/esp32-sketch");
 const FERT = require("./lib/fertil");
+const FICHE = require("./lib/fiche");
+const IMPACT = require("./lib/impact");
 
 // ---------- Configuration ----------
 function loadEnv(file) {
@@ -85,7 +87,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.parcelSoil) s.parcelSoil = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; if (!s.fieldLog) s.fieldLog = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, parcelSoil: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [], fieldLog: [] }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.parcelSoil) s.parcelSoil = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; if (!s.fieldLog) s.fieldLog = []; if (!s.parcelRef) s.parcelRef = {}; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, parcelSoil: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [], fieldLog: [], parcelRef: {} }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -291,13 +293,40 @@ async function deleteParcelSoil(userId, parcelId) {
 }
 
 // ---------- Carnet de champ (interventions et récoltes, par parcelle) ----------
-const LOG_KINDS = { arrosage: "L", compost: "kg", engrais: "kg", traitement: "L", semis: "", recolte: "kg", observation: "" };
+const LOG_KINDS = { arrosage: "L", compost: "kg", engrais: "kg", traitement: "L", semis: "", recolte: "kg", incident: "", observation: "" };
 async function listFieldLog(userId, parcelId) {
   if (USE_DB) { try { return (await sb(`/trv_field_log?user_id=eq.${encodeURIComponent(userId)}&parcel_id=eq.${encodeURIComponent(parcelId)}&select=*&order=date.desc,created_at.desc&limit=500`)) || []; } catch (e) { console.error("listFieldLog:", e.message); throw e; } }
   return loadStore().fieldLog.filter((x) => x.user_id === userId && x.parcel_id === parcelId).sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.created_at).localeCompare(String(a.created_at))).slice(0, 500);
 }
+async function listFieldLogForUser(userId) {
+  if (USE_DB) { try { return (await sb(`/trv_field_log?user_id=eq.${encodeURIComponent(userId)}&select=*&order=date.asc&limit=5000`)) || []; } catch (e) { console.error("listFieldLogForUser:", e.message); return []; } }
+  return loadStore().fieldLog.filter((x) => x.user_id === userId);
+}
+// Référence « avant » d'une parcelle (totaux d'une saison complète, saisis à la main).
+async function getParcelRef(parcelId) {
+  if (USE_DB) { try { const r = await sb(`/trv_parcel_ref?parcel_id=eq.${encodeURIComponent(parcelId)}&select=*&limit=1`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return (loadStore().parcelRef || {})[parcelId] || null;
+}
+async function saveParcelRef(rec) {
+  if (USE_DB) { await sb(`/trv_parcel_ref?on_conflict=parcel_id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([rec]) }); return; }
+  const s = loadStore(); s.parcelRef = s.parcelRef || {}; s.parcelRef[rec.parcel_id] = rec; saveStore(s);
+}
+async function deleteParcelRef(userId, parcelId) {
+  if (USE_DB) { await sb(`/trv_parcel_ref?parcel_id=eq.${encodeURIComponent(parcelId)}&user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); return; }
+  const s = loadStore(); if (s.parcelRef && s.parcelRef[parcelId] && s.parcelRef[parcelId].user_id === userId) { delete s.parcelRef[parcelId]; saveStore(s); }
+}
 async function addFieldLog(rec) {
-  if (USE_DB) { await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); return; }
+  if (USE_DB) {
+    try { await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); }
+    catch (e) {
+      // Colonnes v8.0 (season, product) pas encore créées : on enregistre quand même l'essentiel.
+      if (!/season|product|column/i.test(e.message)) throw e;
+      const { season: _s, product: _p, ...base } = rec;
+      await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([base]) });
+      return "partial";
+    }
+    return;
+  }
   const s = loadStore(); s.fieldLog.push(rec); saveStore(s);
 }
 async function deleteFieldLog(userId, id) {
@@ -973,6 +1002,56 @@ async function handlePlan(req, res) {
     sendJson(res, 200, { plan: rec, reused: false });
   } catch (e) { sendJson(res, e.status || 500, { error: e.message || "La génération a échoué." }); }
 }
+// --- Fiche pratique terrain (version courte et imprimable de l'itinéraire) ---
+const FICHE_CACHE = new Map(); // repli si la colonne trv_plans.fiche n'existe pas encore
+function planFiche(plan) {
+  let f = plan && plan.fiche; if (typeof f === "string") { try { f = JSON.parse(f); } catch (e) { f = null; } }
+  return (f && f.calendrier) ? f : (FICHE_CACHE.get(plan && plan.id) || null);
+}
+async function parcelNumbers(user, parcelId, crop) {
+  const parcel = parcelId ? await findUserParcel(user.id, String(parcelId)) : null;
+  if (!parcel) return null;
+  const out = { id: parcel.id, name: parcel.name, area_m2: FERT.zoneAreaM2(parcel.zone) };
+  try {
+    const rec = await getParcelSoil(parcel.id);
+    if (rec && rec.user_id === user.id && (rec.estimate || rec.manual)) {
+      const sameCrop = rec.crop && crop && rec.crop.toLowerCase() === String(crop).toLowerCase();
+      const f = await buildSoilFiche(parcel, Object.assign({}, rec, { crop: crop || rec.crop, sown_at: sameCrop ? rec.sown_at : null }));
+      const irr = f.advice && f.advice.irrigation, sen = f.advice && f.advice.sensor, org = f.fert && f.fert.organic, ph = f.fert && f.fert.ph;
+      if (irr && !irr.paddy && irr.dose_l_m2) out.irrigation = { dose_l_m2: irr.dose_l_m2, interval_days: irr.interval_days || null };
+      if (sen && sen.threshold_pct) out.sensor = { depth_cm: sen.depth_cm, threshold_pct: sen.threshold_pct };
+      if (org && (org.total_kg || org.dose_kg_plant)) out.compost = { dose_kg_m2: org.dose_kg_m2 || null, total_kg: org.total_kg || null, wheelbarrows: org.wheelbarrows || null, dose_kg_plant: org.dose_kg_plant || null, raw_kg: org.raw_kg || null };
+      if (ph && ph.lime_t_ha) out.lime = { ph: ph.value, total_kg: ph.lime_total_kg || null };
+    }
+  } catch (e) { console.error("fiche/parcelle:", e.message); }
+  return out;
+}
+async function handlePlanFiche(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const plan = p.id ? await getPlan(String(p.id)) : null;
+  if (!plan || !plan.content) return sendJson(res, 404, { error: "Itinéraire introuvable." });
+  if (plan.user_id !== user.id) {
+    // Un itinéraire d'un autre compte n'est accessible que s'il est celui servi pour ce secteur.
+    let shared = null; try { shared = await findSharedPlan(plan.crop, plan.region); } catch (e) {}
+    if (!shared || shared.id !== plan.id) return sendJson(res, 404, { error: "Itinéraire introuvable." });
+  }
+  const parcel = await parcelNumbers(user, p.parcel_id, plan.crop);
+  let fiche = p.refresh === true ? null : planFiche(plan), cached = !!fiche;
+  if (!fiche) {
+    if (!API_KEY) return sendJson(res, 500, { error: "Clé IA manquante (ANTHROPIC_API_KEY)." });
+    if (!rateOk("fiche:" + user.id, 30, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Beaucoup de fiches générées aujourd'hui. Reprenez demain." });
+    let lastErr = null;
+    for (let attempt = 0; attempt < 2 && !fiche; attempt++) {
+      try { fiche = FICHE.parseFiche(await callClaude(FICHE.ficheSystem(), [{ role: "user", content: FICHE.ficheUserMessage(plan) }], null, 4000), plan.crop); }
+      catch (e) { lastErr = e; if (e.status) break; }
+    }
+    if (!fiche) return sendJson(res, (lastErr && lastErr.status) || 502, { error: (lastErr && lastErr.message) || "La fiche n'a pas pu être créée." });
+    FICHE_CACHE.set(plan.id, fiche); if (FICHE_CACHE.size > 500) FICHE_CACHE.delete(FICHE_CACHE.keys().next().value);
+    try { await savePlan(Object.assign({}, plan, { fiche: JSON.stringify(fiche) })); } catch (e) { /* colonne absente : le cache mémoire suffit */ }
+  }
+  sendJson(res, 200, { fiche, parcel, text: FICHE.ficheText(fiche, parcel), cached });
+}
 async function handlePlansList(req, res) { const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." }); sendJson(res, 200, { plans: await listPlansForUser(user.id) }); }
 async function handlePlanGet(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
@@ -1070,9 +1149,12 @@ async function handleFieldLogAdd(req, res) {
   const note = String(p.note || "").trim().slice(0, 300) || null;
   if (qty == null && !note) return sendJson(res, 400, { error: "Indiquez une quantité ou une note." });
   if (!rateOk("log:" + user.id, 200, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Beaucoup d'entrées aujourd'hui. Reprenez demain." });
-  const rec = { id: newId(), user_id: user.id, parcel_id: parcel.id, date, kind, qty, unit: LOG_KINDS[kind] || null, note, created_at: new Date().toISOString() };
-  try { await addFieldLog(rec); } catch (e) { console.error("addFieldLog:", e.message); return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
-  sendJson(res, 200, { ok: true, entry: rec });
+  const season = String(p.season || "").trim().slice(0, 60) || IMPACT.defaultSeason(date);
+  const product = ["engrais", "traitement", "compost"].includes(kind) ? (String(p.product || "").trim().slice(0, 60) || null) : null;
+  const rec = { id: newId(), user_id: user.id, parcel_id: parcel.id, date, kind, qty, unit: LOG_KINDS[kind] || null, product, season, note, created_at: new Date().toISOString() };
+  let partial = null;
+  try { partial = await addFieldLog(rec); } catch (e) { console.error("addFieldLog:", e.message); return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
+  sendJson(res, 200, partial ? { ok: true, entry: rec, warning: "Entrée enregistrée sans la saison ni le produit : exécutez la partie v8.0 de schema.sql (trv_field_log)." } : { ok: true, entry: rec });
 }
 async function handleFieldLogDelete(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
@@ -1080,6 +1162,97 @@ async function handleFieldLogDelete(req, res) {
   if (!id) return sendJson(res, 400, { error: "Identifiant manquant." });
   try { await deleteFieldLog(user.id, id); } catch (e) { return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
   sendJson(res, 200, { ok: true });
+}
+// --- Bilan d'impact (A1) ---
+const REF_SAVE_ERROR = "Enregistrement impossible. Si vous utilisez Supabase, exécutez la partie « trv_parcel_ref » de schema.sql.";
+async function recommendedCompost(user, parcel) {
+  try {
+    const rec = await getParcelSoil(parcel.id);
+    if (!rec || rec.user_id !== user.id || !rec.estimate) return null;
+    const f = FERT.fertilityAdvice({ estimate: rec.estimate, crop: rec.crop, areaM2: FERT.zoneAreaM2(parcel.zone) });
+    return f && f.organic && f.organic.dose_kg_m2 ? f.organic.dose_kg_m2[0] : null;
+  } catch (e) { return null; }
+}
+async function parcelReport(user, parcel) {
+  const entries = await listFieldLog(user.id, parcel.id);
+  const ref = await getParcelRef(parcel.id);
+  return IMPACT.impactReport({ entries, areaM2: FERT.zoneAreaM2(parcel.zone), ref: ref && ref.user_id === user.id ? ref : null, parcelName: parcel.name });
+}
+async function handleImpactGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const id = new URL(req.url, "http://x").searchParams.get("parcel") || "";
+  const parcel = await findUserParcel(user.id, id);
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  let rep; try { rep = await parcelReport(user, parcel); } catch (e) { return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
+  const ref = await getParcelRef(parcel.id);
+  sendJson(res, 200, { report: rep, ref: ref && ref.user_id === user.id ? ref : null });
+}
+async function handleImpactCsv(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const id = new URL(req.url, "http://x").searchParams.get("parcel") || "";
+  const parcel = await findUserParcel(user.id, id);
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  let rep; try { rep = await parcelReport(user, parcel); } catch (e) { return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
+  const name = "bilan-impact-" + String(parcel.name || "parcelle").normalize("NFD").replace(/[^\w-]+/g, "_").slice(0, 40) + ".csv";
+  res.writeHead(200, { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="' + name + '"', "Cache-Control": "no-store" });
+  res.end(IMPACT.reportCsv(rep));
+}
+async function handleImpactRef(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const parcel = await findUserParcel(user.id, String(p.parcel_id || ""));
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const nums = {};
+  for (const k of ["water_l", "compost_kg", "chem_kg", "yield_kg"]) {
+    const v = p[k]; if (v === undefined || v === null || String(v).trim() === "") { nums[k] = null; continue; }
+    const n = Number(String(v).replace(/\s/g, "").replace(",", ".")); if (!isFinite(n) || n < 0 || n > 1e8) return sendJson(res, 400, { error: "Valeur invalide : " + k + "." }); nums[k] = n;
+  }
+  try {
+    if (Object.values(nums).every((x) => x == null)) { await deleteParcelRef(user.id, parcel.id); return sendJson(res, 200, { ok: true, ref: null }); }
+    const rec = Object.assign({ parcel_id: parcel.id, user_id: user.id, label: String(p.label || "").trim().slice(0, 80) || "Saison de référence", note: String(p.note || "").trim().slice(0, 300) || null, updated_at: new Date().toISOString() }, nums);
+    await saveParcelRef(rec); sendJson(res, 200, { ok: true, ref: rec });
+  } catch (e) { console.error("saveParcelRef:", e.message); sendJson(res, 500, { error: REF_SAVE_ERROR }); }
+}
+// Totaux mesurés de la saison en cours, toutes parcelles : pré-remplit l'indice de durabilité.
+async function handleImpactSummary(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const parcels = (await listParcelsForUser(user.id)) || [];
+  const all = await listFieldLogForUser(user.id);
+  const items = []; let compostKg = 0;
+  for (const row of parcels) {
+    const parcel = await findUserParcel(user.id, row.id); if (!parcel) continue;
+    const entries = all.filter((e) => e.parcel_id === parcel.id); if (!entries.length) continue;
+    const rep = IMPACT.impactReport({ entries, areaM2: FERT.zoneAreaM2(parcel.zone) });
+    if (!rep.current) continue;
+    items.push({ t: rep.current, area_m2: FERT.zoneAreaM2(parcel.zone), rec_kg_m2: await recommendedCompost(user, parcel), name: parcel.name });
+    compostKg += rep.current.compost_kg || 0;
+  }
+  const area = items.reduce((a, x) => a + (x.area_m2 || 0), 0);
+  sendJson(res, 200, { parcels: items.length, area_m2: area || null, durability: IMPACT.durabilityFromLog(items), carbon: IMPACT.compostCarbon(compostKg), compost_kg: Math.round(compostKg) });
+}
+// Bilan agrégé de la coopérative (animateur) : saison en cours de chaque parcelle suivie.
+async function handleCoopImpact(req, res) {
+  const c = await coopCtx(req); if (c.error) return sendJson(res, c.code, { error: c.error });
+  if (c.m.role !== "animateur") return sendJson(res, 403, { error: "Réservé à l'animateur de la coopérative." });
+  const members = await listCoopMembers(c.m.coop_id);
+  const names = await userNameMap(c.m.coop_id);
+  const rows = []; const tot = { parcels: 0, area_m2: 0, water_l: 0, compost_kg: 0, chem_kg: 0, harvest_kg: 0, incidents: 0 };
+  for (const mem of members) {
+    const parcels = (await listParcelsForUser(mem.user_id)) || [];
+    const logs = await listFieldLogForUser(mem.user_id);
+    for (const row of parcels) {
+      const parcel = await findUserParcel(mem.user_id, row.id); if (!parcel) continue;
+      const entries = logs.filter((e) => e.parcel_id === parcel.id); if (!entries.length) continue;
+      const area = FERT.zoneAreaM2(parcel.zone);
+      const rep = IMPACT.impactReport({ entries, areaM2: area });
+      const t = rep.current; if (!t) continue;
+      rows.push({ member: names[mem.user_id] || "Membre", parcel: parcel.name, season: t.season, area_m2: area, water_l: t.water_l, water_l_m2: t.water_l_m2, compost_kg: t.compost_kg, chem_kg: t.chem_kg, chem_kg_ha: t.chem_kg_ha, harvest_kg: t.harvest_kg, yield_t_ha: t.yield_t_ha, incidents: t.incidents.length, entries: t.n });
+      tot.parcels++; tot.area_m2 += area || 0; tot.water_l += t.water_l || 0; tot.compost_kg += t.compost_kg || 0; tot.chem_kg += t.chem_kg || 0; tot.harvest_kg += t.harvest_kg || 0; tot.incidents += t.incidents.length;
+    }
+  }
+  Object.keys(tot).forEach((k) => { tot[k] = Math.round(tot[k] * 10) / 10; });
+  tot.members = members.length; tot.members_tracked = new Set(rows.map((x) => x.member)).size;
+  sendJson(res, 200, { rows, totals: tot, carbon: IMPACT.compostCarbon(tot.compost_kg), nature: "mesure" });
 }
 const SOIL_SAVE_ERROR = "Enregistrement impossible. Si vous utilisez Supabase, exécutez la partie « trv_parcel_soil » de schema.sql.";
 async function handleParcelSoilGet(req, res) {
@@ -1599,6 +1772,32 @@ async function handleIngest(req, res) {
   await saveReading(rec);
   sendJson(res, 200, { ok: true });
 }
+// A4 — mesure saisie à la main (sans capteur) : le reste du système (alertes, courbe) fonctionne déjà.
+// « Au toucher » donne une valeur approximative, signalée comme telle.
+const TOUCH_SOIL = { sec: 15, frais: 40, humide: 65, detrempe: 90 };
+async function handleStationManual(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  if (!rateOk("manual:" + user.id, 100, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Beaucoup de mesures aujourd'hui. Reprenez demain." });
+  const n = (v, min, max) => { if (v === undefined || v === null || String(v).trim() === "") return null; const x = Number(String(v).replace(",", ".")); return isFinite(x) && x >= min && x <= max ? x : NaN; };
+  let soil = n(p.soil, 0, 100), source = "manuel";
+  if (soil == null && p.soil_touch) { if (!Object.prototype.hasOwnProperty.call(TOUCH_SOIL, p.soil_touch)) return sendJson(res, 400, { error: "Test au toucher inconnu." }); soil = TOUCH_SOIL[p.soil_touch]; source = "toucher"; }
+  const temp = n(p.temp, -20, 80), hum = n(p.hum, 0, 100), level = n(p.level, 0, 100);
+  if ([soil, temp, hum, level].some((x) => Number.isNaN(x))) return sendJson(res, 400, { error: "Une valeur est hors limites (humidité et cuve : 0 à 100 %, température : −20 à 80 °C)." });
+  const note = String(p.note || "").trim().slice(0, 200) || null;
+  if ([soil, temp, hum, level].every((x) => x == null) && !note) return sendJson(res, 400, { error: "Indiquez au moins une mesure ou une observation." });
+  const st = await getOrCreateStation(user.id); if (!st) return sendJson(res, 500, { error: "Impossible de préparer la station." });
+  const rec = { id: newId(), user_id: user.id, station_id: st.id, soil: soil != null ? Math.round(soil) : null, temp: temp != null ? Math.round(temp * 10) / 10 : null, hum: hum != null ? Math.round(hum) : null, level: level != null ? Math.round(level) : null, source, note, created_at: new Date().toISOString() };
+  if (USE_DB) {
+    try { await sb(`/trv_readings`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); }
+    catch (e) {
+      // Colonnes source/note pas encore créées : on garde la mesure, sans son origine.
+      try { const { source: _s, note: _n, ...base } = rec; await sb(`/trv_readings`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([base]) }); return sendJson(res, 200, { ok: true, reading: rec, warning: "Mesure enregistrée sans son origine : exécutez la partie v8.0 de schema.sql (trv_readings)." }); }
+      catch (e2) { console.error("manual reading:", e2.message); return sendJson(res, 500, { error: "Enregistrement impossible." }); }
+    }
+  } else await saveReading(rec);
+  sendJson(res, 200, { ok: true, reading: rec });
+}
 async function handleStation(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
   const st = await getOrCreateStation(user.id);
@@ -1622,7 +1821,12 @@ async function handleDashboard(req, res) {
   const [plans, devices, readings] = await Promise.all([listPlansForUser(user.id), listDevicesForUser(user.id), recentReadings(user.id, 48)]);
   const region = (user.region) || (plans[0] && plans[0].region) || "";
   const weather = await fetchWeather(region);
-  const latest = readings[0] || null;
+  // Dernière valeur connue de chaque grandeur : une saisie à la main peut ne contenir qu'une mesure.
+  const latest = readings[0] ? Object.assign({}, readings[0]) : null;
+  if (latest) ["soil", "temp", "hum", "level"].forEach((k) => {
+    const r = latest[k] != null ? readings[0] : readings.find((x) => x[k] != null);
+    if (r) { latest[k] = r[k]; latest[k + "_at"] = r.created_at; latest[k + "_source"] = r.source || null; }
+  });
   let soilAdvice = null; try { soilAdvice = await latestSoilAdvice(user.id); } catch (e) {}
   sendJson(res, 200, {
     soilAdvice,
@@ -2956,9 +3160,15 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && url === "/api/plan") return handlePlan(req, res);
   if (req.method === "GET" && url === "/api/plans") return handlePlansList(req, res);
   if (req.method === "GET" && url === "/api/plan") return handlePlanGet(req, res);
+  if (req.method === "POST" && url === "/api/plan/fiche") return handlePlanFiche(req, res);
   if (req.method === "GET" && url === "/api/parcels") return handleParcelsList(req, res);
   if (req.method === "POST" && url === "/api/parcels") return handleParcelSave(req, res);
   if (req.method === "POST" && url === "/api/parcels/delete") return handleParcelDelete(req, res);
+  if (req.method === "GET" && url === "/api/impact") return handleImpactGet(req, res);
+  if (req.method === "GET" && url === "/api/impact/csv") return handleImpactCsv(req, res);
+  if (req.method === "GET" && url === "/api/impact/summary") return handleImpactSummary(req, res);
+  if (req.method === "POST" && url === "/api/impact/ref") return handleImpactRef(req, res);
+  if (req.method === "GET" && url === "/api/coop/impact") return handleCoopImpact(req, res);
   if (req.method === "GET" && url === "/api/fieldlog") return handleFieldLogGet(req, res);
   if (req.method === "POST" && url === "/api/fieldlog") return handleFieldLogAdd(req, res);
   if (req.method === "DELETE" && url === "/api/fieldlog") return handleFieldLogDelete(req, res);
@@ -2984,6 +3194,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && url === "/api/coop/buy/close") return handleBuyClose(req, res);
   if (req.method === "POST" && url === "/api/coop/buy/delete") return handleBuyDelete(req, res);
   if (req.method === "POST" && url === "/api/ingest") return handleIngest(req, res);
+  if (req.method === "POST" && url === "/api/station/manual") return handleStationManual(req, res);
   if (req.method === "POST" && url === "/api/readings/clear") return handleReadingsClear(req, res);
   if (req.method === "GET" && url === "/api/station") return handleStation(req, res);
   if (req.method === "GET" && url === "/api/station/sketch") return handleStationSketch(req, res);

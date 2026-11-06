@@ -323,10 +323,41 @@
         const max=Math.max.apply(null,cult.map(function(x){return x.membres;}))||1;
         html+='<div style="margin-top:10px;">'+cult.map(function(x){ const w=Math.max(6,Math.round(100*x.membres/max)); return '<div class="meter"><div class="t"><b>'+esc(x.culture)+'</b><span>'+x.membres+' membre'+(x.membres>1?'s':'')+'</span></div><div class="bar"><span style="width:'+w+'%"></span></div></div>'; }).join("")+'</div>';
       }
+      html+='<h2 style="margin-top:16px;">Bilan d\'impact de la coopérative</h2><div id="coImpact" class="muted">Chargement…</div>';
       box.innerHTML=card(html);
+      loadCoopImpact();
       box.querySelectorAll("[data-manage]").forEach(function(b){ b.addEventListener("click", function(){ const m=(COOPM||[]).find(function(x){return x.id===b.getAttribute("data-manage");}); if(m) openMember(m); }); });
     }
 
+
+    // ====== Bilan d'impact agrégé (A1) : saison en cours de chaque parcelle suivie ======
+    function nfr(x){ return x==null?"—":Number(x).toLocaleString("fr-FR",{maximumFractionDigits:2}); }
+    let COIMP=null;
+    async function loadCoopImpact(){
+      const el=$("coImpact"); if(!el) return; const r=await api("/api/coop/impact");
+      if(!r.ok){ el.textContent=(r.d&&r.d.error)||"Bilan indisponible."; return; }
+      COIMP=r.d; const T=r.d.totals, rows=r.d.rows||[];
+      let h='<div style="font-size:.84rem;color:var(--soft);">Chiffres <b>mesurés</b> : notés par les membres dans leur carnet de champ (saison en cours de chaque parcelle). '+T.members_tracked+' membre'+(T.members_tracked>1?'s':'')+' sur '+T.members+' tiennent un carnet.</div>';
+      if(!rows.length){ el.innerHTML=h+'<div style="margin-top:6px;">Aucun carnet de champ rempli pour l\'instant. Distribuez la fiche de collecte terrain (tableau de bord → Carnet de champ) et aidez les membres à reporter leurs saisies.</div>'; return; }
+      h+='<div class="stat" style="margin-top:8px;"><div class="tile"><b>'+T.parcels+'</b><span>parcelles suivies</span></div><div class="tile"><b>'+nfr(Math.round(T.area_m2/100)/100)+'</b><span>ha</span></div><div class="tile"><b>'+nfr(T.water_l)+'</b><span>L d\'eau</span></div><div class="tile"><b>'+nfr(T.compost_kg)+'</b><span>kg de compost</span></div><div class="tile"><b>'+nfr(T.chem_kg)+'</b><span>kg d\'engrais chim.</span></div><div class="tile"><b>'+nfr(T.harvest_kg)+'</b><span>kg récoltés</span></div></div>';
+      h+='<div style="overflow-x:auto;margin-top:8px;"><table><tr><th>Membre</th><th>Parcelle</th><th>Saison</th><th>Eau (L/m²)</th><th>Compost (kg)</th><th>Engrais (kg/ha)</th><th>Récolte (kg)</th><th>t/ha</th><th>Incidents</th></tr>'
+        +rows.map(function(x){ return '<tr><td>'+esc(x.member)+'</td><td>'+esc(x.parcel)+'</td><td>'+esc(x.season)+'</td><td>'+nfr(x.water_l_m2)+'</td><td>'+nfr(x.compost_kg)+'</td><td>'+nfr(x.chem_kg_ha)+'</td><td>'+nfr(x.harvest_kg)+'</td><td>'+nfr(x.yield_t_ha)+'</td><td>'+(x.incidents||"—")+'</td></tr>'; }).join("")+'</table></div>';
+      if(r.d.carbon) h+='<div style="font-size:.84rem;margin-top:6px;">Carbone apporté au sol par le compost noté : ≈ '+nfr(r.d.carbon.co2e_kg.v)+' kg CO₂e (calcul à partir des kg notés et d\'hypothèses écrites ; '+nfr(r.d.carbon.retained_co2e_kg.v[0])+' à '+nfr(r.d.carbon.retained_co2e_kg.v[1])+' kg resteraient durablement).</div>';
+      h+='<div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap;"><button class="btn" type="button" id="coImpCsv">Tableur (CSV)</button><button class="btn" type="button" id="coImpPrint">Imprimer / PDF pour un bailleur</button></div>';
+      el.innerHTML=h;
+      $("coImpCsv").addEventListener("click", coopImpactCsv); $("coImpPrint").addEventListener("click", coopImpactPrint);
+    }
+    function coopImpactCsv(){
+      if(!COIMP) return; const q=function(v){ return '"'+String(v==null?"":v).replace(/"/g,'""')+'"'; }, n=function(v){ return v==null?"":String(v).replace(".",","); };
+      const rows=[["membre","parcelle","saison","surface_m2","eau_L","eau_L_m2","compost_kg","engrais_kg","engrais_kg_ha","recolte_kg","rendement_t_ha","incidents","nature"]].concat(COIMP.rows.map(function(x){ return [x.member,x.parcel,x.season,n(x.area_m2),n(x.water_l),n(x.water_l_m2),n(x.compost_kg),n(x.chem_kg),n(x.chem_kg_ha),n(x.harvest_kg),n(x.yield_t_ha),x.incidents,"mesuré (carnet)"]; }));
+      const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+rows.map(function(r){ return r.map(q).join(";"); }).join("\r\n")],{type:"text/csv;charset=utf-8"})); a.download="bilan-impact-cooperative.csv"; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+    }
+    function coopImpactPrint(){
+      const el=$("coImpact"); if(!el||!COIMP) return;
+      const body=el.innerHTML.replace(/<div class="row"[\s\S]*$/,"");
+      const w=window.open("","_blank"); if(!w){ alert("Autorisez les fenêtres pop-up pour imprimer."); return; }
+      w.document.open(); w.document.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Bilan d\'impact — coopérative</title><style>@page{size:A4 landscape;margin:12mm}body{font-family:Arial,sans-serif;font-size:12px;color:#111}h1{color:#1B5E34;font-size:19px;border-bottom:3px solid #1B5E34;padding-bottom:5px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #bbb;padding:4px 6px;text-align:left}th{background:#eef5ef}.stat{display:flex;gap:10px;flex-wrap:wrap}.tile{border:1px solid #bbb;border-radius:6px;padding:4px 10px}.tile b{display:block;font-size:16px}.f{margin-top:10px;font-size:10px;color:#666}</style></head><body><h1>Bilan d\'impact de la coopérative — '+new Date().toLocaleDateString("fr-FR")+'</h1>'+body+'<div class="f">Source : carnets de champ Terravive des membres. Chiffres mesurés (saisis par les membres), sauf le carbone, calculé à partir d\'hypothèses écrites. À vérifier avant toute communication officielle.</div><script>setTimeout(function(){window.print();},300);<\/script></body></html>'); w.document.close();
+    }
     // ====== Matériel partagé + Achats groupés (pour tous les membres) ======
     function fmtDate(s){ if(!s) return ""; try{ return new Date(s).toLocaleDateString("fr-FR"); }catch(e){ return s; } }
     function statusPill(st){ var col={ "demandée":"var(--sun)","acceptée":"var(--good)","refusée":"var(--bad)","annulée":"var(--faint)","terminée":"var(--faint)","ouvert":"var(--good)","clos":"var(--faint)" }[st]||"var(--faint)"; return '<span style="font-size:.76rem;font-weight:700;color:'+col+';border:1px solid '+col+';border-radius:12px;padding:1px 8px;">'+esc(st)+'</span>'; }

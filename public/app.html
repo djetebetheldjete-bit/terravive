@@ -114,6 +114,29 @@
   .modecard :focus-visible, .modehelp:focus-visible, #modeClose:focus-visible{ outline:2px solid var(--leaf); outline-offset:2px; border-radius:6px; }
   .spin{ display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.5); border-top-color:#fff; border-radius:50%; animation:sp .7s linear infinite; vertical-align:-3px; }
   @keyframes sp{ to{ transform:rotate(360deg); } }
+  /* Fiche pratique terrain */
+  .fiche h2.sec{ margin:0; }
+  .fiche .fhead{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .fiche .fact{ display:flex; gap:8px; flex-wrap:wrap; }
+  .fiche .fsec{ margin-top:16px; }
+  .fiche .fsec h3{ font-family:var(--f-display); color:var(--deep); font-size:1.02rem; margin:0 0 6px; border-bottom:1px solid var(--line); padding-bottom:4px; }
+  .fiche ul{ margin:4px 0 0 18px; padding:0; } .fiche li{ margin:3px 0; line-height:1.45; }
+  .fiche table{ width:100%; border-collapse:collapse; font-size:.9rem; }
+  .fiche td,.fiche th{ border-bottom:1px solid var(--line); padding:7px 6px; text-align:left; vertical-align:top; }
+  .fiche th{ font-size:.78rem; color:var(--soft); font-weight:600; }
+  .fiche td.when{ font-weight:700; color:var(--deep); white-space:nowrap; width:1%; }
+  .fiche td.cb{ width:1%; } .fiche td.cb input{ width:18px; height:18px; accent-color:var(--leaf); }
+  .fiche tr.done td:not(.cb){ text-decoration:line-through; color:var(--faint); }
+  .fiche .brief{ background:var(--surface2); border:1px solid var(--line); border-left:4px solid var(--leaf); border-radius:10px; padding:10px 14px; }
+  .fiche .pbox{ background:#fff8e8; border:1px solid #f0dcae; border-radius:10px; padding:10px 14px; color:#3a2a06; }
+  :root[data-theme="sombre"] .fiche .pbox{ background:#2b2414; border-color:#5a4720; color:var(--ink); }
+  .fiche .pgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:8px; margin-top:6px; }
+  .fiche .pgrid div{ font-size:.86rem; } .fiche .pgrid b{ display:block; font-family:var(--f-display); font-size:1.08rem; }
+  .fiche .mat{ display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:4px 12px; }
+  .fiche .mat label{ display:flex; gap:8px; align-items:center; font-size:.9rem; font-weight:400; margin:0; }
+  .fiche .mat input{ width:17px; height:17px; accent-color:var(--leaf); }
+  .fiche .two{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media(max-width:700px){ .fiche .two{ grid-template-columns:1fr; } .fiche td.when{ white-space:normal; min-width:92px; } }
 </style>
 <link rel="icon" type="image/png" href="/favicon-32.png">
 <link rel="stylesheet" href="/mobile.css">
@@ -233,6 +256,17 @@
             <button class="btn" id="newBtn" type="button">Nouveau plan</button>
           </div>
         </div>
+      </div>
+
+      <div class="card fiche" id="ficheCard" style="display:none;">
+        <div class="fhead"><h2 class="sec">📋 Fiche pratique terrain</h2>
+          <div class="fact" id="ficheActions" style="display:none;">
+            <button class="btn sun" type="button" id="fichePrint">Imprimer / PDF</button>
+            <a class="btn" id="ficheWa" href="#" target="_blank" rel="noopener" style="text-decoration:none;background:#25D366;border-color:#25D366;color:#fff;">WhatsApp</a>
+            <button class="btn" type="button" id="ficheCopy">Copier</button>
+          </div></div>
+        <p class="hint" style="margin:6px 0 0;">La version courte de l'itinéraire, à emporter au champ : cochez les étapes au fur et à mesure.</p>
+        <div id="ficheBody" style="margin-top:10px;"></div>
       </div>
 
       <div class="card" id="budgetCard" style="display:none;">
@@ -631,6 +665,7 @@
     $("chatCard").style.display="block"; { var _b=document.getElementById("budgetCard"); if(_b) _b.style.display="block"; } $("thread").innerHTML="";
     $("chatHint").innerHTML='Une question sur votre culture de <b>'+esc(plan.crop)+'</b> ? Un problème observé ? Demandez ici.';
     window.scrollTo({top:0,behavior:"smooth"});
+    loadFiche(plan);
   }
   async function openPlan(id){
     try{ const r=await fetch("/api/plan?id="+encodeURIComponent(id)); const d=await r.json(); if(r.ok) showPlan(d.plan); }catch(e){}
@@ -652,6 +687,80 @@
     btn.disabled=false; btn.innerHTML="Générer mon itinéraire";
   }
 
+
+  // ---- Fiche pratique terrain ----
+  let currentFiche=null;
+  function fr(v){ return Number(v).toLocaleString("fr-FR",{maximumFractionDigits:1}); }
+  function frr(a,u){ if(!a) return ""; return (a[0]===a[1]?fr(a[0]):fr(a[0])+" à "+fr(a[1]))+(u?" "+u:""); }
+  function parcelBox(P){
+    if(!P) return "";
+    const items=[];
+    if(P.area_m2) items.push(['Surface dessinée', fr(P.area_m2)+' m²']);
+    if(P.irrigation) items.push(['Arrosage', fr(P.irrigation.dose_l_m2)+' L/m²'+(P.irrigation.interval_days?' · tous les '+P.irrigation.interval_days+' j sans pluie':'')]);
+    if(P.sensor) items.push(['Capteur', 'à '+P.sensor.depth_cm+' cm · arroser sous '+P.sensor.threshold_pct+' %']);
+    if(P.compost&&P.compost.total_kg) items.push(['Compost mûr', frr(P.compost.total_kg,'kg')+' (≈ '+frr(P.compost.wheelbarrows,'brouettes')+')']);
+    else if(P.compost&&P.compost.dose_kg_plant) items.push(['Compost mûr', frr(P.compost.dose_kg_plant,'kg par pied')]);
+    if(P.compost&&P.compost.raw_kg) items.push(['À composter', frr(P.compost.raw_kg,'kg de matières')]);
+    if(P.lime) items.push(['Sol acide (pH '+fr(P.lime.ph)+')', P.lime.total_kg?frr(P.lime.total_kg,'kg de chaux'):'chaulage à prévoir']);
+    if(!items.length) return "";
+    return '<div class="fsec pbox"><b>Chiffres calculés pour votre parcelle « '+esc(P.name)+' »</b><div class="pgrid">'+items.map(i=>'<div>'+esc(i[0])+'<b>'+esc(i[1])+'</b></div>').join("")+'</div><div style="font-size:.78rem;margin-top:6px;opacity:.85;">Calculés par l\'application à partir de la parcelle dessinée et des cartes de sol ; ils peuvent différer de l\'itinéraire si la surface saisie n\'est pas la même.</div></div>';
+  }
+  function ficheHtml(F,P){
+    let h=parcelBox(P);
+    if(F.en_bref.length) h+='<div class="fsec brief"><b>L\'essentiel</b><ul>'+F.en_bref.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul></div>';
+    if(F.calendrier.length) h+='<div class="fsec"><h3>Calendrier des travaux</h3><table><tbody>'+F.calendrier.map((c,i)=>'<tr><td class="cb"><input type="checkbox" data-fck="'+i+'" aria-label="Fait"></td><td class="when">'+esc(c.quand)+'</td><td><b>'+esc(c.faire)+'</b>'+(c.detail?'<div style="color:var(--soft);font-size:.86rem;">'+esc(c.detail)+'</div>':'')+'</td></tr>').join("")+'</tbody></table></div>';
+    if(F.quantites.length) h+='<div class="fsec"><h3>Quantités à prévoir</h3><table><thead><tr><th>Quoi</th><th>Combien</th><th>Quand</th></tr></thead><tbody>'+F.quantites.map(q=>'<tr><td>'+esc(q.quoi)+'</td><td><b>'+esc(q.combien)+'</b></td><td>'+esc(q.quand)+'</td></tr>').join("")+'</tbody></table></div>';
+    const L=(t,a)=>a&&a.length?'<div class="fsec"><h3>'+t+'</h3><ul>'+a.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul></div>':'';
+    h+='<div class="two"><div>'+L("Arrosage",F.arrosage)+'</div><div>'+L("Récolte et conservation",F.recolte)+'</div></div>';
+    if(F.surveiller.length) h+='<div class="fsec"><h3>À surveiller au champ</h3><table><thead><tr><th>Si vous voyez…</th><th>Faites…</th></tr></thead><tbody>'+F.surveiller.map(x=>'<tr><td>'+esc(x.signe)+'</td><td>'+esc(x.action)+'</td></tr>').join("")+'</tbody></table></div>';
+    h+=L("Sécurité",F.securite);
+    if(F.materiel.length) h+='<div class="fsec"><h3>Matériel à préparer</h3><div class="mat">'+F.materiel.map((m,i)=>'<label><input type="checkbox" data-fmat="'+i+'">'+esc(m)+'</label>').join("")+'</div></div>';
+    if(F.carnet.length) h+='<div class="fsec"><h3>À noter dans le carnet de champ</h3><ul>'+F.carnet.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul><a href="/tableau#logCard" style="color:var(--leaf);font-weight:600;font-size:.88rem;">Ouvrir mon carnet de champ →</a></div>';
+    return h;
+  }
+  function ficheKey(){ return "trv-fiche-"+(currentPlan&&currentPlan.id); }
+  function bindFicheChecks(){
+    let st={}; try{ st=JSON.parse(localStorage.getItem(ficheKey())||"{}"); }catch(e){}
+    $("ficheBody").querySelectorAll("input[type=checkbox]").forEach(cb=>{
+      const k=cb.dataset.fck!=null?"c"+cb.dataset.fck:"m"+cb.dataset.fmat;
+      cb.checked=!!st[k]; const tr=cb.closest("tr"); if(tr) tr.classList.toggle("done",cb.checked);
+      cb.addEventListener("change",function(){ st[k]=cb.checked; if(tr) tr.classList.toggle("done",cb.checked); try{ localStorage.setItem(ficheKey(),JSON.stringify(st)); }catch(e){} });
+    });
+  }
+  async function loadFiche(plan, refresh){
+    $("ficheCard").style.display="block"; $("ficheActions").style.display="none"; currentFiche=null;
+    $("ficheBody").innerHTML='<div class="hint"><span class="spin" style="border-color:var(--line);border-top-color:var(--leaf);"></span> Préparation de la fiche terrain…</div>';
+    try{
+      const parcel_id=($("parcelSel")&&$("parcelSel").value)||undefined;
+      const r=await fetch("/api/plan/fiche",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ id:plan.id, parcel_id, refresh:refresh===true })});
+      const d=await r.json();
+      if(currentPlan!==plan) return;
+      if(!r.ok){ $("ficheBody").innerHTML='<div class="hint" style="color:var(--bad);">'+esc(d.error||"La fiche n'a pas pu être créée.")+' <button class="btn" type="button" id="ficheRetry">Réessayer</button></div>'; const b=$("ficheRetry"); if(b) b.onclick=function(){ loadFiche(plan); }; return; }
+      currentFiche=d;
+      $("ficheBody").innerHTML=ficheHtml(d.fiche,d.parcel); bindFicheChecks();
+      $("ficheWa").href="https://wa.me/?text="+encodeURIComponent(d.text);
+      $("ficheActions").style.display="flex";
+    }catch(e){ $("ficheBody").innerHTML='<div class="hint">Serveur injoignable.</div>'; }
+  }
+  function printFiche(){
+    if(!currentFiche) return;
+    const F=currentFiche.fiche, date=new Date().toLocaleDateString("fr-FR");
+    const body=ficheHtml(F,currentFiche.parcel).replace(/<input type="checkbox"[^>]*>/g,'<span class="box"></span>').replace(/<a href="\/tableau[^<]*<\/a>/,"");
+    const html='<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'+esc(F.titre)+'</title><style>'
+      +'@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:13px;line-height:1.4;margin:0}'
+      +'.h{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1B5E34;padding-bottom:6px;margin-bottom:8px}.h b{font-size:20px;color:#1B5E34}.h span{font-size:11px;color:#555}'
+      +'.fsec{margin-top:10px;page-break-inside:avoid}h3{font-size:14px;color:#1B5E34;margin:0 0 4px;border-bottom:1px solid #bbb;padding-bottom:2px;text-transform:uppercase;letter-spacing:.3px}'
+      +'ul{margin:2px 0 0 16px;padding:0}li{margin:2px 0}table{width:100%;border-collapse:collapse}td,th{border:1px solid #bbb;padding:4px 6px;text-align:left;vertical-align:top}th{background:#eef5ef;font-size:11px}'
+      +'td.when{font-weight:bold;white-space:nowrap;width:1%}td.cb{width:1%}.box{display:inline-block;width:14px;height:14px;border:1.5px solid #333;border-radius:2px;vertical-align:middle;margin-right:4px}'
+      +'.brief{border:2px solid #1B5E34;border-radius:6px;padding:6px 10px}.pbox{border:1.5px dashed #b7791f;border-radius:6px;padding:6px 10px}.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 10px}.pgrid b{display:block;font-size:14px}'
+      +'.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.mat{display:grid;grid-template-columns:repeat(3,1fr);gap:3px 10px}.mat label{display:flex;align-items:center}'
+      +'.notes{margin-top:12px;border:1px solid #bbb;border-radius:6px;height:90px;padding:4px 8px;color:#777;font-size:11px}.f{margin-top:8px;font-size:10px;color:#666}'
+      +'</style></head><body><div class="h"><b>'+esc(F.titre)+'</b><span>Terravive · '+date+(currentPlan&&currentPlan.region?' · '+esc(currentPlan.region):'')+'</span></div>'
+      +body+'<div class="notes">Mes notes :</div><div class="f">Fiche tirée de votre itinéraire technique Terravive. Conseils indicatifs, à adapter au terrain ; en cas de doute (maladie grave, produits), demandez à un agronome local.</div>'
+      +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.focus();window.print();},300);};</scr'+'ipt></body></html>';
+    const w=window.open("","_blank"); if(!w){ alert("Autorisez les fenêtres pop-up de ce site pour imprimer la fiche."); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+  }
   // ---- Export PDF propre (page Terravive + plan + tableau) ----
   function exportPlanPDF(){
     if(!currentPlan){ return; }
@@ -738,6 +847,8 @@
     box.querySelectorAll(".sugchip").forEach(function(b){ b.addEventListener("click", function(){ $("chatInput").value=b.textContent; sendChat(); }); });
   })();
   $("pdfBtn").addEventListener("click", exportPlanPDF);
+  $("fichePrint").addEventListener("click", printFiche);
+  $("ficheCopy").addEventListener("click", async function(){ if(!currentFiche) return; try{ await navigator.clipboard.writeText(currentFiche.text); this.textContent="Copié ✓"; }catch(e){ this.textContent="Copie impossible"; } const b=this; setTimeout(function(){ b.textContent="Copier"; },2000); });
   // Lecture à voix haute de l'itinéraire (en français).
   function planToSpeech(md){ return String(md||"")
       .replace(/```[\s\S]*?```/g," ")           // blocs de code
@@ -745,7 +856,7 @@
       .replace(/[#*_`>-]/g," ")                   // symboles markdown
       .replace(/\s+/g," ").trim(); }
   { const lb=$("listenBtn"); if(lb){ let on=false; lb.addEventListener("click", function(){ if(on){ if(window.trvStop) trvStop(); on=false; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; return; } if(!currentPlan) return; on=true; lb.innerHTML=ICON_STOP+"Arrêter la lecture"; trvSpeak(planToSpeech(currentPlan.content), function(){ on=false; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; }); }); } }
-  $("newBtn").addEventListener("click", ()=>{ try{ if(window.trvStop) trvStop(); }catch(e){} $("planContent").style.display="none"; $("planPlaceholder").style.display="block"; $("chatCard").style.display="none"; { var _b=document.getElementById("budgetCard"); if(_b) _b.style.display="none"; } window.scrollTo({top:0,behavior:"smooth"}); });
+  $("newBtn").addEventListener("click", ()=>{ try{ if(window.trvStop) trvStop(); }catch(e){} $("planContent").style.display="none"; $("planPlaceholder").style.display="block"; $("chatCard").style.display="none"; $("ficheCard").style.display="none"; { var _b=document.getElementById("budgetCard"); if(_b) _b.style.display="none"; } window.scrollTo({top:0,behavior:"smooth"}); });
 
   loadMe();
 

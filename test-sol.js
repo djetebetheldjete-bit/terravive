@@ -219,5 +219,95 @@ async function t(name, fn) { try { await fn(); passed++; console.log("  ok  " + 
     assert.ok(m.length < 1500);
   });
 
+  // ---------- Fiche pratique terrain (lib/fiche.js) ----------
+  const FI = require("./lib/fiche");
+  const good = { titre: "Fiche terrain — tomate 🍅", en_bref: ["Compost avant repiquage", "Arroser au pied"], calendrier: [{ quand: "3 semaines avant", faire: "**Épandre** le compost", detail: "2 à 3 kg/m²" }, { quand: "Jour 0", faire: "Repiquer", detail: "" }, { faire: "", quand: "" }], quantites: [{ quoi: "Compost", combien: "1 à 1,5 t", quand: "avant repiquage" }], arrosage: ["Tôt le matin"], surveiller: [{ signe: "Feuilles tachées", action: "Retirer les feuilles" }], securite: [], recolte: ["Récolter à maturité"], materiel: ["Arrosoir", { x: "Tuteurs" }], carnet: ["Kg récoltés"] };
+  await t("fiche : JSON propre accepté, emojis et gras retirés, lignes vides écartées", () => {
+    const f = FI.parseFiche(JSON.stringify(good), "tomate");
+    assert.strictEqual(f.titre, "Fiche terrain — tomate");
+    assert.strictEqual(f.calendrier.length, 2); assert.strictEqual(f.calendrier[0].faire, "Épandre le compost");
+    assert.deepStrictEqual(f.materiel, ["Arrosoir", "Tuteurs"]); assert.deepStrictEqual(f.securite, []);
+  });
+  await t("fiche : réponse entourée de texte ou d'un bloc de code -> extraite", () => {
+    assert.strictEqual(FI.parseFiche("```json\n" + JSON.stringify(good) + "\n```").calendrier.length, 2);
+    assert.strictEqual(FI.parseFiche("Voici la fiche :\n" + JSON.stringify(good) + "\nBonne saison").en_bref.length, 2);
+  });
+  await t("fiche : réponse illisible ou vide -> erreur claire", () => {
+    assert.throws(() => FI.parseFiche("désolé, je ne peux pas"), /lue/);
+    assert.throws(() => FI.parseFiche(JSON.stringify({ titre: "x" })), /vide/);
+  });
+  await t("fiche : listes plafonnées et textes tronqués", () => {
+    const big = Object.assign({}, good, { calendrier: Array.from({ length: 30 }, (_, i) => ({ quand: "S" + i, faire: "x".repeat(400) })) });
+    const f = FI.parseFiche(JSON.stringify(big));
+    assert.strictEqual(f.calendrier.length, 14); assert.ok(f.calendrier[0].faire.length <= 120);
+  });
+  await t("fiche : version texte avec parcelle, cases à cocher, longueur bornée", () => {
+    const f = FI.parseFiche(JSON.stringify(good));
+    const txt = FI.ficheText(f, { name: "Champ nord", area_m2: 1200 });
+    assert.ok(/Champ nord \(1\s200 m²\)/.test(txt) && /☐ Jour 0 : Repiquer/.test(txt) && txt.length < 3200);
+  });
+  await t("fiche : l'invite contient l'ITK et interdit d'inventer des chiffres", () => {
+    const m = FI.ficheUserMessage({ crop: "maïs", region: "Bouaké", content: "## Semis\n- 25 kg/ha" });
+    assert.ok(/maïs/.test(m) && /25 kg\/ha/.test(m)); assert.ok(/N'invente aucune dose/.test(FI.ficheSystem()));
+  });
+
+  // ---------- Bilan d'impact (lib/impact.js) ----------
+  const IM = require("./lib/impact");
+  const E = (date, kind, qty, extra) => Object.assign({ date, kind, qty, unit: null }, extra || {});
+  const s1 = [E("2025-04-10", "arrosage", 30000), E("2025-04-12", "engrais", 25, { product: "NPK 15-15-15" }), E("2025-07-01", "recolte", 400)];
+  const s2 = [E("2026-04-08", "compost", 1000), E("2026-04-20", "arrosage", 20000), E("2026-05-03", "engrais", 10, { product: "NPK 15-15-15" }), E("2026-06-02", "incident", null, { note: "mildiou" }), E("2026-07-02", "recolte", 520)];
+  await t("saison par défaut : calendrier ivoirien simplifié", () => {
+    assert.strictEqual(IM.defaultSeason("2026-04-08"), "2026 · grande saison");
+    assert.strictEqual(IM.defaultSeason("2026-09-15"), "2026 · petite saison");
+    assert.strictEqual(IM.defaultSeason("2027-01-10"), "2026-2027 · saison sèche");
+    assert.strictEqual(IM.defaultSeason("2026-12-10"), "2026-2027 · saison sèche");
+  });
+  await t("impact : totaux par saison et ratios à la surface", () => {
+    const rep = IM.impactReport({ entries: s1.concat(s2), areaM2: 1000 });
+    assert.strictEqual(rep.seasons.length, 2);
+    const c = rep.current;
+    assert.strictEqual(c.season, "2026 · grande saison");
+    assert.strictEqual(c.water_l_m2, 20); assert.strictEqual(c.chem_kg_ha, 100); assert.strictEqual(c.yield_t_ha, 5.2);
+    assert.strictEqual(c.water_prod_kg_m3, 26); assert.strictEqual(c.incidents.length, 1); assert.strictEqual(c.products["NPK 15-15-15"], 10);
+  });
+  await t("impact : comparaison avec la saison précédente (mesuré contre mesuré) et économies", () => {
+    const rep = IM.impactReport({ entries: s1.concat(s2), areaM2: 1000 });
+    assert.strictEqual(rep.baseline.nature, "mesure");
+    const w = rep.comparisons.find((x) => x.key === "water_l_m2");
+    assert.strictEqual(w.pct, -33); assert.strictEqual(w.better, true);
+    assert.strictEqual(rep.comparisons.find((x) => x.key === "yield_t_ha").pct, 30);
+    assert.strictEqual(rep.savings.water_l.v, 10000); assert.strictEqual(rep.savings.chem_kg.v, 15);
+    assert.strictEqual(rep.savings.water_l.nature, "modele");
+  });
+  await t("impact : une référence saisie l'emporte et reste marquée « déclaré »", () => {
+    const rep = IM.impactReport({ entries: s2, areaM2: 1000, ref: { label: "2025 avant", water_l: 40000, chem_kg: 30, yield_kg: 350 } });
+    assert.strictEqual(rep.baseline.nature, "declare");
+    const c = rep.comparisons.find((x) => x.key === "chem_kg_ha");
+    assert.strictEqual(c.baseline.nature, "declare"); assert.strictEqual(c.current.nature, "mesure"); assert.strictEqual(c.baseline.v, 300);
+  });
+  await t("impact : rien d'inventé quand il manque des données", () => {
+    const rep = IM.impactReport({ entries: [E("2026-04-08", "arrosage", 500)], areaM2: null });
+    assert.strictEqual(rep.comparisons.length, 0); assert.deepStrictEqual(rep.savings, {}); assert.strictEqual(rep.current.yield_t_ha, null);
+    assert.ok(rep.missing.some((m) => /Surface/.test(m)) && rep.missing.some((m) => /récolte/.test(m)) && rep.missing.some((m) => /référence/.test(m)));
+    assert.strictEqual(IM.impactReport({ entries: [] }).current, null);
+  });
+  await t("impact : carbone du compost avec hypothèses écrites", () => {
+    const k = IM.compostCarbon(1000);
+    assert.strictEqual(k.carbon_kg.v, 150); assert.strictEqual(k.co2e_kg.v, 550); assert.deepStrictEqual(k.retained_co2e_kg.v, [55, 110]);
+    assert.strictEqual(k.retained_co2e_kg.nature, "hypothese"); assert.strictEqual(k.hypotheses.length, 3); assert.strictEqual(IM.compostCarbon(0), null);
+  });
+  await t("durabilité déduite du carnet : compost à la dose, pas d'engrais", () => {
+    const t1 = IM.impactReport({ entries: [E("2026-04-08", "compost", 2500), E("2026-04-20", "arrosage", 100), E("2026-05-01", "recolte", 50)], areaM2: 1000 }).current;
+    const d = IM.durabilityFromLog([{ t: t1, area_m2: 1000, rec_kg_m2: 2.25 }]);
+    assert.strictEqual(d.mo.value, 100); assert.strictEqual(d.intrant.value, 100);
+    const d2 = IM.durabilityFromLog([{ t: Object.assign({}, t1, { chem_n: 1, chem_kg: 5 }), area_m2: 1000, rec_kg_m2: 3 }]);
+    assert.strictEqual(d2.mo.value, 50); assert.ok(!d2.intrant && /Engrais/.test(d2.intrant_note));
+    assert.deepStrictEqual(IM.durabilityFromLog([{ t: { n: 1 } }]), {});
+  });
+  await t("impact : CSV avec séparateur ; et virgule décimale", () => {
+    const csv = IM.reportCsv(IM.impactReport({ entries: s2, areaM2: 1000 }));
+    assert.ok(csv.startsWith("\ufeff")); assert.ok(/"2026 · grande saison";"2026-04-08";"2026-07-02";"20000";"20"/.test(csv)); assert.ok(/"5,2"/.test(csv));
+  });
+
   console.log(process.exitCode ? "\nDes tests ont échoué." : `\n${passed} tests réussis.`);
 })();
