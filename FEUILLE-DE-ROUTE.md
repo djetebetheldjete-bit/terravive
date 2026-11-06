@@ -19,6 +19,7 @@ _Dernière mise à jour : 4 novembre 2026._
 - **Voix** : lecture à voix haute et dictée (fiable en français).
 - **Diagnostic des maladies par photo** : le cultivateur photographie une plante, l'IA propose une cause probable et des solutions durables.
 - **Sol & racines (v7)** : nature du sol estimée par satellite (iSDAsoil 30 m, repli SoilGrids), profondeur du sol, fertilité estimée (pH, carbone, N, P, K), profondeur racinaire utile selon la culture et son stade, dose et fréquence d'arrosage (FAO-56 + ET0 Open-Meteo), profondeur du capteur et seuil d'arrosage. Correction par test de terrain (bocal, fosse). Données transmises à l'IA pour un itinéraire adapté au sol.
+- **Fertilisation, partage et carnet (v7.8)** : plan de compost et de correction du sol calculé pour la parcelle (dose, total, brouettes, pH, N-P-K), envoi du conseil au producteur par WhatsApp (sans API), carnet de champ avec totaux et export CSV pour mesurer l'impact.
 - **Station ESP32 prête à brancher (v7)** : programme généré par le serveur (clé, adresse, seuil de la parcelle), humidité du sol + air (DHT22) + niveau de cuve (JSN-SR04T), HTTPS, reprise Wi-Fi, nouvelles tentatives si le serveur dort ; vérifié par compilation (ESP32, cœur Arduino 3.0.7). Alertes « arroser » et « cuve presque vide » dans le tableau de bord.
 
 ---

@@ -1,4 +1,4 @@
-# Sol, racines et station connectée — guide (Terravive v7)
+# Sol, racines et station connectée — guide (Terravive v7, complété en v7.8)
 
 ## 1. Mise en service (une fois)
 
@@ -10,7 +10,8 @@
    (Render → Environment). Données sous licence CC BY 4.0 : citer « iSDAsoil » (c'est affiché dans la fiche).
    Sans compte, Terravive utilise **SoilGrids** (ISRIC, 250 m), dont l'API « bêta » est parfois en pause :
    la fiche le signale et propose la correction par test de terrain.
-3. Vérifiez : `npm test` (31 tests, sans réseau).
+3. **v7.8 — carnet de champ** : exécutez aussi le bloc `trv_field_log` de `schema.sql`.
+4. Vérifiez : `npm test` (40 tests, sans réseau).
 
 ## 2. Ce que calcule la fiche « Sol & racines »
 
@@ -60,6 +61,35 @@ Notes techniques :
 | POST | `/api/parcels/soil/manual` | `{id, texture, depth_cm, stones}` : correction de terrain (vide = effacer) |
 | GET | `/api/station/sketch[?parcel=]` | Programme ESP32 pré-rempli |
 | POST | `/api/plan` | nouveau champ facultatif `parcel_id` : itinéraire adapté au sol de la parcelle |
+| GET | `/api/fieldlog?parcel=` | Carnet de champ de la parcelle + totaux (v7.8) |
+| POST | `/api/fieldlog` | `{parcel_id, date, kind, qty?, note?}` : ajoute une entrée (v7.8) |
+| DELETE | `/api/fieldlog?id=` | Supprime une entrée (seulement les siennes) (v7.8) |
 
 Limites : 20 estimations de sol par utilisateur et par jour ; 4 appels par minute vers les services de cartes
 (respect de l'usage raisonnable de SoilGrids).
+
+
+## 5. Nouveautés v7.8 — fertilisation, partage WhatsApp, carnet de champ
+
+**Plan de fertilisation organique** (`lib/fertil.js`, affiché dans la fiche « Sol & racines ») :
+- **Compost mûr** selon le groupe de culture (repères de vulgarisation) : maraîchage 15–30 t/ha,
+  tubercules 10–20 t/ha, céréales et légumineuses 5–10 t/ha, pérennes 5–10 kg par pied et par an.
+  La fourchette est ajustée au carbone organique estimé : sol pauvre (< 6 g/kg) → moitié haute ;
+  moyen (6–12) → moitié basse ; bien pourvu (≥ 12) → dose d'entretien.
+- **Quantités pour la parcelle** : surface calculée à partir du dessin (rectangle ou polygone),
+  total en kg, nombre de brouettes (≈ 50 kg), matières brutes à composter (≈ 3 kg pour 1 kg de compost).
+- **pH** : < 5,0 → chaux ou dolomie 1–2 t/ha ; 5,0–5,5 → 0,5–1 t/ha (à confirmer par analyse) ;
+  alternative locale : cendre de bois 100–200 g/m². Pas de chaulage pour l'ananas. Sol alcalin : ni chaux ni cendre.
+- **N, P, K faibles** : sources organiques locales (fientes, phosphate naturel, cendre, cabosses de cacao
+  compostées, tiges de bananier). Légumineuses : pas d'engrais azoté.
+- **Aucune dose d'engrais minéral n'est calculée** : elle reste dans l'itinéraire technique. Le repère de
+  compost est transmis à l'IA pour que l'itinéraire reste cohérent.
+
+**Envoyer sur WhatsApp** : message court (arrosage, seuil du capteur, compost, acidité, éléments faibles),
+ouvert dans WhatsApp par un lien `wa.me` ; l'utilisateur choisit le contact et envoie lui-même.
+Aucune API, aucun compte, aucun envoi automatique. Le numéro saisi reste dans le navigateur.
+
+**Carnet de champ** (tableau de bord) : arrosage (L), compost (kg), engrais chimique (kg), traitement (L),
+semis, récolte (kg), observation. Totaux par parcelle, ramenés à la surface (L/m², kg/m², t/ha),
+export tableur CSV (séparateur « ; », compatible Excel en français). Sert de preuve d'impact pour un
+pilote terrain et de base de traçabilité.

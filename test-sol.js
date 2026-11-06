@@ -170,5 +170,54 @@ async function t(name, fn) { try { await fn(); passed++; console.log("  ok  " + 
     assert.deepStrictEqual(src.zoneCenter({ bbox: [-5.3, 6.8, -5.2, 6.9] }), { lon: -5.25, lat: 6.85 });
   });
 
+  // ---------- Fertilisation (lib/fertil.js) ----------
+  const FER = require("./lib/fertil");
+  await t("zoneAreaM2 : rectangle de 0,001° près de l'équateur ≈ 1,23 ha", () => {
+    const a = FER.zoneAreaM2({ bbox: [-5.001, 6.8, -5.0, 6.801] });
+    assert.ok(a > 12000 && a < 12400, a);
+  });
+  await t("zoneAreaM2 : polygone = même surface que le rectangle équivalent", () => {
+    const b = FER.zoneAreaM2({ bbox: [-5.001, 6.8, -5.0, 6.801] });
+    const p = FER.zoneAreaM2({ polygon: [[-5.001, 6.8], [-5.0, 6.8], [-5.0, 6.801], [-5.001, 6.801]] });
+    assert.ok(Math.abs(b - p) < 2);
+  });
+  await t("fertilité : tomate, sol pauvre en carbone -> haut de fourchette, total et brouettes", () => {
+    const f = FER.fertilityAdvice({ estimate: { source: "iSDAsoil (30 m)", oc_gkg: 4, ph: 6.2, n_gkg: 0.4, p_ppm: 6, k_ppm: 120 }, crop: "tomate", areaM2: 500 });
+    assert.deepStrictEqual(f.organic.dose_t_ha, [22.5, 30]);
+    assert.deepStrictEqual(f.organic.total_kg, [1130, 1500]);          // 2,25 à 3 kg/m² × 500 m²
+    assert.deepStrictEqual(f.organic.wheelbarrows, [23, 30]);
+    assert.ok(/priorité/.test(f.priorities[0]));
+    assert.strictEqual(f.nutrients.find((x) => x.k.startsWith("Phosphore")).status, "faible");
+    assert.ok(!f.ph.lime_t_ha);
+  });
+  await t("fertilité : sol bien pourvu -> dose d'entretien", () => {
+    const f = FER.fertilityAdvice({ estimate: { oc_gkg: 15, ph: 6.5 }, crop: "maïs", areaM2: 10000 });
+    assert.deepStrictEqual(f.organic.dose_t_ha, [2.5, 5]);
+  });
+  await t("fertilité : sol très acide -> chaulage 1 à 2 t/ha, sauf ananas", () => {
+    const f = FER.fertilityAdvice({ estimate: { oc_gkg: 8, ph: 4.7 }, crop: "manioc", areaM2: 1000 });
+    assert.deepStrictEqual(f.ph.lime_t_ha, [1, 2]); assert.deepStrictEqual(f.ph.lime_total_kg, [100, 200]);
+    const a = FER.fertilityAdvice({ estimate: { oc_gkg: 8, ph: 4.7 }, crop: "ananas" });
+    assert.ok(!a.ph.lime_t_ha && /ananas/.test(a.ph.action));
+  });
+  await t("fertilité : légumineuse -> pas d'azote ; pérenne -> dose par pied", () => {
+    const f = FER.fertilityAdvice({ estimate: { oc_gkg: 8, n_gkg: 0.3 }, crop: "niébé" });
+    assert.ok(/fixe l'azote/.test(f.nutrients[0].action));
+    const c = FER.fertilityAdvice({ estimate: { oc_gkg: 4 }, crop: "cacao" });
+    assert.deepStrictEqual(c.organic.dose_kg_plant, [7.5, 10]);
+  });
+  await t("fertilité : sans estimation -> null ; sans culture -> invite à la préciser", () => {
+    assert.strictEqual(FER.fertilityAdvice({ estimate: null }), null);
+    const f = FER.fertilityAdvice({ estimate: { oc_gkg: 8 } });
+    assert.ok(/culture/.test(f.priorities.join(" ")));
+  });
+  await t("message de partage : arrosage, capteur, compost, acidité", () => {
+    const fert = FER.fertilityAdvice({ estimate: { oc_gkg: 4, ph: 5.2, k_ppm: 50 }, crop: "tomate", areaM2: 500 });
+    const m = FER.shareMessage({ parcelName: "Champ nord", crop: "tomate", advice: { irrigation: { dose_l_m2: 45, interval_days: 14 }, sensor: { threshold_pct: 60 } }, fert });
+    assert.ok(/Champ nord/.test(m) && /45 L par m²/.test(m) && /14 jours/.test(m) && /sous 60 %/.test(m));
+    assert.ok(/1\u202f130 à 1\u202f500 kg/.test(m) && /Sol acide/.test(m) && /Potassium/.test(m));
+    assert.ok(m.length < 1500);
+  });
+
   console.log(process.exitCode ? "\nDes tests ont échoué." : `\n${passed} tests réussis.`);
 })();

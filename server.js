@@ -16,6 +16,7 @@ const crypto = require("crypto");
 const SOL = require("./lib/sol");
 const SOL_SRC = require("./lib/sol-sources");
 const { esp32Sketch } = require("./lib/esp32-sketch");
+const FERT = require("./lib/fertil");
 
 // ---------- Configuration ----------
 function loadEnv(file) {
@@ -84,7 +85,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.parcelSoil) s.parcelSoil = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, parcelSoil: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [] }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.parcelSoil) s.parcelSoil = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; if (!s.fieldLog) s.fieldLog = []; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, parcelSoil: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [], fieldLog: [] }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -287,6 +288,26 @@ async function saveParcelSoil(rec) {
 async function deleteParcelSoil(userId, parcelId) {
   if (USE_DB) { try { await sb(`/trv_parcel_soil?parcel_id=eq.${encodeURIComponent(parcelId)}&user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); } catch (e) {} return; }
   const s = loadStore(); const x = s.parcelSoil[parcelId]; if (x && x.user_id === userId) { delete s.parcelSoil[parcelId]; saveStore(s); }
+}
+
+// ---------- Carnet de champ (interventions et récoltes, par parcelle) ----------
+const LOG_KINDS = { arrosage: "L", compost: "kg", engrais: "kg", traitement: "L", semis: "", recolte: "kg", observation: "" };
+async function listFieldLog(userId, parcelId) {
+  if (USE_DB) { try { return (await sb(`/trv_field_log?user_id=eq.${encodeURIComponent(userId)}&parcel_id=eq.${encodeURIComponent(parcelId)}&select=*&order=date.desc,created_at.desc&limit=500`)) || []; } catch (e) { console.error("listFieldLog:", e.message); throw e; } }
+  return loadStore().fieldLog.filter((x) => x.user_id === userId && x.parcel_id === parcelId).sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.created_at).localeCompare(String(a.created_at))).slice(0, 500);
+}
+async function addFieldLog(rec) {
+  if (USE_DB) { await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); return; }
+  const s = loadStore(); s.fieldLog.push(rec); saveStore(s);
+}
+async function deleteFieldLog(userId, id) {
+  if (USE_DB) { await sb(`/trv_field_log?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); return; }
+  const s = loadStore(); s.fieldLog = s.fieldLog.filter((x) => !(x.id === id && x.user_id === userId)); saveStore(s);
+}
+function fieldLogTotals(entries) {
+  const t = {};
+  entries.forEach((e) => { if (e.qty == null || !isFinite(Number(e.qty))) { t[e.kind] = t[e.kind] || { n: 0, qty: 0, unit: e.unit || "" }; t[e.kind].n++; return; } const k = e.kind; t[k] = t[k] || { n: 0, qty: 0, unit: e.unit || LOG_KINDS[k] || "" }; t[k].n++; t[k].qty = Math.round((t[k].qty + Number(e.qty)) * 100) / 100; });
+  return t;
 }
 
 function cleanZone(z) {
@@ -924,6 +945,8 @@ async function handlePlan(req, res) {
       if (parcel && (rec.estimate || rec.manual)) {
         const f = await buildSoilFiche(parcel, Object.assign({}, rec, { crop: crop, sown_at: rec.crop && rec.crop.toLowerCase() === crop.toLowerCase() ? rec.sown_at : null }));
         soilBlock = SOL.adviceForPrompt(f.advice, f.chem);
+        if (f.fert && f.fert.organic && f.fert.organic.dose_t_ha) soilBlock += "\n- Fertilité organique estimée : matière organique " + (f.fert.organic.status || "inconnue") + (f.fert.organic.mo_pct != null ? " (≈ " + f.fert.organic.mo_pct + " %)" : "") + " ; repère de compost mûr calculé par l'application : " + f.fert.organic.dose_t_ha.join(" à ") + " t/ha. Reste cohérent avec ce repère.";
+        if (f.fert && f.fert.ph && f.fert.ph.lime_t_ha) soilBlock += "\n- Sol acide (pH ≈ " + f.fert.ph.value + ") : prévoir une correction calcique modérée (à confirmer par analyse).";
         if (!clean.soil && f.advice.texture) clean.soil = f.advice.texture.label + (f.advice.soil.textureFrom === "terrain" ? " (confirmé sur le terrain)" : " (estimation satellite)");
         if (!clean.ph && rec.estimate && rec.estimate.ph != null) clean.ph = "≈ " + (Math.round(rec.estimate.ph * 10) / 10) + " (estimation satellite)";
         if (soilBlock) fresh = true;
@@ -1012,8 +1035,51 @@ async function buildSoilFiche(parcel, rec) {
     parcel: { id: parcel.id, name: parcel.name }, center: center ? { lat: Math.round(center.lat * 1e5) / 1e5, lon: Math.round(center.lon * 1e5) / 1e5 } : null,
     crop: rec.crop || null, sown_at: rec.sown_at || null,
     estimate: rec.estimate || null, estimate_error: rec.estimate_error || null, manual: rec.manual || null,
-    advice, chem: SOL.interpretChem(rec.estimate), updated_at: rec.updated_at || null
+    advice, chem: SOL.interpretChem(rec.estimate), updated_at: rec.updated_at || null,
+    ...(function () {
+      const area = FERT.zoneAreaM2(parcel.zone);
+      const fert = FERT.fertilityAdvice({ estimate: rec.estimate, crop: rec.crop, areaM2: area });
+      return { area_m2: area, fert, share_text: FERT.shareMessage({ parcelName: parcel.name, crop: rec.crop, advice, fert }) };
+    })()
   };
+}
+const LOG_SAVE_ERROR = "Enregistrement impossible. Si vous utilisez Supabase, exécutez la partie « trv_field_log » de schema.sql.";
+async function handleFieldLogGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const id = new URL(req.url, "http://x").searchParams.get("parcel") || "";
+  const parcel = await findUserParcel(user.id, id);
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  let entries; try { entries = await listFieldLog(user.id, parcel.id); } catch (e) { return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
+  sendJson(res, 200, { parcel: { id: parcel.id, name: parcel.name, area_m2: FERT.zoneAreaM2(parcel.zone) }, entries, totals: fieldLogTotals(entries) });
+}
+async function handleFieldLogAdd(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const parcel = await findUserParcel(user.id, String(p.parcel_id || ""));
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const kind = String(p.kind || "");
+  if (!Object.prototype.hasOwnProperty.call(LOG_KINDS, kind)) return sendJson(res, 400, { error: "Type d'intervention inconnu." });
+  const date = parseIsoDate(p.date || new Date().toISOString().slice(0, 10));
+  if (!date) return sendJson(res, 400, { error: "Date invalide (format AAAA-MM-JJ)." });
+  if (date > new Date(Date.now() + 86400000).toISOString().slice(0, 10)) return sendJson(res, 400, { error: "La date ne peut pas être dans le futur." });
+  let qty = null;
+  if (p.qty !== undefined && p.qty !== null && String(p.qty).trim() !== "") {
+    qty = Number(String(p.qty).replace(",", "."));
+    if (!isFinite(qty) || qty < 0 || qty > 1e7) return sendJson(res, 400, { error: "Quantité invalide." });
+  }
+  const note = String(p.note || "").trim().slice(0, 300) || null;
+  if (qty == null && !note) return sendJson(res, 400, { error: "Indiquez une quantité ou une note." });
+  if (!rateOk("log:" + user.id, 200, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Beaucoup d'entrées aujourd'hui. Reprenez demain." });
+  const rec = { id: newId(), user_id: user.id, parcel_id: parcel.id, date, kind, qty, unit: LOG_KINDS[kind] || null, note, created_at: new Date().toISOString() };
+  try { await addFieldLog(rec); } catch (e) { console.error("addFieldLog:", e.message); return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
+  sendJson(res, 200, { ok: true, entry: rec });
+}
+async function handleFieldLogDelete(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const id = new URL(req.url, "http://x").searchParams.get("id") || "";
+  if (!id) return sendJson(res, 400, { error: "Identifiant manquant." });
+  try { await deleteFieldLog(user.id, id); } catch (e) { return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
+  sendJson(res, 200, { ok: true });
 }
 const SOIL_SAVE_ERROR = "Enregistrement impossible. Si vous utilisez Supabase, exécutez la partie « trv_parcel_soil » de schema.sql.";
 async function handleParcelSoilGet(req, res) {
@@ -2893,6 +2959,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url === "/api/parcels") return handleParcelsList(req, res);
   if (req.method === "POST" && url === "/api/parcels") return handleParcelSave(req, res);
   if (req.method === "POST" && url === "/api/parcels/delete") return handleParcelDelete(req, res);
+  if (req.method === "GET" && url === "/api/fieldlog") return handleFieldLogGet(req, res);
+  if (req.method === "POST" && url === "/api/fieldlog") return handleFieldLogAdd(req, res);
+  if (req.method === "DELETE" && url === "/api/fieldlog") return handleFieldLogDelete(req, res);
   if (req.method === "GET" && url === "/api/parcels/soil") return handleParcelSoilGet(req, res);
   if (req.method === "POST" && url === "/api/parcels/soil") return handleParcelSoil(req, res);
   if (req.method === "POST" && url === "/api/parcels/soil/manual") return handleParcelSoilManual(req, res);

@@ -115,6 +115,20 @@ create table if not exists trv_parcel_soil (
 );
 create index if not exists trv_parcel_soil_user_idx on trv_parcel_soil (user_id, updated_at desc);
 
+-- Carnet de champ : interventions et récoltes notées par parcelle (v7.8)
+create table if not exists trv_field_log (
+  id text primary key,
+  user_id text,
+  parcel_id text,
+  date date,
+  kind text,                  -- arrosage | compost | engrais | traitement | semis | recolte | observation
+  qty numeric,
+  unit text,                  -- L ou kg
+  note text,
+  created_at timestamptz default now()
+);
+create index if not exists trv_field_log_parcel_idx on trv_field_log (user_id, parcel_id, date desc);
+
 -- Coopératives (relais humain + base achats groupés / mise en marché)
 create table if not exists trv_coops (
   id text primary key,
