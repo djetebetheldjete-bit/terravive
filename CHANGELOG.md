@@ -1,5 +1,9 @@
 # Journal des versions — Terravive
 
+## v8.2.1 — 6 novembre 2026
+- **Carte satellite** : au zoom maximal, Esri n'a pas toujours d'image (zoom 19 absent dans une grande partie de la Côte d'Ivoire, qui affichait « Map data not yet available »). Les images du zoom 18 sont désormais agrandies au-delà, au lieu d'afficher un fond gris ; même chose pour la couche NDVI.
+- Service worker v19.
+
 ## v8.2 — 6 novembre 2026
 - **Test côte à côte** : une parcelle conduite avec Terravive peut être associée à sa parcelle témoin. Le bilan d'impact affiche les deux face à face (eau d'arrosage, eau totale reçue, engrais chimique, compost, récolte vendable, rendement, litres d'eau par kg vendable, incidents), avec l'écart en %, le sens « plus bas / plus haut » et un verdict par ligne. Alertes si les saisons, la pluie ou les surfaces ne concordent pas. Inclus dans l'impression, le CSV, WhatsApp et la fiche de preuve.
 - **Carnet** : nouveaux types « Pluie » (mm au pluviomètre ; 1 mm = 1 L/m²) et « Récolte invendable » (kg) ; le bilan calcule l'eau totale reçue et la récolte vendable.

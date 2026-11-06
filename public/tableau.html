@@ -923,7 +923,7 @@
     const sv=savedParcelle();
     const center = (d.weather && d.weather.lat!=null) ? [d.weather.lat, d.weather.lon] : [6.82,-5.28];
     MAP = L.map('map', { zoomControl:true }).setView(center, 13);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'Imagerie © Esri, Maxar, Earthstar Geographics' }).addTo(MAP);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, maxNativeZoom:18, attribution:'Imagerie © Esri, Maxar, Earthstar Geographics' }).addTo(MAP);
     drawGroup = new L.FeatureGroup(); MAP.addLayer(drawGroup);
     if(L.Control && L.Control.Draw){
       const dc = new L.Control.Draw({
@@ -1135,7 +1135,7 @@
       if(typeof d.surface_ha==="number"){ window.lastSurfaceHa = d.surface_ha; var _da=document.getElementById("durArea"); if(_da && !_da.value) _da.value = d.surface_ha; }
       saveCtx({ ndvi:d.ndvi_moyen, pctFaible:d.pct_faible, surface:d.surface_ha, culture:($("vCulture").value||"").trim() });
       if(ndviLayer) MAP.removeLayer(ndviLayer);
-      if(d.tile_url){ ndviLayer=L.tileLayer(d.tile_url,{opacity:0.85}); ndviLayer.addTo(MAP); }
+      if(d.tile_url){ ndviLayer=L.tileLayer(d.tile_url,{opacity:0.85, maxZoom:19, maxNativeZoom:18}); ndviLayer.addTo(MAP); }
       const ac=alertClass(d.pct_faible,d.pct_moyen);
       // Qualité d'observation — champs déjà renvoyés par Vertea ; s'ils manquent (ancienne réponse), ils sont simplement ignorés.
       const nImg = (typeof d.images_utilisees==="number") ? d.images_utilisees : null;
