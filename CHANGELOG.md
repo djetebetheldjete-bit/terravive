@@ -1,5 +1,11 @@
 # Journal des versions — Terravive
 
+## v8.2 — 6 novembre 2026
+- **Test côte à côte** : une parcelle conduite avec Terravive peut être associée à sa parcelle témoin. Le bilan d'impact affiche les deux face à face (eau d'arrosage, eau totale reçue, engrais chimique, compost, récolte vendable, rendement, litres d'eau par kg vendable, incidents), avec l'écart en %, le sens « plus bas / plus haut » et un verdict par ligne. Alertes si les saisons, la pluie ou les surfaces ne concordent pas. Inclus dans l'impression, le CSV, WhatsApp et la fiche de preuve.
+- **Carnet** : nouveaux types « Pluie » (mm au pluviomètre ; 1 mm = 1 L/m²) et « Récolte invendable » (kg) ; le bilan calcule l'eau totale reçue et la récolte vendable.
+- Migration : table `trv_parcel_pair` (sans elle, tout fonctionne sauf l'enregistrement du témoin, avec un message clair).
+- Service worker v18.
+
 ## v8.1 — 6 novembre 2026
 - Interface sans émojis : jeu d'icônes au trait (`public/icons.js`, même style que le menu), qui suit les thèmes clair et sombre.
 - Carnet de champ : sélecteur d'intervention à boutons (icône, nom, unité attendue), utilisable au clavier (flèches) et lu correctement par les lecteurs d'écran.

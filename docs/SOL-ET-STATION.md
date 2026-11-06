@@ -70,6 +70,7 @@ Notes techniques :
 | POST | `/api/plan/fiche` | `{id, parcel_id?, refresh?}` : fiche pratique terrain de l'itinéraire (v7.9) |
 | GET | `/api/impact?parcel=` | Bilan d'impact de la parcelle (saisons, comparaisons, économies, carbone, données manquantes) (v8.0) |
 | GET | `/api/impact/csv?parcel=` | Bilan en tableur CSV (v8.0) |
+| POST | `/api/impact/pair` | `{parcel_id, control_id}` : associe la parcelle témoin (vide = dissocier) (v8.2) |
 | POST | `/api/impact/ref` | `{parcel_id, label?, water_l?, compost_kg?, chem_kg?, yield_kg?}` : référence « avant » ; tout vide = effacer (v8.0) |
 | GET | `/api/impact/summary` | Saison en cours, toutes parcelles : pré-remplissage de l'indice de durabilité (v8.0) |
 | GET | `/api/coop/impact` | Bilan agrégé de la coopérative — animateur seulement (v8.0) |
@@ -135,3 +136,13 @@ le carnet de champ.
 - **Station manuelle** : valeur d'un appareil (Déclaré) ou test au toucher (sec ≈ 15 %, frais ≈ 40 %,
   humide ≈ 65 %, détrempé ≈ 90 % : Hypothèse). Le tableau de bord garde la dernière valeur connue de chaque grandeur.
 - **Alertes** « arroser » et « cuve presque vide » : bouton WhatsApp et lecture à voix haute (voix du téléphone).
+
+## 8. Nouveautés v8.2 — test côte à côte, pluie, récolte invendable
+
+- **Parcelle témoin** : dans le bilan d'impact de la parcelle conduite avec Terravive, « Test côte à côte : choisir la
+  parcelle témoin ». Le bilan affiche alors les deux parcelles face à face, saison en cours de chacune, avec écart
+  = (Terravive − témoin) ÷ témoin et un verdict par indicateur selon qu'une valeur plus basse ou plus haute est meilleure.
+  Le bilan de la parcelle témoin renvoie vers celui de la parcelle Terravive.
+- **Pluie** : relevé du pluviomètre en mm, à noter sur les deux parcelles. L'eau totale reçue = arrosage par m² + pluie.
+- **Récolte invendable** : kg abîmés ou invendus ; récolte vendable = récolte − invendable.
+- SQL : table `trv_parcel_pair` (voir `schema.sql`).

@@ -309,5 +309,30 @@ async function t(name, fn) { try { await fn(); passed++; console.log("  ok  " + 
     assert.ok(csv.startsWith("\ufeff")); assert.ok(/"2026 · grande saison";"2026-04-08";"2026-07-02";"20000";"20"/.test(csv)); assert.ok(/"5,2"/.test(csv));
   });
 
+  // ---------- Pluie, invendable et test côte à côte ----------
+  await t("impact : pluie (1 mm = 1 L/m²), récolte vendable et eau par kg vendable", () => {
+    const c = IM.impactReport({ entries: [E("2026-12-02", "arrosage", 4000), E("2026-12-03", "pluie", 6), E("2026-12-09", "pluie", 4), E("2027-01-20", "recolte", 250), E("2027-01-20", "perte", 10)], areaM2: 200 }).current;
+    assert.strictEqual(c.rain_mm, 10); assert.strictEqual(c.water_l_m2, 20); assert.strictEqual(c.total_water_l_m2, 30);
+    assert.strictEqual(c.sellable_kg, 240); assert.strictEqual(c.sellable_t_ha, 12); assert.strictEqual(c.water_per_kg, 16.7);
+  });
+  await t("côte à côte : écarts, verdicts selon le sens, score", () => {
+    const a = IM.impactReport({ entries: [E("2026-12-02", "arrosage", 52000, { season: "S" }), E("2026-12-05", "engrais", 1, { season: "S" }), E("2027-01-20", "recolte", 230, { season: "S" }), E("2027-01-21", "perte", 12, { season: "S" })], areaM2: 200, parcelName: "T" });
+    const b = IM.impactReport({ entries: [E("2026-12-02", "arrosage", 68000, { season: "S" }), E("2026-12-05", "engrais", 3, { season: "S" }), E("2027-01-20", "recolte", 245, { season: "S" }), E("2027-01-21", "perte", 20, { season: "S" })], areaM2: 200, parcelName: "M" });
+    const p = IM.compareParcels(a, b);
+    const row = (k) => p.rows.find((x) => x.key === k);
+    assert.strictEqual(row("water_l_m2").pct, -23.5); assert.strictEqual(row("water_l_m2").verdict, "terravive");
+    assert.strictEqual(row("chem_kg_ha").verdict, "terravive"); assert.strictEqual(row("sellable_kg").verdict, "temoin");
+    assert.strictEqual(row("sellable_kg").terravive.v, 218); assert.strictEqual(row("sellable_kg").temoin.v, 225);
+    assert.strictEqual(row("water_l_m2").terravive.nature, "mesure");
+    assert.strictEqual(p.score.terravive, 4); assert.strictEqual(p.score.temoin, 2); assert.deepStrictEqual(p.warnings, []);
+  });
+  await t("côte à côte : alertes si saison, pluie ou surface diffèrent ; rien sans carnet", () => {
+    const a = IM.impactReport({ entries: [E("2026-12-02", "pluie", 30, { season: "A" })], areaM2: 200 });
+    const b = IM.impactReport({ entries: [E("2026-12-02", "pluie", 5, { season: "B" })], areaM2: 300 });
+    const w = IM.compareParcels(a, b).warnings.join(" ");
+    assert.ok(/même nom de saison/.test(w) && /pluie notée diffère/.test(w) && /surfaces/.test(w) && /Récolte pas encore/.test(w));
+    assert.strictEqual(IM.compareParcels(a, IM.impactReport({ entries: [] })), null);
+  });
+
   console.log(process.exitCode ? "\nDes tests ont échoué." : `\n${passed} tests réussis.`);
 })();

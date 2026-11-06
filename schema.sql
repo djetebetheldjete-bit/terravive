@@ -148,6 +148,13 @@ create table if not exists trv_parcel_ref (
   note text,
   updated_at timestamptz default now()
 );
+-- v8.2 : test côte à côte — parcelle Terravive et sa parcelle témoin
+create table if not exists trv_parcel_pair (
+  parcel_id text primary key, -- parcelle conduite avec Terravive
+  user_id text,
+  control_id text,            -- parcelle témoin (pratique habituelle)
+  updated_at timestamptz default now()
+);
 
 -- Coopératives (relais humain + base achats groupés / mise en marché)
 create table if not exists trv_coops (
