@@ -63,6 +63,8 @@ function loadServer() {
     if (name === "path") return path;
     if (name === "crypto") return require("crypto");
     if (name === "os") return os;
+    // Modules internes du dépôt (./lib/*.js, sans dépendance externe) : chargés depuis le vrai dossier.
+    if (/^\.\/lib\/[\w-]+$/.test(name)) return require(path.join(path.dirname(serverPath), name));
     // Le code de production n'importe rien d'autre (zéro dépendance).
     throw new Error("Module non prévu en test : " + name);
   };
