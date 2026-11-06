@@ -1,5 +1,12 @@
 # Journal des versions — Terravive
 
+## v8.1 — 6 novembre 2026
+- Interface sans émojis : jeu d'icônes au trait (`public/icons.js`, même style que le menu), qui suit les thèmes clair et sombre.
+- Carnet de champ : sélecteur d'intervention à boutons (icône, nom, unité attendue), utilisable au clavier (flèches) et lu correctement par les lecteurs d'écran.
+- Messages WhatsApp (conseil sol, alertes, bilan, fiche terrain) sans émojis.
+- Bouton WhatsApp sobre (vert Terravive), dates du bilan au format français.
+- Service worker v17 (met en cache `icons.js` et `voice.js`).
+
 ## v8.0 — 6 novembre 2026
 **Ajouts**
 - A1 — Carnet par saison (saison/campagne, produit, incident) et **bilan d'impact** par parcelle : comparaison avant/maintenant (référence saisie ou saison précédente), eau économisée, engrais évité, rendement, productivité de l'eau, carbone apporté par le compost ; export PDF et CSV ; **bilan agrégé de la coopérative** (animateur) ; indice de durabilité pré-rempli d'après le carnet.
