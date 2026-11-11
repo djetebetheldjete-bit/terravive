@@ -1086,7 +1086,8 @@ async function handleParcelsList(req, res) {
   const parcels = (rows || []).map((p) => {
     let z = p.geom; if (typeof z === "string") { try { z = JSON.parse(z); } catch (e) { z = null; } }
     const so = soils[p.id];
-    return { id: p.id, name: p.name, zone: cleanZone(z), created_at: p.created_at, soil: so ? { crop: so.crop || null, sown_at: so.sown_at || null, analyzed: !!(so.estimate || so.manual) } : null };
+    const zc = cleanZone(z);
+    return { id: p.id, name: p.name, zone: zc, area_m2: zc ? FERT.zoneAreaM2(zc) : null, created_at: p.created_at, soil: so ? { crop: so.crop || null, sown_at: so.sown_at || null, analyzed: !!(so.estimate || so.manual) } : null };
   }).filter((p) => p.zone);
   sendJson(res, 200, { parcels });
 }

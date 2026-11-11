@@ -1069,7 +1069,7 @@
     // Suites
     h+='<div class="maprow" style="margin-top:10px;">'
       +'<a class="btn" href="/api/station/sketch?parcel='+encodeURIComponent(f.parcel.id)+'" download="terravive_station_esp32.ino">Programme ESP32 réglé pour cette parcelle</a>'
-      +(f.crop?'<a class="btn primary" href="/app?culture='+encodeURIComponent(f.crop)+'&parcelle='+encodeURIComponent(f.parcel.id)+'">Itinéraire adapté à ce sol →</a>':'')
+      +'<a class="btn primary" href="/app?'+(f.crop?'culture='+encodeURIComponent(f.crop)+'&':'')+'parcelle='+encodeURIComponent(f.parcel.id)+'">Itinéraire adapté à ce sol →</a>'
       +'</div></div>';
     $("soilOut").innerHTML=h;
     bindSoilCalc(true);

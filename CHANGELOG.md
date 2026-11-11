@@ -1,5 +1,8 @@
 # Journal des versions — Terravive
 
+## v8.2.3 — 11 novembre 2026
+- **Du sol à l'itinéraire** : en choisissant une parcelle enregistrée dans le formulaire de l'itinéraire technique, la **surface** se remplit aussi automatiquement (m² ou ha, d'après le dessin sur la carte), en plus de la texture et du pH. Le bouton « Itinéraire adapté à ce sol » de la fiche Sol & racines est toujours affiché, même sans culture choisie. Service worker v21.
+
 ## v8.2.2 — 11 novembre 2026
 - **Bilan d'impact plus clair** : sans parcelle témoin ni référence, le bilan n'affiche plus « Données manquantes ». Une note « Facultatif » explique comment mesurer les économies (témoin, référence de mémoire ou saison suivante). Les volets « Test côte à côte » et « Référence avant » sont repliés et marqués facultatifs. « Données manquantes » devient « À compléter », réservé aux vrais manques (surface, récolte, arrosage).
 - Service worker v20.

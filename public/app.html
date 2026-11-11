@@ -525,15 +525,20 @@
     try{
       const r=await fetch("/api/parcels"); const d=await r.json(); if(!r.ok) return;
       const list=d.parcels||[]; if(!list.length) return;
+      PARCEL_AREA={}; list.forEach(function(p){ PARCEL_AREA[p.id]=p.area_m2||null; });
       $("parcelSel").innerHTML='<option value="">— aucune —</option>'+list.map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.name)+(p.soil&&p.soil.analyzed?' — sol analysé':'')+'</option>'; }).join("");
       $("parcelPick").style.display="block";
       let want=""; try{ want=new URLSearchParams(location.search).get("parcelle")||""; }catch(e){}
       if(want && list.some(function(p){ return p.id===want; })){ $("parcelSel").value=want; onParcelPick(); }
     }catch(e){}
   }
+  var PARCEL_AREA={};
+  // Surface de la parcelle dessinée, écrite comme un producteur la dit (m² ou ha).
+  function areaLabel(m2){ if(!m2) return ""; const n=Math.round(m2); if(n<10000) return n.toLocaleString("fr-FR")+" m²"; return (Math.round(n/100)/100).toLocaleString("fr-FR")+" ha ("+n.toLocaleString("fr-FR")+" m²)"; }
   async function onParcelPick(){
     const id=$("parcelSel").value, note=$("parcelSoilNote"); note.textContent="";
     if(!id) return;
+    if($("area") && !$("area").value.trim() && PARCEL_AREA[id]) $("area").value=areaLabel(PARCEL_AREA[id]);
     try{
       const r=await fetch("/api/parcels/soil?id="+encodeURIComponent(id)); const d=await r.json();
       const f=r.ok?d.fiche:null;
