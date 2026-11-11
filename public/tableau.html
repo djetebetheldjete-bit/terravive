@@ -732,7 +732,7 @@
     const R=d.report, cur=R.pair&&R.pair.control_id||"", me=$("logParcel").value;
     if(R.control_of) return '';
     const opts=myParcels.filter(p=>p.id!==me).map(p=>'<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>').join("");
-    return '<details style="margin-top:10px;"'+(R.pair?'':' open')+'><summary style="cursor:pointer;font-weight:700;color:var(--leaf);">Test côte à côte : choisir la parcelle témoin</summary>'
+    return '<details style="margin-top:10px;"><summary style="cursor:pointer;font-weight:700;color:var(--leaf);">Test côte à côte avec une parcelle témoin <span class="muted" style="font-weight:400;">(facultatif)</span></summary>'
       +'<div class="muted" style="font-size:.82rem;margin:6px 0;">Pour un test terrain, dessinez deux parcelles voisines : celle-ci, conduite avec Terravive, et une parcelle témoin cultivée comme d\'habitude. Tenez le carnet des deux avec le même nom de saison.</div>'
       +(opts?'<div class="maprow" style="align-items:flex-end;"><label class="muted" style="flex:1;min-width:200px;font-size:.8rem;">Parcelle témoin<select class="sel" id="pairSel" style="width:100%;margin-top:4px;"><option value="">— aucune —</option>'+opts+'</select></label><button class="btn" type="button" id="pairSave">Enregistrer</button></div><div class="muted" id="pairMsg" style="font-size:.82rem;margin-top:4px;"></div>'
         :'<div class="muted" style="font-size:.84rem;">Dessinez d\'abord une seconde parcelle sur la carte pour en faire le témoin.</div>')
@@ -773,14 +773,15 @@
       const K=R.carbon;
       h+='<h4>Carbone apporté au sol par le compost noté</h4><div style="font-size:.86rem;">'+fv(K.carbon_kg)+natTag(K.carbon_kg.nature)+' soit '+fv(K.co2e_kg)+natTag(K.co2e_kg.nature)+', dont '+fv(K.retained_co2e_kg)+natTag(K.retained_co2e_kg.nature)+' resteraient durablement dans le sol.</div><div class="muted" style="font-size:.76rem;">Hypothèses : '+K.hypotheses.map(esc).join(" ; ")+'.</div>';
     }
-    if(R.missing.length) h+='<h4>Données manquantes</h4><ul style="margin:2px 0 0 18px;font-size:.84rem;">'+R.missing.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>';
+    if(R.missing.length) h+='<h4>À compléter</h4><ul style="margin:2px 0 0 18px;font-size:.84rem;">'+R.missing.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>';
+    if(!forPrint&&R.tips&&R.tips.length) h+='<div class="muted" style="font-size:.84rem;margin-top:10px;padding:8px 12px;border-left:3px solid var(--leaf);background:rgba(46,125,79,.06);border-radius:6px;"><b>Facultatif.</b> Votre bilan est complet. '+R.tips.map(esc).join(" ")+'</div>';
     if(forPrint) h+='<h4>Légende</h4><div style="font-size:.8rem;">'+Object.keys(NAT).map(k=>natTag(k)+' '+esc(NAT[k][1])).join(" &nbsp; ")+'</div>';
     return h;
   }
   function renderImpact(d){
     const ref=d.ref||{};
     let h='<div class="impact">'+impactHtml(d,false)+pairPicker(d);
-    h+='<details style="margin-top:10px;"'+(d.report.baseline?'':' open')+'><summary style="cursor:pointer;font-weight:700;color:var(--leaf);">Référence « avant » (saison sans Terravive)</summary>'
+    h+='<details style="margin-top:10px;"><summary style="cursor:pointer;font-weight:700;color:var(--leaf);">Référence « avant », saison sans Terravive <span class="muted" style="font-weight:400;">(facultatif)</span></summary>'
       +'<div class="muted" style="font-size:.82rem;margin:6px 0;">Totaux d\'une saison complète sur cette parcelle, de mémoire ou d\'après un cahier. Ils seront marqués <span class="nat declare">Déclaré</span>. Laissez tout vide puis enregistrez pour effacer.</div>'
       +'<div class="maprow" style="align-items:flex-end;">'
       +'<label class="muted" style="flex:2;min-width:170px;font-size:.8rem;">Nom<input class="sel" id="refLabel" maxlength="80" value="'+esc(ref.label||"")+'" placeholder="ex. Saison 2025, avant Terravive" style="width:100%;margin-top:4px;"></label>'
@@ -849,7 +850,7 @@
       +rows.map(x=>'<tr><td>'+esc(x[0])+'</td><td><b>'+esc(String(x[1]).replace(/(\d)\.(\d)/g,"$1,$2"))+'</b></td><td>'+esc((NAT[x[2]]||[x[2]])[0])+'</td><td>'+esc(x[3]||"")+'</td><td><span class="box"></span></td></tr>').join("")+'</tbody></table>';
     const hyp=(R.carbon?R.carbon.hypotheses:[]).concat(["Les volumes d'eau notés ne comptent pas la pluie","Les rendements dépendent de la surface dessinée sur la carte"]);
     body+='<h4>Hypothèses utilisées</h4><ul>'+hyp.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>';
-    if(R.missing.length) body+='<h4>Données manquantes</h4><ul>'+R.missing.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>';
+    if(R.missing.length) body+='<h4>À compléter</h4><ul>'+R.missing.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>';
     body+='<h4>Validation</h4><div><span class="box"></span> Chiffres vérifiés et cohérents &nbsp; <span class="box"></span> À corriger (voir remarques)</div><div class="sign"><div>Nom de l\'agronome</div><div>Date</div><div>Signature</div></div><div class="sign" style="grid-template-columns:1fr;"><div style="height:70px;">Remarques</div></div>';
     printDoc("Fiche de preuve — "+(R.parcel.name||""), body, "Niveaux : Mesuré = noté dans le carnet ; Déclaré = référence saisie à la main ; Estimé satellite = images ou cartes ; Estimé (calcul) = modèle et hypothèses écrites ; Hypothèse = à confirmer.");
   }

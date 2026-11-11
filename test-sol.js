@@ -288,7 +288,7 @@ async function t(name, fn) { try { await fn(); passed++; console.log("  ok  " + 
   await t("impact : rien d'inventé quand il manque des données", () => {
     const rep = IM.impactReport({ entries: [E("2026-04-08", "arrosage", 500)], areaM2: null });
     assert.strictEqual(rep.comparisons.length, 0); assert.deepStrictEqual(rep.savings, {}); assert.strictEqual(rep.current.yield_t_ha, null);
-    assert.ok(rep.missing.some((m) => /Surface/.test(m)) && rep.missing.some((m) => /récolte/.test(m)) && rep.missing.some((m) => /référence/.test(m)));
+    assert.ok(rep.missing.some((m) => /Surface/.test(m)) && rep.missing.some((m) => /récolte/.test(m)) && rep.tips.some((m) => /comparaison/.test(m)) && !rep.missing.some((m) => /référence/.test(m)));
     assert.strictEqual(IM.impactReport({ entries: [] }).current, null);
   });
   await t("impact : carbone du compost avec hypothèses écrites", () => {

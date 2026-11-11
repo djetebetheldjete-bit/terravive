@@ -1203,7 +1203,7 @@ async function parcelReport(user, parcel) {
       rep.pair = IMPACT.compareParcels(rep, repB) || { terravive: { name: parcel.name }, temoin: { name: ctrl.name }, rows: [], warnings: ["Notez au moins une entrée dans le carnet de chacune des deux parcelles pour voir la comparaison."], score: { terravive: 0, temoin: 0 } };
       rep.pair.control_id = ctrl.id;
       // La parcelle témoin sert de comparaison : la référence « avant » n'est plus indispensable.
-      rep.missing = rep.missing.filter((m) => !/référence « avant »/.test(m));
+      rep.tips = [];
     }
   } else {
     const asCtrl = await getPairAsControl(user.id, parcel.id);

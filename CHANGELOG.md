@@ -1,5 +1,9 @@
 # Journal des versions — Terravive
 
+## v8.2.2 — 11 novembre 2026
+- **Bilan d'impact plus clair** : sans parcelle témoin ni référence, le bilan n'affiche plus « Données manquantes ». Une note « Facultatif » explique comment mesurer les économies (témoin, référence de mémoire ou saison suivante). Les volets « Test côte à côte » et « Référence avant » sont repliés et marqués facultatifs. « Données manquantes » devient « À compléter », réservé aux vrais manques (surface, récolte, arrosage).
+- Service worker v20.
+
 ## v8.2.1 — 6 novembre 2026
 - **Carte satellite** : au zoom maximal, Esri n'a pas toujours d'image (zoom 19 absent dans une grande partie de la Côte d'Ivoire, qui affichait « Map data not yet available »). Les images du zoom 18 sont désormais agrandies au-delà, au lieu d'afficher un fond gris ; même chose pour la couche NDVI.
 - Service worker v19.
