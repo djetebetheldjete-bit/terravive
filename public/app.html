@@ -161,8 +161,8 @@
     <!-- Colonne gauche : formulaire + mes plans -->
     <div>
       <div class="card">
-        <h2 class="sec">Créer mon itinéraire technique</h2>
-        <p class="hint">Décrivez votre parcelle. L'IA agronome bâtit un itinéraire technique complet, tourné vers l'agroécologie. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></p>
+        <h2 class="sec">Créer mon plan de culture <span style="font-weight:400;font-size:.8em;color:var(--faint);">(itinéraire technique)</span></h2>
+        <p class="hint">Décrivez votre parcelle. L'IA agronome prépare un plan de culture complet, du sol à la récolte, tourné vers l'agroécologie. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></p>
         <label>Que voulez-vous cultiver ? *</label>
         <input id="crop" placeholder="ex. tomate, maïs, cacao, gombo…" maxlength="120">
         <div id="parcelPick" style="display:none;">
@@ -231,7 +231,7 @@
         <label>Moyens / contraintes (facultatif)</label>
         <textarea id="notes" placeholder="ex. peu d'eau disponible, pas de tracteur, budget limité, présence de fourmis…" maxlength="500"></textarea>
         <div class="err" id="formErr"></div>
-        <button class="btn primary" id="genBtn" type="button" style="width:100%;margin-top:6px;">Générer mon itinéraire</button>
+        <button class="btn primary" id="genBtn" type="button" style="width:100%;margin-top:6px;">Générer mon plan de culture</button>
       </div>
 
       <div class="card plans">
@@ -245,7 +245,7 @@
       <div class="card planbox" id="planCard">
         <div class="placeholder" id="planPlaceholder">
           <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 20c-.5-8 5-14.5 15-15.5.7 10.5-5.5 16.5-13.5 16.5"/><path d="M8.5 20c1.3-5 4-8.5 8.5-10.5"/></svg></div>
-          <p>Remplissez le formulaire à gauche et cliquez sur <b>« Générer mon itinéraire »</b>.<br>Votre itinéraire technique personnalisé s'affichera ici.</p>
+          <p>Remplissez le formulaire à gauche et cliquez sur <b>« Générer mon plan de culture »</b>.<br>Votre plan personnalisé s'affichera ici.</p>
         </div>
         <div id="planContent" style="display:none;">
           <div id="reuseNote" style="display:none;"></div>
@@ -253,7 +253,7 @@
           <div class="doc" id="planDoc"></div>
           <div class="toolbar">
             <button class="btn sun" id="pdfBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:15px;height:15px;vertical-align:-2px;margin-right:5px;"><path d="M6 3h8l4 4v14a0 0 0 0 1 0 0H6a0 0 0 0 1 0 0z"/><path d="M14 3v4h4"/><path d="M12 11v6M9 14l3 3 3-3"/></svg>Télécharger en PDF</button>
-            <button class="btn" id="listenBtn" type="button" style="display:none;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M19 6.5a8 8 0 0 1 0 11"/></svg>Écouter l'itinéraire</button>
+            <button class="btn" id="listenBtn" type="button" style="display:none;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M19 6.5a8 8 0 0 1 0 11"/></svg>Écouter le plan</button>
             <button class="btn" id="newBtn" type="button">Nouveau plan</button>
           </div>
         </div>
@@ -265,8 +265,9 @@
             <button class="btn sun" type="button" id="fichePrint"><span data-ico="printer"></span>Imprimer / PDF</button>
             <a class="btn" id="ficheWa" href="#" target="_blank" rel="noopener" style="text-decoration:none;background:#1f8f4e;border-color:#1f8f4e;color:#fff;"><span data-ico="send"></span>WhatsApp</a>
             <button class="btn" type="button" id="ficheCopy">Copier</button>
+            <button class="btn" type="button" id="ficheSpeak" style="display:none;"><span data-ico="speaker"></span>Écouter la fiche</button>
           </div></div>
-        <p class="hint" style="margin:6px 0 0;">La version courte de l'itinéraire, à emporter au champ : cochez les étapes au fur et à mesure.</p>
+        <p class="hint" style="margin:6px 0 0;">La version courte du plan de culture, à emporter au champ : cochez les étapes au fur et à mesure.</p>
         <div id="ficheBody" style="margin-top:10px;"></div>
       </div>
 
@@ -558,6 +559,7 @@
     let params; try{ params=new URLSearchParams(location.search); }catch(e){ return; }
     const c=params.get("culture")||params.get("crop");
     deepLinkDone=true;
+    const pid=params.get("plan"); if(pid && me){ openPlan(pid); return; }
     if(!c) return;
     const inp=$("crop"); if(inp){ inp.value=c; }
     const reg=params.get("region"); if(reg && $("region") && !$("region").value){ $("region").value=reg; }
@@ -667,7 +669,7 @@
     const pills=[["Culture",plan.crop],["Région",plan.region],["Surface",plan.area],["Sol",plan.soil],["Saison",plan.season]].filter(x=>x[1]);
     $("planPills").innerHTML = pills.map(x=>'<span class="pill">'+x[0]+' : <b>'+esc(x[1])+'</b></span>').join("");
     $("planDoc").innerHTML = renderMd(plan.content);
-    { const lb=$("listenBtn"); if(lb){ if(window.trvCanSpeak && window.trvCanSpeak()){ lb.style.display="inline-block"; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; } else { lb.style.display="none"; } try{ if(window.trvStop) window.trvStop(); }catch(e){} } }
+    { const lb=$("listenBtn"); if(lb){ if(window.trvCanSpeak && window.trvCanSpeak()){ lb.style.display="inline-block"; lb.innerHTML=ICON_SPEAK+"Écouter le plan"; } else { lb.style.display="none"; } try{ if(window.trvStop) window.trvStop(); }catch(e){} } }
     $("chatCard").style.display="block"; { var _b=document.getElementById("budgetCard"); if(_b) _b.style.display="block"; } $("thread").innerHTML="";
     $("chatHint").innerHTML='Une question sur votre culture de <b>'+esc(plan.crop)+'</b> ? Un problème observé ? Demandez ici.';
     window.scrollTo({top:0,behavior:"smooth"});
@@ -681,7 +683,7 @@
     if(!me){ openAuth("register"); return; }
     const crop=$("crop").value.trim(), err=$("formErr"); err.textContent="";
     if(!crop){ err.textContent="Indiquez au moins ce que vous voulez cultiver."; return; }
-    const btn=$("genBtn"); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Génération de l\'itinéraire…';
+    const btn=$("genBtn"); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Préparation du plan de culture…';
     var rb=document.getElementById("regenBtn"); if(rb){ rb.disabled=true; rb.innerHTML='<span class="spin"></span> Génération…'; }
     try{
       const body={ parcel_id:($("parcelSel")&&$("parcelSel").value)||undefined, crop, region:$("region").value, area:$("area").value, soil:$("soil").value, ph:$("ph").value, season:$("season").value, mode:($("mode")?$("mode").value:""), structure:($("structure")?$("structure").value:""), goal:$("goal").value, notes:$("notes").value, fresh:fresh };
@@ -690,7 +692,7 @@
       if(!r.ok){ err.textContent=d.error||"La génération a échoué."; }
       else { showPlan(d.plan, { reused: d.reused===true, sector: d.sector }); if(d.reused!==true) loadPlans(); }
     }catch(e){ err.textContent="Serveur injoignable."; }
-    btn.disabled=false; btn.innerHTML="Générer mon itinéraire";
+    btn.disabled=false; btn.innerHTML="Générer mon plan de culture";
   }
 
 
@@ -854,6 +856,8 @@
   })();
   $("pdfBtn").addEventListener("click", exportPlanPDF);
   $("fichePrint").addEventListener("click", printFiche);
+  { const fs=$("ficheSpeak"); if(fs && window.trvCanSpeak && trvCanSpeak()){ fs.style.display=""; let on=false; const idle=fs.innerHTML;
+      fs.addEventListener("click", function(){ if(on){ if(window.trvStop) trvStop(); on=false; fs.innerHTML=idle; return; } if(!currentFiche||!currentFiche.text) return; on=true; fs.innerHTML=ICON_STOP+"Arrêter"; trvSpeak(currentFiche.text.replace(/https?:\/\/\S+/g,"").replace(/[•☐▢□]/g,""), function(){ on=false; fs.innerHTML=idle; }); }); } }
   $("ficheCopy").addEventListener("click", async function(){ if(!currentFiche) return; try{ await navigator.clipboard.writeText(currentFiche.text); this.textContent="Copié ✓"; }catch(e){ this.textContent="Copie impossible"; } const b=this; setTimeout(function(){ b.textContent="Copier"; },2000); });
   // Lecture à voix haute de l'itinéraire (en français).
   function planToSpeech(md){ return String(md||"")
@@ -861,7 +865,7 @@
       .replace(/\|/g," ")                         // tableaux
       .replace(/[#*_`>-]/g," ")                   // symboles markdown
       .replace(/\s+/g," ").trim(); }
-  { const lb=$("listenBtn"); if(lb){ let on=false; lb.addEventListener("click", function(){ if(on){ if(window.trvStop) trvStop(); on=false; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; return; } if(!currentPlan) return; on=true; lb.innerHTML=ICON_STOP+"Arrêter la lecture"; trvSpeak(planToSpeech(currentPlan.content), function(){ on=false; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; }); }); } }
+  { const lb=$("listenBtn"); if(lb){ let on=false; lb.addEventListener("click", function(){ if(on){ if(window.trvStop) trvStop(); on=false; lb.innerHTML=ICON_SPEAK+"Écouter le plan"; return; } if(!currentPlan) return; on=true; lb.innerHTML=ICON_STOP+"Arrêter la lecture"; trvSpeak(planToSpeech(currentPlan.content), function(){ on=false; lb.innerHTML=ICON_SPEAK+"Écouter le plan"; }); }); } }
   $("newBtn").addEventListener("click", ()=>{ try{ if(window.trvStop) trvStop(); }catch(e){} $("planContent").style.display="none"; $("planPlaceholder").style.display="block"; $("chatCard").style.display="none"; $("ficheCard").style.display="none"; { var _b=document.getElementById("budgetCard"); if(_b) _b.style.display="none"; } window.scrollTo({top:0,behavior:"smooth"}); });
 
   loadMe();

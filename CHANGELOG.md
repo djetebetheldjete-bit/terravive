@@ -1,5 +1,13 @@
 # Journal des versions — Terravive
 
+## v8.3 — 11 novembre 2026 : une application plus facile à utiliser
+- **Écran « Aujourd'hui »** en haut du tableau de bord : la culture et le jour depuis le semis, les tâches de cette semaine et de la suivante (tirées du calendrier de la fiche terrain), les alertes de la station, un gros bouton « Noter ce que j'ai fait » et un bouton « Écouter ». Nouvelle route `GET /api/today?parcel=` et module `lib/today.js`.
+- **Mesures du terrain dans le carnet** : arrosoirs, seaux, bidons, fûts, pulvérisateurs, brouettes, sacs, cageots, paniers. La quantité est convertie en litres ou en kilos ; la taille de chaque contenant se règle une fois (gardée sur le téléphone) ; la note garde la trace (« 12 arrosoirs de 10 L »).
+- **Carnet hors ligne** : sans réseau (ou serveur en réveil), la saisie est gardée sur le téléphone, affichée « en attente », puis envoyée automatiquement au retour du réseau.
+- **Mode simple / mode complet** : le producteur voit l'essentiel (Aujourd'hui, carte, carnet, alertes) ; l'animateur garde tout (CSV, durabilité, programme ESP32, saison). Bouton en haut du tableau de bord.
+- **Écouter la fiche terrain** ; **« Plan de culture »** à la place d'« itinéraire technique » dans les boutons et titres ; ouverture d'un plan par lien (`/app?plan=`) ; boutons et champs plus grands sur téléphone.
+- Service worker v22.
+
 ## v8.2.3 — 11 novembre 2026
 - **Du sol à l'itinéraire** : en choisissant une parcelle enregistrée dans le formulaire de l'itinéraire technique, la **surface** se remplit aussi automatiquement (m² ou ha, d'après le dessin sur la carte), en plus de la texture et du pH. Le bouton « Itinéraire adapté à ce sol » de la fiche Sol & racines est toujours affiché, même sans culture choisie. Service worker v21.
 

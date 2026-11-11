@@ -207,6 +207,43 @@
   .durbar{ height:12px; border-radius:999px; background:var(--surface2); border:1px solid var(--line); overflow:hidden; }
   .durbar>span{ display:block; height:100%; border-radius:999px; transition:width .5s ease; }
   .durtag{ font-size:.72rem; font-weight:700; padding:2px 9px; border-radius:20px; color:#fff; }
+/* v8.3 — facilité d'usage : mode simple, écran « Aujourd'hui », mesures du terrain */
+html.simple .adv{display:none!important}
+.today{border-left:5px solid var(--leaf);margin-bottom:16px}
+.todayhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}
+.todayhead .sel{width:auto;min-width:160px}
+.todayday{margin-top:6px;font-size:.95rem}
+.todaysec{margin-top:10px}
+.todayt{font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--leaf)}
+.todaylist{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.todaylist li{padding:10px 12px;border-radius:10px;background:rgba(46,125,79,.08);display:flex;flex-direction:column;gap:2px}
+.todaylist li b{font-size:1.02rem}
+.todaylist li span{font-size:.88rem}
+.todaylist li em{font-style:normal;font-size:.76rem;opacity:.7}
+.todaystep{margin-top:10px;line-height:1.55}
+.todaystep .btn{margin:6px 0 0 6px}
+.todayhead select.sel{font:inherit;font-size:.92rem;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink)}
+.todaystage summary{cursor:pointer;font-size:.86rem;margin-top:8px}
+.todayacts{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.btn.big{min-height:52px;font-size:1.02rem;padding:0 20px}
+.qtyrow{display:flex;gap:6px;margin-top:4px}
+.qtyrow select{width:auto;flex:1}
+.qtysize{display:block;margin-top:4px;font-size:.78rem}
+.qtyconv{display:block;margin-top:2px;font-weight:700;color:var(--leaf)}
+.logpend{opacity:.8}
+.logpend .tag{font-size:.72rem;border:1px dashed currentColor;border-radius:999px;padding:1px 8px;margin-left:6px}
+@media (max-width:720px){
+  .btn,.sel,select.sel,input.sel{min-height:46px;font-size:16px}
+  .todayacts .btn{flex:1}
+  #logBody .maprow.logform{flex-direction:column;align-items:stretch!important;gap:12px}
+  #logBody .maprow.logform>label,#logBody .maprow.logform>button{width:100%!important;min-width:0!important;flex:none!important;font-size:.9rem!important}
+  .logform .sel{box-sizing:border-box;max-width:100%}
+  .qtyrow{width:100%}
+  .qtyrow>.sel{min-width:0}
+  .qtyrow input.sel{flex:1;width:auto!important}
+  .qtyrow select.sel{flex:1.4}
+  .qtysize input.sel{width:90px!important;min-height:40px}
+}
 </style>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#2E7D46">
@@ -214,6 +251,7 @@
 <script src="/pwa.js" defer></script>
 <link rel="icon" type="image/png" href="/favicon-32.png">
 <link rel="stylesheet" href="/mobile.css">
+<script>try{ if(localStorage.getItem("trv-mode")==="simple") document.documentElement.classList.add("simple"); }catch(e){}</script>
 <link rel="stylesheet" href="/anims.css">
 <script src="/mobile.js" defer></script>
 <script src="/anims.js" defer></script>
@@ -227,7 +265,7 @@
     <a class="brand" href="/"><span class="emblem" aria-hidden="true"><img src="/logo.png" alt="Terravive" style="display:block;width:100%;height:100%;object-fit:contain"></span> Terravive</a>
     <nav class="menu">
       <a href="/tableau" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg> Tableau de bord</a>
-      <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V6a2 2 0 0 1 2-2h11l3 3v12.5"/><path d="M8 8h7M8 12h9M8 16h5"/></svg> Itinéraire de culture</a>
+      <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V6a2 2 0 0 1 2-2h11l3 3v12.5"/><path d="M8 8h7M8 12h9M8 16h5"/></svg> Plan de culture</a>
       <a href="/arduino"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="9" rx="2"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/><path d="M2 12h2M20 12h2"/></svg> Automatisation</a>
       <a href="/conseiller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.6 8.6 0 0 1-3.9-.9L3 20l1.4-4.1A8.4 8.4 0 0 1 3.5 11.5 8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg> Conseiller</a>
       <a href="/diagnostic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2 2 0 0 1 5 6.5h1.5l1-1.6h5l1 1.6H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12.5" cy="12.5" r="3.2"/></svg> Diagnostic photo</a>
@@ -248,6 +286,7 @@
         <div class="sub" id="subline"></div>
       </div>
       <span class="grow"></span>
+      <button class="btn" type="button" id="modeBtn" style="display:none;" title="Mode simple : l'essentiel pour le producteur. Mode complet : toutes les fonctions (animateur).">Mode complet</button>
       <div class="theme-wrap">
         <label for="themeSel">Thème</label>
         <select class="theme" id="themeSel">
@@ -262,6 +301,20 @@
     <div id="authNote" style="display:none;" class="card">Connectez-vous pour voir votre tableau de bord. <a href="/app" style="color:var(--leaf);font-weight:600;">Ouvrir la page de connexion</a></div>
 
     <div id="board" style="display:none;">
+      <div class="card today" id="todayCard" style="display:none;">
+        <div class="todayhead">
+          <h2 class="ct" style="margin:0;"><span data-ico="check"></span>Aujourd'hui</h2>
+          <select class="sel" id="todayParcel" aria-label="Parcelle"></select>
+        </div>
+        <div id="todayDay" class="todayday"></div>
+        <div id="todayAlert"></div>
+        <div id="todayTasks"></div>
+        <div class="todayacts">
+          <button class="btn primary big" type="button" id="todayNote"><span data-ico="pencil"></span>Noter ce que j'ai fait</button>
+          <button class="btn big" type="button" id="todaySpeak" style="display:none;"><span data-ico="speaker"></span>Écouter</button>
+        </div>
+        <div id="todayQueue" class="muted" style="font-size:.84rem;margin-top:6px;"></div>
+      </div>
       <!-- Tuiles KPI -->
       <div class="grid kpis">
         <div class="tile"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2c3.6 4.6 6 7.7 6 10.8a6 6 0 0 1-12 0c0-3.1 2.4-6.2 6-10.8z"/></svg></div><div class="lab">Humidité du sol</div><div class="val" id="kSoil">—</div><div class="meta" id="kSoilMeta">en attente du capteur</div></div>
@@ -395,8 +448,8 @@
           <div class="card section-gap">
             <h2 class="ct">Accès rapide</h2>
             <div class="list">
-              <a href="/app"><span>Nouvel itinéraire de culture</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
-              <a href="/arduino"><span>Nouveau projet d'automatisation</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
+              <a href="/app"><span>Nouveau plan de culture</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
+              <a href="/arduino" class="adv"><span>Nouveau projet d'automatisation</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
               <a href="/conseiller"><span>Poser une question au conseiller</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
               <a href="/diagnostic"><span>Diagnostiquer une plante malade (photo)</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
               <a href="/cooperative"><span>Ma coopérative</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
@@ -413,24 +466,25 @@
               <div class="kindlabel muted section-gap" id="kindLabel">Intervention</div>
               <div class="kindpick" id="kindPick" role="radiogroup" aria-labelledby="kindLabel"></div>
               <select id="logKind" hidden aria-hidden="true" tabindex="-1"><option value="arrosage">Arrosage</option><option value="pluie">Pluie</option><option value="compost">Compost / fumier</option><option value="engrais">Engrais chimique</option><option value="traitement">Traitement</option><option value="semis">Semis / plantation</option><option value="recolte">Récolte</option><option value="perte">Récolte invendable</option><option value="incident">Incident</option><option value="observation">Observation</option></select>
-              <div class="maprow" style="align-items:flex-end;margin-top:12px;">
+              <div class="maprow logform" style="align-items:flex-end;margin-top:12px;">
                 <label class="muted" style="min-width:160px;flex:1;font-size:.8rem;">Parcelle<select class="sel" id="logParcel" style="width:100%;margin-top:4px;"></select></label>
                 <label class="muted" style="width:150px;font-size:.8rem;">Date<input class="sel" type="date" id="logDate" style="width:100%;margin-top:4px;"></label>
-                <label class="muted" style="width:130px;font-size:.8rem;">Quantité <span id="logUnit">(L)</span><input class="sel" id="logQty" inputmode="decimal" placeholder="ex. 200" style="width:100%;margin-top:4px;"></label>
+                <label class="muted" id="logQtyWrap" style="min-width:230px;flex:1;font-size:.8rem;">Quantité <span id="logUnit">(L)</span><span class="qtyrow"><input class="sel" id="logQty" inputmode="decimal" placeholder="ex. 12" style="width:90px;"><select class="sel" id="logMeasure" aria-label="Mesure"></select></span><span class="qtysize" id="logSizeWrap" style="display:none;">1 <span id="logSizeName">arrosoir</span> = <input class="sel" id="logSize" inputmode="decimal" style="width:70px;"> <span id="logSizeUnit">L</span> <span class="muted">(réglez une fois)</span></span><span class="qtyconv" id="logConv"></span></label>
                 <label class="muted" id="logProdWrap" style="width:170px;font-size:.8rem;display:none;">Produit / type<input class="sel" id="logProd" maxlength="60" list="logProdList" placeholder="ex. NPK 15-15-15" style="width:100%;margin-top:4px;"><datalist id="logProdList"></datalist></label>
-                <label class="muted" style="width:190px;font-size:.8rem;">Saison / campagne<input class="sel" id="logSeason" maxlength="60" list="logSeasonList" style="width:100%;margin-top:4px;"><datalist id="logSeasonList"></datalist></label>
+                <label class="muted adv" style="width:190px;font-size:.8rem;">Saison / campagne<input class="sel" id="logSeason" maxlength="60" list="logSeasonList" style="width:100%;margin-top:4px;"><datalist id="logSeasonList"></datalist></label>
                 <label class="muted" style="flex:2;min-width:180px;font-size:.8rem;">Note (facultatif)<input class="sel" id="logNote" maxlength="300" placeholder="ex. tomates, 2ᵉ cueillette" style="width:100%;margin-top:4px;"></label>
-                <button class="btn primary" type="button" id="logAdd">Ajouter</button>
+                <button class="btn primary" type="button" id="logAdd">Enregistrer</button>
               </div>
               <div class="muted" id="logMsg" style="margin-top:4px;font-size:.84rem;"></div>
               <div class="maprow" style="margin-top:10px;align-items:center;"><span class="muted" style="font-size:.82rem;">Totaux :</span><select class="sel" id="logSeasonFilter" style="width:auto;"></select></div>
               <div id="logTotals" class="vchips"></div>
+              <div id="logPending" class="loglist"></div>
               <div id="logList" class="loglist"></div>
-              <div class="maprow" style="margin-top:8px;"><button class="btn primary" type="button" id="impactBtn"><span data-ico="chart"></span>Bilan d'impact</button><button class="btn" type="button" id="logCsv"><span data-ico="download"></span>Télécharger le carnet (CSV)</button><button class="btn" type="button" id="collectBtn"><span data-ico="printer"></span>Fiche de collecte à imprimer</button></div>
+              <div class="maprow" style="margin-top:8px;"><button class="btn primary" type="button" id="impactBtn"><span data-ico="chart"></span>Bilan d'impact</button><button class="btn adv" type="button" id="logCsv"><span data-ico="download"></span>Télécharger le carnet (CSV)</button><button class="btn" type="button" id="collectBtn"><span data-ico="printer"></span>Fiche de collecte à imprimer</button></div>
               <div id="impactBox" style="display:none;"></div>
             </div>
           </div>
-          <div class="card wide section-gap" id="durCard">
+          <div class="card wide section-gap adv" id="durCard">
             <h2 class="ct">Indice de durabilité de mon exploitation</h2>
             <div class="muted">Auto-évaluation inspirée du cadre des agrosystèmes durables — trois piliers : environnemental, économique, social. Répondez en quelques clics ; si vous avez lancé la Santé (NDVI), elle est prise en compte automatiquement. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></div>
             <div id="durForm" class="section-gap"></div>
@@ -635,7 +689,7 @@
     try{
       const r=await fetch("/api/fieldlog?parcel="+encodeURIComponent(id)); const d=await r.json();
       if(!r.ok){ $("logList").innerHTML='<div class="valert warn">'+esc(d.error||"Carnet indisponible.")+'</div>'; $("logTotals").innerHTML=""; return; }
-      logEntries=d.entries||[]; logParcelName=d.parcel&&d.parcel.name||""; renderLog(d);
+      logEntries=d.entries||[]; logParcelName=d.parcel&&d.parcel.name||""; renderLog(d); showQueue();
     }catch(e){ $("logList").innerHTML='<div class="muted">Serveur injoignable.</div>'; }
   }
   let logArea=null;
@@ -671,25 +725,180 @@
       try{ const r=await fetch("/api/fieldlog?id="+encodeURIComponent(b.getAttribute("data-logdel")),{method:"DELETE"}); if(r.ok) loadLog(); }catch(e){}
     }));
   }
+  // ---- Mesures du terrain (arrosoirs, sacs…), converties en L ou en kg ----
+  // Tailles par défaut indicatives : chaque producteur règle les siennes une fois (gardées sur le téléphone).
+  const MEASURES={
+    arrosage:[["L","litres",1],["arrosoir","arrosoirs",10],["seau","seaux",15],["bidon","bidons",20],["fut","fûts",200]],
+    traitement:[["L","litres",1],["pulve","pulvérisateurs",16],["bidon","bidons",20]],
+    compost:[["kg","kg",1],["brouette","brouettes",50],["sac","sacs",50],["seau","seaux",10]],
+    engrais:[["kg","kg",1],["sac","sacs",50]],
+    recolte:[["kg","kg",1],["sac","sacs",50],["cageot","cageots",20],["panier","paniers",15],["seau","seaux",10]],
+    perte:[["kg","kg",1],["sac","sacs",50],["cageot","cageots",20],["panier","paniers",15],["seau","seaux",10]]
+  };
+  const MEAS_ONE={arrosoir:"arrosoir",seau:"seau",bidon:"bidon",fut:"fût",pulve:"pulvérisateur",brouette:"brouette",sac:"sac",cageot:"cageot",panier:"panier"};
+  function mSizes(){ try{ const o=JSON.parse(localStorage.getItem("trv-units")||"{}"); return o&&typeof o==="object"?o:{}; }catch(e){ return {}; } }
+  function mSize(kind,code){ const own=Number(mSizes()[kind+":"+code]); if(own>0) return own; const m=(MEASURES[kind]||[]).find(x=>x[0]===code); return m?m[2]:1; }
+  function numIn(v){ const x=parseFloat(String(v==null?"":v).replace(/\s/g,"").replace(",",".")); return isFinite(x)?x:null; }
+  function fillMeasure(){
+    const k=$("logKind").value, list=MEASURES[k], sel=$("logMeasure");
+    if(!list){ sel.style.display="none"; sel.innerHTML=""; $("logSizeWrap").style.display="none"; $("logConv").textContent=""; return; }
+    sel.style.display=""; let want=""; try{ want=localStorage.getItem("trv-measure-"+k)||""; }catch(e){}
+    sel.innerHTML=list.map(m=>'<option value="'+m[0]+'">'+esc(m[1])+'</option>').join("");
+    if(list.some(m=>m[0]===want)) sel.value=want; measureChanged();
+  }
+  function measureChanged(){
+    const k=$("logKind").value, code=$("logMeasure").value, base=LOG_UNIT[k];
+    try{ if(code) localStorage.setItem("trv-measure-"+k,code); }catch(e){}
+    const isBase=!code||code===base; $("logSizeWrap").style.display=isBase?"none":"";
+    if(!isBase){ $("logSizeName").textContent=MEAS_ONE[code]||code; $("logSize").value=String(mSize(k,code)).replace(".",","); $("logSizeUnit").textContent=base; }
+    convPreview();
+  }
+  // Quantité à enregistrer (toujours en L ou kg) et trace lisible de la mesure du terrain.
+  function measured(){
+    const k=$("logKind").value, base=LOG_UNIT[k], code=$("logMeasure").value, n=numIn($("logQty").value);
+    if(n==null) return { qty:$("logQty").value.trim(), label:"" };
+    if(!MEASURES[k]||!code||code===base) return { qty:String(n), label:"" };
+    const size=numIn($("logSize").value)||mSize(k,code), total=Math.round(n*size*100)/100;
+    const plural=(MEASURES[k].find(m=>m[0]===code)||[])[1]||code;
+    return { qty:String(total), label:nf(n)+" "+(n>1?plural:(MEAS_ONE[code]||plural))+" de "+nf(size)+" "+base };
+  }
+  function convPreview(){ const k=$("logKind").value, m=measured(); $("logConv").textContent=m.label&&numIn(m.qty)!=null?"= "+nf(numIn(m.qty))+" "+LOG_UNIT[k]:""; }
+
+  // ---- Carnet hors ligne : les saisies sans réseau attendent sur le téléphone ----
+  const QKEY="trv-log-queue"; let qBusy=false;
+  function qGet(){ try{ const a=JSON.parse(localStorage.getItem(QKEY)||"[]"); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+  function qSet(a){ try{ localStorage.setItem(QKEY,JSON.stringify(a)); }catch(e){} showQueue(); }
+  function qAdd(p){ const a=qGet(); a.push({ p:p, t:Date.now() }); qSet(a); }
+  function showQueue(){
+    const a=qGet(), n=a.length;
+    const txt=n?(n+" saisie"+(n>1?"s":"")+" en attente de réseau : "+(n>1?"elles seront envoyées":"elle sera envoyée")+" automatiquement."):"";
+    if($("todayQueue")) $("todayQueue").textContent=txt;
+    const box=$("logPending"); if(!box) return;
+    const cur=$("logParcel")&&$("logParcel").value, mine=a.filter(x=>x.p&&x.p.parcel_id===cur);
+    box.innerHTML=mine.map(x=>'<div class="logrow logpend"><span class="d">'+esc(new Date(x.p.date+"T12:00:00").toLocaleDateString("fr-FR"))+'</span><span class="k">'+ico(LOG_ICON[x.p.kind]||"observation")+' '+esc(LOG_LABEL[x.p.kind]||x.p.kind)+'<span class="tag">en attente</span></span><span class="q">'+(x.p.qty!==""&&x.p.qty!=null?esc(nf(x.p.qty)+" "+(LOG_UNIT[x.p.kind]||"")):"")+'</span><span class="n">'+esc(x.p.note||"")+'</span></div>').join("");
+  }
+  async function flushQueue(){
+    if(qBusy) return; const a=qGet(); if(!a.length||navigator.onLine===false) return;
+    qBusy=true; const keep=[]; let sent=0, refused=0;
+    for(const it of a){
+      try{ const r=await fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(it.p)}); if(r.ok) sent++; else if(r.status===400||r.status===404) refused++; else keep.push(it); }
+      catch(e){ keep.push(it); }
+    }
+    qBusy=false; qSet(keep.concat(qGet().slice(a.length)));
+    if(sent||refused){ if($("logMsg")) $("logMsg").textContent=(sent?sent+" saisie"+(sent>1?"s":"")+" en attente envoyée"+(sent>1?"s":"")+" ✓":"")+(refused?(sent?" — ":"")+refused+" refusée"+(refused>1?"s":"")+" par le serveur (parcelle supprimée ?).":""); loadLog(); loadToday(); }
+  }
+
+  // ---- Écran « Aujourd'hui » ----
+  let TODAY=null, todayAlerts=[];
+  function renderTodayParcels(){
+    const c=$("todayCard"); if(!c) return;
+    if(!myParcels.length){ c.style.display="none"; return; }
+    c.style.display="";
+    const sel=$("todayParcel"), cur=sel.value||(function(){ try{ return localStorage.getItem("trv-today-parcel")||localStorage.getItem("trv-log-parcel")||""; }catch(e){ return ""; } })();
+    sel.innerHTML=myParcels.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join("");
+    if(cur&&myParcels.some(p=>p.id===cur)) sel.value=cur;
+    sel.style.display=myParcels.length>1?"":"none";
+    loadToday();
+  }
+  async function loadToday(){
+    const sel=$("todayParcel"); if(!sel||!sel.value) return;
+    try{ localStorage.setItem("trv-today-parcel",sel.value); }catch(e){}
+    try{ const r=await fetch("/api/today?parcel="+encodeURIComponent(sel.value)); const d=await r.json(); if(r.ok){ TODAY=d; renderToday(); } }catch(e){}
+    showQueue();
+  }
+  function fdate(iso){ try{ return new Date(String(iso).slice(0,10)+"T12:00:00").toLocaleDateString("fr-FR"); }catch(e){ return iso; } }
+  function taskList(title, arr){
+    if(!arr||!arr.length) return "";
+    return '<div class="todaysec">'+(title?'<div class="todayt">'+esc(title)+'</div>':'')+'<ul class="todaylist">'+arr.map(x=>'<li><b>'+esc(x.faire)+'</b>'+(x.detail?'<span>'+esc(x.detail)+'</span>':'')+(x.quand?'<em>'+esc(x.quand)+'</em>':'')+'</li>').join("")+'</ul></div>';
+  }
+  function renderToday(){
+    const d=TODAY; if(!d) return;
+    const pid=d.parcel.id, t=d.tasks;
+    const planUrl=d.plan?'/app?plan='+encodeURIComponent(d.plan.id):'/app?'+(d.crop?'culture='+encodeURIComponent(d.crop)+'&':'')+'parcelle='+encodeURIComponent(pid);
+    let day="", h="";
+    if(!d.crop){
+      day="Pas encore de culture notée pour cette parcelle.";
+      h='<div class="todaystep">Sur la carte ci-dessous, ouvrez <b>« Sol &amp; racines »</b> pour cette parcelle et indiquez la culture et la date de semis : vos tâches de la semaine apparaîtront ici.</div>';
+    } else {
+      const crop=d.crop.charAt(0).toUpperCase()+d.crop.slice(1);
+      day='<b>'+esc(crop)+'</b>'+(d.sown_at?(t&&t.day!=null?(t.day>=0?' · Jour '+t.day+' depuis le semis ('+fdate(d.sown_at)+')':' · semis dans '+(-t.day)+' jour'+(t.day<-1?'s':'')+' ('+fdate(d.sown_at)+')'):' · semé le '+fdate(d.sown_at)):' · date de semis non notée');
+      if(!d.plan) h='<div class="todaystep">Pas encore de plan de culture pour '+esc(d.crop)+'. <a class="btn primary" href="'+planUrl+'">Créer le plan de culture</a></div>';
+      else if(!d.fiche) h='<div class="todaystep">Ouvrez une fois votre plan de culture pour préparer la fiche terrain : vos tâches de la semaine apparaîtront ici. <a class="btn" href="'+planUrl+'">Ouvrir le plan</a></div>';
+      else {
+        if(t.day==null) h+=taskList("Pour démarrer", t.start)+'<div class="muted" style="font-size:.84rem;margin-top:6px;">Notez la date de semis dans « Sol &amp; racines » pour voir les tâches de chaque semaine.</div>';
+        else { h+=taskList("Cette semaine", t.now)+taskList("La semaine prochaine", t.next); if(!t.now.length&&!t.next.length) h+='<div class="todaystep">Rien de prévu par la fiche cette semaine. Surveillez la culture et notez vos arrosages.</div>'; }
+        if(t.stage&&t.stage.length) h+='<details class="todaystage"><summary>Selon le stade de la plante</summary>'+taskList("", t.stage)+'</details>';
+        h+='<div style="margin-top:8px;"><a style="font-size:.84rem;color:var(--leaf);font-weight:600;" href="'+planUrl+'">Voir toute la fiche terrain</a></div>';
+      }
+    }
+    $("todayDay").innerHTML=day; $("todayTasks").innerHTML=h; renderTodayAlert();
+  }
+  function renderTodayAlert(){
+    const box=$("todayAlert"); if(!box) return;
+    box.innerHTML=todayAlerts.map(m=>'<div class="valert warn" style="margin-top:8px;">'+esc(m)+'</div>').join("");
+    const sp=$("todaySpeak"); if(sp) sp.style.display=(window.trvCanSpeak&&trvCanSpeak()&&((TODAY&&TODAY.speech)||todayAlerts.length))?"":"none";
+  }
+  function bindToday(){
+    if(!$("todayCard")) return;
+    $("todayParcel").addEventListener("change", loadToday);
+    $("todayNote").addEventListener("click", function(){
+      const id=$("todayParcel").value;
+      if(id&&$("logParcel").value!==id&&myParcels.some(p=>p.id===id)){ $("logParcel").value=id; $("logParcel").dispatchEvent(new Event("change")); }
+      $("logDate").value=new Date().toISOString().slice(0,10);
+      try{ $("logCard").scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){}
+      setTimeout(function(){ const b=document.querySelector('#kindPick [aria-checked="true"]'); if(b) b.focus(); },600);
+    });
+    const sp=$("todaySpeak"), idle=sp.innerHTML; let on=false;
+    sp.addEventListener("click", function(){
+      if(on){ if(window.trvStop) trvStop(); on=false; sp.innerHTML=idle; return; }
+      const txt=[(TODAY&&TODAY.speech)||"", todayAlerts.join(" ")].filter(Boolean).join(" "); if(!txt) return;
+      on=true; sp.innerHTML=ico("stop")+"Arrêter"; trvSpeak(txt, function(){ on=false; sp.innerHTML=idle; });
+    });
+    window.addEventListener("online", flushQueue); setInterval(flushQueue, 60000); flushQueue(); showQueue();
+  }
+
+  // ---- Mode simple (producteur) / complet (animateur) ----
+  function applyMode(m){
+    document.documentElement.classList.toggle("simple", m==="simple");
+    const b=$("modeBtn"); if(b){ b.style.display=""; b.textContent=m==="simple"?"Passer en mode complet":"Passer en mode simple"; b.setAttribute("aria-pressed", m==="simple"?"true":"false"); }
+  }
+  function initMode(){
+    let m=null; try{ m=localStorage.getItem("trv-mode"); }catch(e){}
+    if(m!=="simple"&&m!=="complet") m=(me&&(me.isAdmin||me.animator))?"complet":"simple";
+    applyMode(m);
+    const b=$("modeBtn"); if(b) b.onclick=function(){ m=(m==="simple")?"complet":"simple"; try{ localStorage.setItem("trv-mode",m); }catch(e){} applyMode(m); };
+  }
+
   function bindLog(){
     if(!$("logCard")) return;
     $("logDate").value=new Date().toISOString().slice(0,10);
     $("logParcel").addEventListener("change", loadLog);
-    function unit(){ const k=$("logKind").value, u=LOG_UNIT[k]; $("logUnit").textContent=u?"("+u+")":""; $("logQty").disabled=!u; if(!u) $("logQty").value=""; $("logProdWrap").style.display=(k==="engrais"||k==="traitement"||k==="compost")?"":"none"; }
+    function unit(){ const k=$("logKind").value, u=LOG_UNIT[k]; $("logUnit").textContent=u?"("+u+")":""; $("logQty").disabled=!u; if(!u) $("logQty").value=""; $("logProdWrap").style.display=(k==="engrais"||k==="traitement"||k==="compost")?"":"none"; fillMeasure(); }
     $("logSeasonFilter").addEventListener("change", function(){ this.dataset.picked="1"; renderLog({ parcel:{ area_m2:logArea } }); });
     $("logParcel").addEventListener("change", function(){ $("logSeason").value=""; $("logSeasonFilter").dataset.picked=""; $("impactBox").style.display="none"; });
     $("impactBtn").addEventListener("click", function(){ const b=$("impactBox"); if(b.style.display==="none"){ b.style.display=""; loadImpact(); } else b.style.display="none"; });
     $("collectBtn").addEventListener("click", printCollect);
+    $("logMeasure").addEventListener("change", measureChanged);
+    $("logQty").addEventListener("input", convPreview);
+    $("logSize").addEventListener("change", function(){ const k=$("logKind").value, code=$("logMeasure").value, v=numIn(this.value); if(v>0){ const a=mSizes(); a[k+":"+code]=v; try{ localStorage.setItem("trv-units",JSON.stringify(a)); }catch(e){} } convPreview(); });
+    $("logSize").addEventListener("input", convPreview);
     $("logKind").addEventListener("change", unit); unit();
     $("logAdd").addEventListener("click", async function(){
-      const b=this; b.disabled=true; $("logMsg").textContent="Enregistrement…";
+      const b=this, k=$("logKind").value, m=measured();
+      const note=[m.label, $("logNote").value.trim()].filter(Boolean).join(" · ").slice(0,300);
+      const payload={ parcel_id:$("logParcel").value, date:$("logDate").value, kind:k, qty:m.qty, product:$("logProd").value.trim(), season:$("logSeason").value.trim(), note:note };
+      try{ localStorage.setItem("trv-log-season-"+payload.parcel_id,payload.season); }catch(e){}
+      const done=function(msg){ $("logMsg").textContent=msg; $("logQty").value=""; $("logNote").value=""; $("logProd").value=""; convPreview(); };
+      const keepOffline=function(){ qAdd(payload); done("Pas de réseau : saisie gardée sur ce téléphone. Elle sera envoyée automatiquement dès que le réseau revient."); };
+      if(navigator.onLine===false){ keepOffline(); return; }
+      b.disabled=true; $("logMsg").textContent="Enregistrement…";
       try{
-        const r=await fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ parcel_id:$("logParcel").value, date:$("logDate").value, kind:$("logKind").value, qty:$("logQty").value.trim(), product:$("logProd").value.trim(), season:$("logSeason").value.trim(), note:$("logNote").value.trim() })});
-        try{ localStorage.setItem("trv-log-season-"+$("logParcel").value,$("logSeason").value.trim()); }catch(e){}
-        const d=await r.json();
-        if(!r.ok){ $("logMsg").textContent="Erreur : "+(d.error||"enregistrement impossible."); }
-        else { $("logMsg").textContent="Ajouté ✓"+(d.warning?" — "+d.warning:""); $("logQty").value=""; $("logNote").value=""; $("logProd").value=""; loadLog(); if($("impactBox").style.display!=="none") loadImpact(); if(!d.warning) setTimeout(function(){ $("logMsg").textContent=""; },2000); }
-      }catch(e){ $("logMsg").textContent="Serveur injoignable."; }
+        const r=await fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
+        let d={}; try{ d=await r.json(); }catch(e){}
+        if(r.status===502||r.status===503||r.status===504) keepOffline();
+        else if(!r.ok){ $("logMsg").textContent="Erreur : "+(d.error||"enregistrement impossible."); }
+        else { done("Enregistré ✓"+(d.warning?" — "+d.warning:"")); loadLog(); loadToday(); if($("impactBox").style.display!=="none") loadImpact(); if(!d.warning) setTimeout(function(){ $("logMsg").textContent=""; },2500); }
+      }catch(e){ keepOffline(); }
       b.disabled=false;
     });
     $("logCsv").addEventListener("click", function(){
@@ -790,7 +999,7 @@
       +'<label class="muted" style="width:130px;font-size:.8rem;">Engrais chim. (kg)<input class="sel" id="refChem" inputmode="decimal" value="'+(ref.chem_kg!=null?ref.chem_kg:"")+'" style="width:100%;margin-top:4px;"></label>'
       +'<label class="muted" style="width:120px;font-size:.8rem;">Récolte (kg)<input class="sel" id="refYield" inputmode="decimal" value="'+(ref.yield_kg!=null?ref.yield_kg:"")+'" style="width:100%;margin-top:4px;"></label>'
       +'<button class="btn" type="button" id="refSave">Enregistrer</button></div><div class="muted" id="refMsg" style="font-size:.82rem;margin-top:4px;"></div></details>';
-    h+='<div class="maprow" style="margin-top:10px;"><button class="btn sun" type="button" id="impPrint">'+ico("printer")+'Imprimer le bilan / PDF</button><a class="btn" href="/api/impact/csv?parcel='+encodeURIComponent($("logParcel").value)+'">'+ico("download")+'Bilan en tableur (CSV)</a><a class="btn wa" id="impWa" target="_blank" rel="noopener">'+ico("send")+'Envoyer sur WhatsApp</a><button class="btn" type="button" id="impProof">'+ico("proof")+'Fiche de preuve</button></div>';
+    h+='<div class="maprow" style="margin-top:10px;"><button class="btn sun" type="button" id="impPrint">'+ico("printer")+'Imprimer le bilan / PDF</button><a class="btn adv" href="/api/impact/csv?parcel='+encodeURIComponent($("logParcel").value)+'">'+ico("download")+'Bilan en tableur (CSV)</a><a class="btn wa" id="impWa" target="_blank" rel="noopener">'+ico("send")+'Envoyer sur WhatsApp</a><button class="btn" type="button" id="impProof">'+ico("proof")+'Fiche de preuve</button></div>';
     h+='<div class="muted" style="font-size:.74rem;margin-top:6px;">Chaque chiffre porte son origine : '+Object.keys(NAT).map(k=>natTag(k)).join(" ")+'. Survolez une étiquette pour l\'explication.</div></div>';
     $("impactBox").innerHTML=h;
     $("impWa").href="https://wa.me/?text="+encodeURIComponent(impactText(d));
@@ -868,7 +1077,7 @@
   }
   let myParcels=[];
   async function loadParcels(){
-    try{ const r=await fetch("/api/parcels"); const d=await r.json(); if(r.ok){ myParcels=d.parcels||[]; renderParcels(); renderLogParcels(); } }catch(e){}
+    try{ const r=await fetch("/api/parcels"); const d=await r.json(); if(r.ok){ myParcels=d.parcels||[]; renderParcels(); renderLogParcels(); renderTodayParcels(); } }catch(e){}
   }
   function renderParcels(){
     const box=$("parcelList"); if(!box) return;
@@ -1068,8 +1277,8 @@
       +'<button class="btn" id="manSave" type="button">Enregistrer</button></div><div class="muted" id="manMsg" style="margin-top:4px;"></div></details>';
     // Suites
     h+='<div class="maprow" style="margin-top:10px;">'
-      +'<a class="btn" href="/api/station/sketch?parcel='+encodeURIComponent(f.parcel.id)+'" download="terravive_station_esp32.ino">Programme ESP32 réglé pour cette parcelle</a>'
-      +'<a class="btn primary" href="/app?'+(f.crop?'culture='+encodeURIComponent(f.crop)+'&':'')+'parcelle='+encodeURIComponent(f.parcel.id)+'">Itinéraire adapté à ce sol →</a>'
+      +'<a class="btn adv" href="/api/station/sketch?parcel='+encodeURIComponent(f.parcel.id)+'" download="terravive_station_esp32.ino">Programme ESP32 réglé pour cette parcelle</a>'
+      +'<a class="btn primary" href="/app?'+(f.crop?'culture='+encodeURIComponent(f.crop)+'&':'')+'parcelle='+encodeURIComponent(f.parcel.id)+'">Plan de culture adapté à ce sol →</a>'
       +'</div></div>';
     $("soilOut").innerHTML=h;
     bindSoilCalc(true);
@@ -1098,6 +1307,7 @@
     const msgs=[];
     if(L&&L.soil!=null&&adv&&adv.threshold_pct!=null&&L.soil<adv.threshold_pct) msgs.push("Arroser « "+adv.parcel_name+" »"+(adv.crop?" ("+adv.crop+")":"")+" : le sol est à "+L.soil+" %, sous le seuil de "+adv.threshold_pct+" %."+(adv.dose_l_m2?" Dose : environ "+String(adv.dose_l_m2).replace(".",",")+" litres par mètre carré.":"")+" Vérifiez d'abord qu'il n'a pas plu. Arrosez tôt le matin ou en fin de journée.");
     if(L&&L.level!=null&&L.level<15) msgs.push("La cuve est presque vide ("+L.level+" %). Remplissez-la avant le prochain arrosage.");
+    todayAlerts=msgs.slice(); renderTodayAlert();
     if(msgs.length){
       const txt="Terravive — alerte\n"+msgs.join("\n")+(L.soil_source==="toucher"?"\n(Mesure au toucher, approximative.)":"");
       h+='<div class="alertshare"><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(txt)+'">'+ico("send")+'Envoyer l\'alerte sur WhatsApp</a>'+(window.trvCanSpeak&&window.trvCanSpeak()?'<button class="btn" type="button" id="alertSpeak">'+ico("speaker")+'Lire à voix haute</button>':'')+'</div>';
@@ -1223,7 +1433,7 @@
       if(d.erreur){ vSetBusy(false, "Erreur : "+d.erreur); return; }
       const cls=v=> v==="Favorable"?"fav":(v==="Deconseille"?"dec":"prec");
       let html='<div class="valert ok">Mois : '+esc(d.mois||"")+' · Température ~'+(d.temperature_moy??"?")+'°C · Pluie sur ~90 j : '+(d.pluie_cycle_mm??"?")+' mm</div>';
-      html+='<div class="valert" style="margin-top:6px">Cliquez une culture pour créer son <b>itinéraire technique</b> complet.</div>';
+      html+='<div class="valert" style="margin-top:6px">Cliquez une culture pour créer son <b>plan de culture</b> complet.</div>';
       (d.cultures||[]).forEach(c=>{ const k=cls(c.verdict); html+='<div class="vverdict '+k+'" data-crop="'+esc(c.culture)+'" role="button" tabindex="0" title="Créer l\'itinéraire technique de « '+esc(c.culture)+' »" style="cursor:pointer"><div class="tete"><span class="nom">'+esc(c.culture)+'</span><span class="vbadge '+k+'">'+esc(c.verdict)+'</span></div><ul>'+(c.raisons||[]).map(r=>'<li>'+esc(r)+'</li>').join("")+'</ul><div class="note">'+esc(c.note||"")+'</div><div style="margin-top:8px;font-weight:700;color:var(--leaf,#3b6d11);font-size:.85rem">Créer l\'itinéraire technique →</div></div>'; });
       $("vOut").innerHTML=html;
       $("vOut").querySelectorAll(".vverdict[data-crop]").forEach(function(el){
@@ -1302,7 +1512,7 @@
     // Actualisation automatique des mesures du capteur (toutes les 60 s) :
     // dès qu'une vraie carte envoie des données, elles apparaissent sans recharger la page.
     setInterval(refresh, 60000);
-    bindLog(); buildKindPick(); loadParcels();
+    initMode(); bindLog(); bindToday(); buildKindPick(); loadParcels();
     if(me && me.isAdmin){
       loadAdminQuestions(); initAdminAnimators();
       // Quality Guard apparaît uniquement dans le menu des administrateurs.

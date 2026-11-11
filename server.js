@@ -19,6 +19,7 @@ const { esp32Sketch } = require("./lib/esp32-sketch");
 const FERT = require("./lib/fertil");
 const FICHE = require("./lib/fiche");
 const IMPACT = require("./lib/impact");
+const TODAY = require("./lib/today");
 
 // ---------- Configuration ----------
 function loadEnv(file) {
@@ -1068,6 +1069,38 @@ async function handlePlanFiche(req, res) {
     try { await savePlan(Object.assign({}, plan, { fiche: JSON.stringify(fiche) })); } catch (e) { /* colonne absente : le cache mémoire suffit */ }
   }
   sendJson(res, 200, { fiche, parcel, text: FICHE.ficheText(fiche, parcel), cached });
+}
+// Écran « Aujourd'hui » : tâches de la semaine d'après la fiche terrain du plan de culture
+// de la parcelle (même culture), repérées par rapport à la date de semis notée dans « Sol & racines ».
+async function handleToday(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const id = new URL(req.url, "http://x").searchParams.get("parcel") || "";
+  const parcel = id ? await findUserParcel(user.id, id) : null;
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const soil = await getParcelSoil(parcel.id);
+  const crop = soil && soil.user_id === user.id ? (soil.crop || null) : null;
+  const sownAt = soil && soil.user_id === user.id ? (soil.sown_at || null) : null;
+  const today = new Date().toISOString().slice(0, 10);
+  const out = { parcel: { id: parcel.id, name: parcel.name }, crop, sown_at: sownAt, today, plan: null, fiche: false, tasks: null };
+  if (!crop) return sendJson(res, 200, out);
+  // Plan le plus récent de la même culture (liste déjà triée du plus récent au plus ancien).
+  const want = crop.toLowerCase();
+  let plan = null;
+  for (const p of (await listPlansForUser(user.id)).slice(0, 30)) {
+    if (String(p.crop || "").trim().toLowerCase() !== want) continue;
+    const full = await getPlan(p.id); if (!full) continue;
+    if (!plan) plan = full;
+    if (planFiche(full)) { plan = full; break; }
+  }
+  if (!plan) { try { const sh = await findSharedPlan(crop, ""); if (sh) plan = sh; } catch (e) {} }
+  if (!plan) return sendJson(res, 200, out);
+  out.plan = { id: plan.id, title: plan.title || plan.crop };
+  const fiche = planFiche(plan);
+  if (!fiche) return sendJson(res, 200, out);
+  out.fiche = true;
+  out.tasks = TODAY.tasksFor(fiche.calendrier, sownAt, today);
+  out.speech = TODAY.speechText(out.tasks, parcel.name);
+  sendJson(res, 200, out);
 }
 async function handlePlansList(req, res) { const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." }); sendJson(res, 200, { plans: await listPlansForUser(user.id) }); }
 async function handlePlanGet(req, res) {
@@ -3212,6 +3245,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url === "/api/plans") return handlePlansList(req, res);
   if (req.method === "GET" && url === "/api/plan") return handlePlanGet(req, res);
   if (req.method === "POST" && url === "/api/plan/fiche") return handlePlanFiche(req, res);
+  if (req.method === "GET" && url === "/api/today") return handleToday(req, res);
   if (req.method === "GET" && url === "/api/parcels") return handleParcelsList(req, res);
   if (req.method === "POST" && url === "/api/parcels") return handleParcelSave(req, res);
   if (req.method === "POST" && url === "/api/parcels/delete") return handleParcelDelete(req, res);

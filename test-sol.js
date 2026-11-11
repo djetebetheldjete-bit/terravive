@@ -334,5 +334,31 @@ async function t(name, fn) { try { await fn(); passed++; console.log("  ok  " + 
     assert.strictEqual(IM.compareParcels(a, IM.impactReport({ entries: [] })), null);
   });
 
+  const TD = require("./lib/today");
+  await t("aujourd'hui : repères du calendrier convertis en jours depuis le semis", () => {
+    const P = (q) => TD.parseWhen(q);
+    assert.deepStrictEqual(P("Jour 0"), { from: 0, to: 0 });
+    assert.deepStrictEqual(P("J+10"), { from: 10, to: 10 });
+    assert.deepStrictEqual(P("Jours 21 à 28"), { from: 21, to: 28 });
+    assert.deepStrictEqual(P("Semaine 3"), { from: 14, to: 20 });
+    assert.deepStrictEqual(P("Semaines 3-4"), { from: 14, to: 27 });
+    assert.deepStrictEqual(P("2 semaines avant semis"), { from: -14, to: -8 });
+    assert.deepStrictEqual(P("La veille du semis"), { from: -1, to: -1 });
+    assert.deepStrictEqual(P("3 semaines après semis"), { from: 21, to: 27 });
+    assert.deepStrictEqual(P("Dès 6 semaines"), { from: 35, to: 90 });
+    assert.strictEqual(P("À la floraison"), null);
+  });
+  await t("aujourd'hui : tâches de la semaine et de la suivante, stade à part, sans date de semis", () => {
+    const cal = [{ quand: "2 semaines avant semis", faire: "Préparer le sol" }, { quand: "Jour 0", faire: "Semer" }, { quand: "Semaines 2-3", faire: "Butter" }, { quand: "Semaine 4", faire: "Tuteurer" }, { quand: "À la floraison", faire: "Surveiller" }];
+    const x = TD.tasksFor(cal, "2026-10-28", "2026-11-11");
+    assert.strictEqual(x.day, 14);
+    assert.deepStrictEqual(x.now.map((i) => i.faire), ["Butter"]);
+    assert.deepStrictEqual(x.next.map((i) => i.faire), ["Tuteurer"]);
+    assert.deepStrictEqual(x.stage.map((i) => i.faire), ["Surveiller"]);
+    const y = TD.tasksFor(cal, null, "2026-11-11");
+    assert.strictEqual(y.day, null); assert.strictEqual(y.start.length, 3);
+    assert.ok(/Jour 14/.test(TD.speechText(x, "SP")) && /Butter/.test(TD.speechText(x, "SP")));
+  });
+
   console.log(process.exitCode ? "\nDes tests ont échoué." : `\n${passed} tests réussis.`);
 })();
