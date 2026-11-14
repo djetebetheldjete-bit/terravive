@@ -334,6 +334,14 @@ async function t(name, fn) { try { await fn(); passed++; console.log("  ok  " + 
     assert.strictEqual(IM.compareParcels(a, IM.impactReport({ entries: [] })), null);
   });
 
+  await t("fiche : une réponse coupée avant la fin est refermée, on garde ce qui est complet", () => {
+    const F = require("./lib/fiche");
+    const full = JSON.stringify({ titre: "Fiche concombre", en_bref: ["Semer en poquets", "Pailler"], calendrier: [{ quand: "Jour 0", faire: "Semer" }, { quand: "Semaine 3", faire: "Tuteurer" }, { quand: "Semaine 6", faire: "Récolter" }], quantites: [{ quoi: "Compost", combien: "300 kg" }] });
+    const cut = "```json\n" + full.slice(0, full.indexOf("Semaine 6") + 4);
+    const f = F.parseFiche(cut, "concombre");
+    assert.strictEqual(f.calendrier.length, 2); assert.strictEqual(f.en_bref.length, 2);
+    assert.throws(() => F.parseFiche("Désolé, je ne peux pas.", "concombre"));
+  });
   const TD = require("./lib/today");
   await t("aujourd'hui : repères du calendrier convertis en jours depuis le semis", () => {
     const P = (q) => TD.parseWhen(q);

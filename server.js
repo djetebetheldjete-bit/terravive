@@ -1072,8 +1072,9 @@ async function handlePlanFiche(req, res) {
     if (!rateOk("fiche:" + user.id, 30, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Beaucoup de fiches générées aujourd'hui. Reprenez demain." });
     let lastErr = null;
     for (let attempt = 0; attempt < 2 && !fiche; attempt++) {
-      try { fiche = FICHE.parseFiche(await callClaude(FICHE.ficheSystem(), [{ role: "user", content: FICHE.ficheUserMessage(plan) }], null, 4000), plan.crop); }
-      catch (e) { lastErr = e; if (e.status) break; }
+      let raw = "";
+      try { raw = await callClaude(FICHE.ficheSystem(), [{ role: "user", content: FICHE.ficheUserMessage(plan) }], null, 8000); fiche = FICHE.parseFiche(raw, plan.crop); }
+      catch (e) { lastErr = e; if (e.status) break; console.error("Fiche illisible (essai " + (attempt + 1) + ", " + raw.length + " caractères) : début « " + raw.slice(0, 80).replace(/\s+/g, " ") + " » fin « " + raw.slice(-80).replace(/\s+/g, " ") + " »"); }
     }
     if (!fiche) return sendJson(res, (lastErr && lastErr.status) || 502, { error: (lastErr && lastErr.message) || "La fiche n'a pas pu être créée." });
     FICHE_CACHE.set(plan.id, fiche); if (FICHE_CACHE.size > 500) FICHE_CACHE.delete(FICHE_CACHE.keys().next().value);

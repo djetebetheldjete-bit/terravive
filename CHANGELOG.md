@@ -1,5 +1,8 @@
 # Journal des versions — Terravive
 
+## v8.4.1 — 14 novembre 2026
+- **Fiche terrain plus robuste** (trouvé par un test réel en ligne) : la réponse de l'IA pouvait être coupée avant la fin et la fiche échouait (« La fiche n'a pas pu être lue »). La longueur autorisée est doublée, une réponse coupée est refermée en gardant tout ce qui est complet, et chaque échec est écrit dans les journaux.
+
 ## v8.4 — 14 novembre 2026
 - **Carnet d'un membre tenu par l'animateur** (membre sans téléphone) : dans la page Coopérative, la fiche d'un membre a un volet « Carnet de champ du membre ». L'animateur choisit la parcelle, le type, la quantité, la date ; la saisie va dans le carnet du membre avec la mention « Saisi par l'animateur ». Routes `GET` et `POST /api/coop/member/fieldlog`, réservées à l'animateur de la coopérative du membre.
 - **Modèle d'IA** : `claude-sonnet-5-5` par défaut (au lieu de `claude-sonnet-5`), avec retour automatique sur l'ancien modèle si l'API refuse le nouveau. La variable `ANTHROPIC_MODEL` garde la priorité.
