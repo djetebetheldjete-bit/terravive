@@ -103,7 +103,7 @@ input,select,textarea{border:1px solid var(--line);border-radius:10px;padding:9p
 
  <!-- Produits -->
  <section class="view" id="view-products">
-  <div class="toolbar"><input id="prodSearch" placeholder="Rechercher un produit…" style="max-width:260px"><button class="btn small primary perm-products" id="addProduct" type="button">+ Nouveau produit</button><button class="btn small perm-products" id="seedProducts" type="button">Produits de démarrage</button><button class="btn small perm-export" id="expProducts" type="button">Exporter CSV</button></div>
+  <div class="toolbar"><input id="prodSearch" aria-label="Rechercher un produit" placeholder="Rechercher un produit…" style="max-width:260px"><button class="btn small primary perm-products" id="addProduct" type="button">+ Nouveau produit</button><button class="btn small perm-products" id="seedProducts" type="button">Produits de démarrage</button><button class="btn small perm-export" id="expProducts" type="button">Exporter CSV</button></div>
   <section class="card"><div class="table-wrap"><table><thead><tr><th>Produit</th><th>Catégorie</th><th>Disponible</th><th>Seuil</th><th>Prix</th><th>Statut</th><th>Producteur</th><th></th></tr></thead><tbody id="productsBody"><tr><td colspan="8" class="empty">Chargement…</td></tr></tbody></table></div></section>
  </section>
 
@@ -315,9 +315,9 @@ async function ensureRefs(){if(!PRODUCTS.length){try{const d=await api('/api/sto
 
 // Produit
 $('addProduct')&&$('addProduct').addEventListener('click',()=>{modal(`<h3>Nouveau produit</h3>
- <div class="field"><label>Nom *</label><input id="pName" placeholder="Ex. Tomate"></div>
- <div class="row2"><div class="field"><label>Catégorie</label><input id="pCat" placeholder="Légume, céréale…"></div><div class="field"><label>Unité</label><select id="pUnit">${unitOpts('kg')}</select></div></div>
- <div class="row2"><div class="field"><label>Seuil d'alerte (stock bas)</label><input id="pMin" type="number" min="0" step="0.001" value="0"></div><div class="field"><label>Prix de vente (FCFA)</label><input id="pPrice" type="number" min="0" step="1" value="0"></div></div>
+ <div class="field"><label for="pName">Nom *</label><input id="pName" placeholder="Ex. Tomate"></div>
+ <div class="row2"><div class="field"><label for="pCat">Catégorie</label><input id="pCat" placeholder="Légume, céréale…"></div><div class="field"><label for="pUnit">Unité</label><select id="pUnit">${unitOpts('kg')}</select></div></div>
+ <div class="row2"><div class="field"><label for="pMin">Seuil d'alerte (stock bas)</label><input id="pMin" type="number" min="0" step="0.001" value="0"></div><div class="field"><label for="pPrice">Prix de vente (FCFA)</label><input id="pPrice" type="number" min="0" step="1" value="0"></div></div>
  <div class="field"><label><input type="checkbox" id="pPublic" style="width:auto;margin-right:6px">Visible dans la vitrine publique</label></div>
  ${imagePickerHTML(null)}
  <div class="muted small">Si vous ne choisissez rien, une image par défaut est attribuée selon le nom (tomate, concombre…).</div>
@@ -329,9 +329,9 @@ $('addProduct')&&$('addProduct').addEventListener('click',()=>{modal(`<h3>Nouvea
 function editProduct(id){
  const p=PRODUCTS.find(x=>x.id===id); if(!p)return;
  modal(`<h3>Modifier le produit</h3>
- <div class="field"><label>Nom *</label><input id="pName" value="${esc(p.name)}"></div>
- <div class="row2"><div class="field"><label>Catégorie</label><input id="pCat" value="${esc(p.category||'')}"></div><div class="field"><label>Unité</label><select id="pUnit">${unitOpts(p.unit)}</select></div></div>
- <div class="row2"><div class="field"><label>Seuil d'alerte</label><input id="pMin" type="number" min="0" step="0.001" value="${p.min_qty}"></div><div class="field"><label>Prix (FCFA)</label><input id="pPrice" type="number" min="0" step="1" value="${p.price}"></div></div>
+ <div class="field"><label for="pName">Nom *</label><input id="pName" value="${esc(p.name)}"></div>
+ <div class="row2"><div class="field"><label for="pCat">Catégorie</label><input id="pCat" value="${esc(p.category||'')}"></div><div class="field"><label for="pUnit">Unité</label><select id="pUnit">${unitOpts(p.unit)}</select></div></div>
+ <div class="row2"><div class="field"><label for="pMin">Seuil d'alerte</label><input id="pMin" type="number" min="0" step="0.001" value="${p.min_qty}"></div><div class="field"><label for="pPrice">Prix (FCFA)</label><input id="pPrice" type="number" min="0" step="1" value="${p.price}"></div></div>
  <div class="field"><label><input type="checkbox" id="pPublic" style="width:auto;margin-right:6px" ${p.is_public?'checked':''}>Visible dans la vitrine publique</label></div>
  ${imagePickerHTML(p.image||null)}
  <div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="pUpd" type="button">Enregistrer</button></div>`);
@@ -340,28 +340,28 @@ function editProduct(id){
 }
 // Récolte
 $('addHarvest')&&$('addHarvest').addEventListener('click',async()=>{await ensureRefs();modal(`<h3>Enregistrer une récolte</h3>
- <div class="field"><label>Produit *</label><select id="hProd">${prodOpts()}</select></div>
- <div class="field"><label>Producteur</label><select id="hProducer">${producerOpts()}</select></div>
- <div class="row2"><div class="field"><label>Quantité *</label><input id="hQty" type="number" min="0" step="0.001"></div><div class="field"><label>Unité</label><select id="hUnit">${unitOpts('kg')}</select></div></div>
- <div class="row2"><div class="field"><label>Qualité</label><input id="hQual" placeholder="A, B…"></div><div class="field"><label>Date</label><input id="hDate" type="date"></div></div>
- <div class="row2"><div class="field"><label>Parcelle</label><input id="hParcel"></div><div class="field"><label>Lot</label><input id="hBatch"></div></div>
+ <div class="field"><label for="hProd">Produit *</label><select id="hProd">${prodOpts()}</select></div>
+ <div class="field"><label for="hProducer">Producteur</label><select id="hProducer">${producerOpts()}</select></div>
+ <div class="row2"><div class="field"><label for="hQty">Quantité *</label><input id="hQty" type="number" min="0" step="0.001"></div><div class="field"><label for="hUnit">Unité</label><select id="hUnit">${unitOpts('kg')}</select></div></div>
+ <div class="row2"><div class="field"><label for="hQual">Qualité</label><input id="hQual" placeholder="A, B…"></div><div class="field"><label for="hDate">Date</label><input id="hDate" type="date"></div></div>
+ <div class="row2"><div class="field"><label for="hParcel">Parcelle</label><input id="hParcel"></div><div class="field"><label for="hBatch">Lot</label><input id="hBatch"></div></div>
  <div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="hSave" type="button">Enregistrer</button></div>`);
  $('hSave').addEventListener('click',async()=>{try{await api('/api/stock/harvests',{method:'POST',body:JSON.stringify({product_id:$('hProd').value,producer_id:$('hProducer').value||null,qty:$('hQty').value,unit:$('hUnit').value,quality:$('hQual').value,harvested_at:$('hDate').value,parcel:$('hParcel').value,batch_ref:$('hBatch').value})});closeModal();notice('Récolte enregistrée, stock mis à jour.','ok');loadView('harvests');}catch(e){notice(e.message,'err');}});
 });
 // Perte
 $('addLoss')&&$('addLoss').addEventListener('click',async()=>{await ensureRefs();modal(`<h3>Enregistrer une perte</h3>
- <div class="field"><label>Produit *</label><select id="lProd">${prodOpts()}</select></div>
- <div class="row2"><div class="field"><label>Quantité *</label><input id="lQty" type="number" min="0" step="0.001"></div><div class="field"><label>Cause</label><select id="lCause">${Object.entries(CAUSE_LABEL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div></div>
- <div class="field"><label>Date</label><input id="lDate" type="date"></div>
- <div class="field"><label>Commentaire</label><textarea id="lNote" rows="2"></textarea></div>
+ <div class="field"><label for="lProd">Produit *</label><select id="lProd">${prodOpts()}</select></div>
+ <div class="row2"><div class="field"><label for="lQty">Quantité *</label><input id="lQty" type="number" min="0" step="0.001"></div><div class="field"><label for="lCause">Cause</label><select id="lCause">${Object.entries(CAUSE_LABEL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div></div>
+ <div class="field"><label for="lDate">Date</label><input id="lDate" type="date"></div>
+ <div class="field"><label for="lNote">Commentaire</label><textarea id="lNote" rows="2"></textarea></div>
  <div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="lSave" type="button">Enregistrer</button></div>`);
  $('lSave').addEventListener('click',async()=>{try{await api('/api/stock/losses',{method:'POST',body:JSON.stringify({product_id:$('lProd').value,qty:$('lQty').value,cause:$('lCause').value,lost_at:$('lDate').value,note:$('lNote').value})});closeModal();notice('Perte enregistrée, stock mis à jour.','ok');loadView('losses');}catch(e){notice(e.message,'err');}});
 });
 // Producteur
 $('addProducer')&&$('addProducer').addEventListener('click',()=>{modal(`<h3>Nouveau producteur</h3>
- <div class="field"><label>Nom *</label><input id="rName"></div>
- <div class="row2"><div class="field"><label>Téléphone</label><input id="rPhone"></div><div class="field"><label>Région</label><input id="rRegion"></div></div>
- <div class="field"><label>Coopérative</label><input id="rCoop"></div>
+ <div class="field"><label for="rName">Nom *</label><input id="rName"></div>
+ <div class="row2"><div class="field"><label for="rPhone">Téléphone</label><input id="rPhone"></div><div class="field"><label for="rRegion">Région</label><input id="rRegion"></div></div>
+ <div class="field"><label for="rCoop">Coopérative</label><input id="rCoop"></div>
  <div class="field"><label><input type="checkbox" id="rConsent" style="width:auto;margin-right:6px">Accepte d'être présenté dans la vitrine publique</label></div>
  <div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="rSave" type="button">Enregistrer</button></div>`);
  $('rSave').addEventListener('click',async()=>{try{await api('/api/stock/producers',{method:'POST',body:JSON.stringify({name:$('rName').value,phone:$('rPhone').value,region:$('rRegion').value,cooperative:$('rCoop').value,consent_public:$('rConsent').checked})});closeModal();notice('Producteur enregistré.','ok');loadView('producers');}catch(e){notice(e.message,'err');}});
@@ -369,7 +369,7 @@ $('addProducer')&&$('addProducer').addEventListener('click',()=>{modal(`<h3>Nouv
 // Vente
 $('addSale')&&$('addSale').addEventListener('click',async()=>{await ensureRefs();
  modal(`<h3>Nouvelle vente</h3>
- <div class="field"><label>Client</label><input id="sClient" placeholder="Nom du client (facultatif)"></div>
+ <div class="field"><label for="sClient">Client</label><input id="sClient" placeholder="Nom du client (facultatif)"></div>
  <div id="saleLines"></div>
  <button class="btn small ghost" id="addLine" type="button">+ Ajouter une ligne</button>
  <div class="tot"><span>Total</span><span id="saleTotal">0 F CFA</span></div>
@@ -385,8 +385,8 @@ $('addSale')&&$('addSale').addEventListener('click',async()=>{await ensureRefs()
  $('sSave').addEventListener('click',async()=>{const items=[];lines.querySelectorAll('.sale-line').forEach(r=>{const pid=r.querySelector('.lp').value,q=Number(r.querySelector('.lq').value)||0,p=Number(r.querySelector('.lpr').value);if(pid&&q>0)items.push({product_id:pid,qty:q,unit_price:p});});if(!items.length){notice('Ajoutez au moins une ligne valide.','err');return;}try{const d=await api('/api/stock/sales',{method:'POST',body:JSON.stringify({customer_name:$('sClient').value,items})});closeModal();notice('Vente créée ('+d.reference+'). Validez-la pour décrémenter le stock.','ok');await loadSales();openSale(d.saleId);}catch(e){notice(e.message,'err');}});
 });
 function payModal(s){modal(`<h3>Enregistrer un paiement</h3><p class="muted small">Reste à payer : ${money(s.remaining)}</p>
- <div class="row2"><div class="field"><label>Montant (FCFA) *</label><input id="payAmt" type="number" min="1" step="1"></div><div class="field"><label>Moyen</label><select id="payMethod">${Object.entries(PAY_LABEL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div></div>
- <div class="field"><label>Référence (facultatif)</label><input id="payRef"></div>
+ <div class="row2"><div class="field"><label for="payAmt">Montant (FCFA) *</label><input id="payAmt" type="number" min="1" step="1"></div><div class="field"><label for="payMethod">Moyen</label><select id="payMethod">${Object.entries(PAY_LABEL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div></div>
+ <div class="field"><label for="payRef">Référence (facultatif)</label><input id="payRef"></div>
  <div class="alert small">N'enregistrez un paiement que lorsqu'il est réellement reçu. Aucun paiement automatique n'est effectué.</div>
  <div class="toolbar" style="justify-content:flex-end"><button class="btn small ghost" onclick="closeModal()" type="button">Annuler</button><button class="btn small primary" id="paySave" type="button">Enregistrer</button></div>`);
  $('paySave').addEventListener('click',async()=>{try{await api('/api/stock/payments',{method:'POST',body:JSON.stringify({sale_id:s.id,amount:$('payAmt').value,method:$('payMethod').value,reference:$('payRef').value})});closeModal();notice('Paiement enregistré.','ok');openSale(s.id);}catch(e){notice(e.message,'err');}});

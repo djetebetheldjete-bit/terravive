@@ -1,5 +1,13 @@
 # Journal des versions — Terravive
 
+## v8.6 — 14 novembre 2026 : robustesse, accessibilité, tests automatiques
+- **Serveur plus robuste** : une adresse ou un cookie mal formé ne peut plus arrêter le serveur (réponse 400, le service continue). Toute erreur imprévue d'une requête renvoie une réponse au lieu de couper le service.
+- **Anti-force brute** : 10 essais de connexion par compte et 30 par connexion sur 10 minutes, 10 créations de compte par heure et par connexion (réponse 429 au-delà).
+- **En-têtes de sécurité** : `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, et `Strict-Transport-Security` en production.
+- **Interface** : en-tête des pages Plan de culture et Automatisation remis au propre (le sélecteur de thème ne s'étire plus, les boutons tiennent sur une ligne) ; pastilles de thème rondes sur téléphone.
+- **Accessibilité** : chaque champ de formulaire a un nom lisible par les lecteurs d'écran (plan, stock, automatisation, tableau de bord, conseiller, diagnostic) ; un seul titre principal par page.
+- **Tests automatiques** : `npm test` lance toutes les suites, dont 65 nouveaux tests de bout en bout (`test/test-http.js` : pages, sécurité, comptes, rôles cultivateur / client / administrateur, limites anti-abus) sur un serveur local à données jetables — jamais la base de production. Lancement automatique à chaque envoi sur GitHub (`.github/workflows/tests.yml`).
+- Dossier de données local configurable (`DATA_DIR`), ajout d'un `.gitignore`. Service worker v26.
 ## v8.5.1 — 14 novembre 2026
 - **Plan de culture et fiche terrain plus rapides** : mesure en ligne, le modèle réfléchissait 79 s avant d'écrire la première ligne. Le plan (effort « medium ») et la fiche (effort « low ») sont maintenant rédigés sans réflexion préalable (`thinking: between_tools`). Si l'API refuse ces réglages, la requête repart sans eux. Variables facultatives : `PLAN_EFFORT`, `PLAN_THINKING=adaptive`.
 
