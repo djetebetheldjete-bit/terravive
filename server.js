@@ -55,7 +55,8 @@ const SUPABASE_URL = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const USE_DB = !!(SUPABASE_URL && SUPABASE_KEY);
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-const DATA_DIR = path.join(__dirname, "data");
+// Dossier des données locales (mode sans base). DATA_DIR permet aux tests d'utiliser un dossier jetable.
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const PUBLIC_DIR = path.join(__dirname, "public");
 try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
 
@@ -135,7 +136,7 @@ async function getSessionUser(token) {
   }
   const s = loadStore(); const x = s.sessions[token]; if (!x) return null; if (Date.now() - (x.at || 0) > SESSION_TTL_MS) { delete s.sessions[token]; saveStore(s); return null; } return s.users[x.userId] || null;
 }
-function parseCookies(req) { const h = req.headers.cookie || ""; const out = {}; h.split(";").forEach((p) => { const i = p.indexOf("="); if (i > -1) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim()); }); return out; }
+function parseCookies(req) { const h = req.headers.cookie || ""; const out = {}; h.split(";").forEach((p) => { const i = p.indexOf("="); if (i > -1) { const v = p.slice(i + 1).trim(); let d = v; try { d = decodeURIComponent(v); } catch (e) { d = v; } out[p.slice(0, i).trim()] = d; } }); return out; }
 function setSessionCookie(res, token) { res.setHeader("Set-Cookie", `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax${COOKIE_SECURE}; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`); }
 function clearSessionCookie(res) { res.setHeader("Set-Cookie", `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax${COOKIE_SECURE}; Max-Age=0`); }
 // Code administrateur (facultatif). S'il est défini, un compte administrateur doit AUSSI
@@ -957,6 +958,7 @@ async function handleRegister(req, res) {
     const email = normEmail(p.email);
     if (!validEmail(email)) return sendJson(res, 400, { error: "Adresse e-mail invalide." });
     if (typeof p.password !== "string" || p.password.length < 6) return sendJson(res, 400, { error: "Le mot de passe doit contenir au moins 6 caractères." });
+    if (!rateOk("register-ip:" + clientIp(req), 10, 60 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de créations de compte depuis cette connexion. Réessayez plus tard." });
     if (await findUserByEmail(email)) return sendJson(res, 409, { error: "Un compte existe déjà avec cette adresse. Connectez-vous." });
     const user = await createUser({ email, name: p.name, password: p.password, region: p.region, profile: p.profile });
     const token = await createSession(user.id); setSessionCookie(res, token);
@@ -966,6 +968,8 @@ async function handleRegister(req, res) {
 async function handleLogin(req, res) {
   try {
     let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+    // Anti-force brute : nombre de tentatives limité par adresse IP et par e-mail.
+    if (!rateOk("login-ip:" + clientIp(req), 30, 10 * 60 * 1000) || !rateOk("login:" + normEmail(p.email).slice(0, 200), 10, 10 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de tentatives de connexion. Réessayez dans quelques minutes." });
     const user = await findUserByEmail(p.email);
     if (!user || !verifyPassword(p.password, user.pass)) return sendJson(res, 401, { error: "E-mail ou mot de passe incorrect." });
     // Onglet « Administrateur » + code administrateur configuré : le code est exigé.
@@ -3253,7 +3257,30 @@ async function denyIfClient(req, res, url, method) {
 }
 
 // ---------- Routeur ----------
-const server = http.createServer(async (req, res) => {
+// Réponse de secours : une requête en erreur reçoit un message, le serveur continue de tourner.
+function failRequest(res, err) {
+  const bad = err instanceof URIError;
+  if (!bad) console.error("Requête en erreur :", (err && err.stack) || err);
+  try {
+    if (!res.headersSent) { res.writeHead(bad ? 400 : 500, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify({ error: bad ? "Adresse ou requête invalide." : "Erreur serveur." })); }
+    else if (!res.writableEnded) res.end();
+  } catch (e) {}
+}
+// Filets de sécurité : une erreur imprévue est journalisée au lieu d'arrêter le serveur.
+process.on("unhandledRejection", (e) => console.error("Rejet non géré :", (e && e.stack) || e));
+process.on("uncaughtException", (e) => console.error("Exception non gérée :", (e && e.stack) || e));
+// Purge horaire du limiteur de débit : on oublie les clés sans activité depuis 24 h.
+setInterval(() => { const now = Date.now(); for (const k of Object.keys(RL)) { const a = RL[k]; if (!a.length || now - a[a.length - 1] > 24 * 60 * 60 * 1000) delete RL[k]; } }, 60 * 60 * 1000).unref();
+
+const server = http.createServer((req, res) => {
+  // En-têtes de sécurité communs à toutes les réponses.
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  if (COOKIE_SECURE) res.setHeader("Strict-Transport-Security", "max-age=15552000");
+  routeRequest(req, res).catch((err) => failRequest(res, err));
+});
+async function routeRequest(req, res) {
   const url = (req.url || "").split("?")[0];
   // Point de contrôle de santé (pour un moniteur d'uptime : garde le service éveillé et signale les pannes).
   if (req.method === "GET" && (url === "/healthz" || url === "/api/health")) return sendJson(res, 200, { ok: true, service: "terravive", time: new Date().toISOString(), uptime_s: Math.round(process.uptime()), db: USE_DB ? "supabase" : "local", sol: SOL_SRC.isdaConfigured() ? "isda" : "soilgrids (ISDA_USERNAME/ISDA_PASSWORD absents)" });
@@ -3364,7 +3391,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && url === "/api/quality/tests") return handleQualityTests(req, res);
   if (req.method === "GET") return serveStatic(req, res);
   res.writeHead(405); res.end("Méthode non autorisée");
-});
+}
 
 server.listen(PORT, () => {
   console.log(`\n  Terravive — agriculture durable accompagnée par l'IA`);

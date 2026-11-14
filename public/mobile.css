@@ -49,7 +49,7 @@
 }
 
 /* le sélecteur de thème de l'accueil reste visible et compact sur mobile */
-@media (max-width: 860px) { body.m-on .top .themepick { display: flex !important; } body.m-on .top .themepick .tlab { display: none; } body.m-on .top .themepick .th { width: 20px; height: 20px; } }
+@media (max-width: 860px) { body.m-on .top .themepick { display: flex !important; } body.m-on .top .themepick .tlab { display: none; } body.m-on .top .themepick { gap: 9px; } body.m-on .top .themepick .th { width: 26px; height: 26px; min-height: 0; flex: 0 0 auto; } }
 
 /* ---------- 3. Barre de navigation basse (zone du pouce) ---------- */
 .m-nav, .m-sheet, .m-backdrop, .m-cta { display: none; }

@@ -337,7 +337,7 @@ html.simple .adv{display:none!important}
             <h2 class="ct">Propriétaire — animateurs désignés</h2>
             <div class="muted">Vous seul accordez le statut d'<b>animateur</b> (droit de créer et d'animer une coopérative). La personne doit déjà avoir un compte Terravive.</div>
             <div class="row" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-              <input class="sel" id="animEmail" style="flex:1;min-width:200px;" placeholder="adresse e-mail du compte" autocomplete="off">
+              <input class="sel" id="animEmail" aria-label="Adresse e-mail du compte à désigner" style="flex:1;min-width:200px;" placeholder="adresse e-mail du compte" autocomplete="off">
               <button class="btn primary" id="animGrant" type="button">Désigner animateur</button>
               <button class="btn" id="animRevoke" type="button">Retirer le statut</button>
             </div>
@@ -359,7 +359,7 @@ html.simple .adv{display:none!important}
             <h2 class="ct">Ma parcelle — surveillance satellite</h2>
             <div class="muted" id="mapSub">Repérez votre champ (recherche ou GPS), puis dessinez votre parcelle (outil rectangle ou polygone, en haut à gauche de la carte) et lancez une analyse satellite via Vertea.</div>
             <div class="maprow" style="margin-top:10px;">
-              <input id="placeSearch" class="sel" style="flex:1;min-width:150px;" placeholder="Rechercher un lieu (village, ville…)">
+              <input id="placeSearch" aria-label="Rechercher un lieu" class="sel" style="flex:1;min-width:150px;" placeholder="Rechercher un lieu (village, ville…)">
               <button class="btn" id="btnSearch" type="button">Aller</button>
               <button class="btn" id="btnLocate" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> Me localiser</button>
             </div>
@@ -374,7 +374,7 @@ html.simple .adv{display:none!important}
               <button class="btn" id="btnPlant" type="button">Quoi planter&nbsp;?</button>
             </div>
             <div class="maprow" id="parcelSaveRow" style="display:none;align-items:center;">
-              <input class="sel" id="parcelName" style="flex:1;min-width:150px;" placeholder="Nom de cette parcelle (ex. Champ derrière la maison)" maxlength="80" autocomplete="off">
+              <input class="sel" id="parcelName" aria-label="Nom de la parcelle" style="flex:1;min-width:150px;" placeholder="Nom de cette parcelle (ex. Champ derrière la maison)" maxlength="80" autocomplete="off">
               <button class="btn" id="btnSaveParcel" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M5 3h12l2 2v16l-7-4-7 4z"/></svg> Enregistrer la parcelle</button>
             </div>
             <div id="parcelList" class="section-gap"></div>
@@ -476,7 +476,7 @@ html.simple .adv{display:none!important}
                 <button class="btn primary" type="button" id="logAdd">Enregistrer</button>
               </div>
               <div class="muted" id="logMsg" style="margin-top:4px;font-size:.84rem;"></div>
-              <div class="maprow" style="margin-top:10px;align-items:center;"><span class="muted" style="font-size:.82rem;">Totaux :</span><select class="sel" id="logSeasonFilter" style="width:auto;"></select></div>
+              <div class="maprow" style="margin-top:10px;align-items:center;"><span class="muted" style="font-size:.82rem;">Totaux :</span><select class="sel" id="logSeasonFilter" aria-label="Saison des totaux" style="width:auto;"></select></div>
               <div id="logTotals" class="vchips"></div>
               <div id="logPending" class="loglist"></div>
               <div id="logList" class="loglist"></div>
