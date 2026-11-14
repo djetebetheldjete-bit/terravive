@@ -1,5 +1,8 @@
 # Journal des versions — Terravive
 
+## v8.5 — 14 novembre 2026
+- **Le plan de culture s'écrit sous les yeux du producteur** : le texte s'affiche à mesure que l'IA le rédige (premières lignes en quelques secondes), au lieu d'un écran d'attente de plusieurs minutes. Le plan complet est enregistré à la fin, même si le téléphone perd la connexion entre-temps. `POST /api/plan` accepte `stream: true` (réponse en lignes JSON : `start`, `delta`, `done` ou `error`). Service worker v25.
+
 ## v8.4.1 — 14 novembre 2026
 - **Fiche terrain plus robuste** (trouvé par un test réel en ligne) : la réponse de l'IA pouvait être coupée avant la fin et la fiche échouait (« La fiche n'a pas pu être lue »). La longueur autorisée est doublée, une réponse coupée est refermée en gardant tout ce qui est complet, et chaque échec est écrit dans les journaux.
 

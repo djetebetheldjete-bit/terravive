@@ -687,10 +687,36 @@
     var rb=document.getElementById("regenBtn"); if(rb){ rb.disabled=true; rb.innerHTML='<span class="spin"></span> Génération…'; }
     try{
       const body={ parcel_id:($("parcelSel")&&$("parcelSel").value)||undefined, crop, region:$("region").value, area:$("area").value, soil:$("soil").value, ph:$("ph").value, season:$("season").value, mode:($("mode")?$("mode").value:""), structure:($("structure")?$("structure").value:""), goal:$("goal").value, notes:$("notes").value, fresh:fresh };
+      body.stream=true;
       const r=await fetch("/api/plan",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
-      const d=await r.json();
-      if(!r.ok){ err.textContent=d.error||"La génération a échoué."; }
-      else { showPlan(d.plan, { reused: d.reused===true, sector: d.sector }); if(d.reused!==true) loadPlans(); }
+      const ct=r.headers.get("content-type")||"";
+      if(ct.indexOf("ndjson")>=0 && r.body && r.body.getReader){
+        // Le plan s'écrit sous les yeux du producteur : on affiche le texte à mesure qu'il arrive.
+        const reader=r.body.getReader(), dec=new TextDecoder(); let buf="", text="", last=0, shown=false, finalPlan=null, failed=null;
+        const paint=function(force){
+          const now=Date.now(); if(!force && now-last<700) return; last=now;
+          if(!shown){ shown=true; $("planPlaceholder").style.display="none"; $("planContent").style.display="block"; $("reuseNote").style.display="none"; $("planPills").innerHTML='<span class="pill">Culture : <b>'+esc(crop)+'</b></span><span class="pill">Rédaction en cours…</span>'; $("chatCard").style.display="none"; { const fc=$("ficheCard"); if(fc) fc.style.display="none"; } { const lb=$("listenBtn"); if(lb) lb.style.display="none"; } try{ $("planContent").scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){} }
+          $("planDoc").innerHTML=renderMd(text)+'<p class="muted" style="margin-top:10px;"><span class="spin"></span> La suite arrive…</p>';
+          btn.innerHTML='<span class="spin"></span> Rédaction en cours… ('+Math.round(text.length/100)/10+' k caractères)';
+        };
+        for(;;){
+          const x=await reader.read(); if(x.done) break;
+          buf+=dec.decode(x.value,{stream:true}); let k;
+          while((k=buf.indexOf("\n"))>=0){
+            const line=buf.slice(0,k); buf=buf.slice(k+1); if(!line.trim()) continue;
+            let ev; try{ ev=JSON.parse(line); }catch(e){ continue; }
+            if(ev.t==="delta"){ text+=ev.d; paint(false); }
+            else if(ev.t==="done") finalPlan=ev.plan;
+            else if(ev.t==="error") failed=ev.error||"La génération a échoué.";
+          }
+        }
+        if(finalPlan){ showPlan(finalPlan,{reused:false}); loadPlans(); }
+        else { err.textContent=failed||"La connexion a été coupée avant la fin. Si le plan a pu être terminé, il apparaît dans « Mes plans » ; sinon, relancez."; if(shown){ $("planDoc").innerHTML=renderMd(text); } loadPlans(); }
+      } else {
+        const d=await r.json();
+        if(!r.ok){ err.textContent=d.error||"La génération a échoué."; }
+        else { showPlan(d.plan, { reused: d.reused===true, sector: d.sector }); if(d.reused!==true) loadPlans(); }
+      }
     }catch(e){ err.textContent="Serveur injoignable."; }
     btn.disabled=false; btn.innerHTML="Générer mon plan de culture";
   }

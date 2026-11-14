@@ -684,6 +684,45 @@ async function callClaudeOnce(system, messages, model, maxTokens) {
   throw lastErr || new Error("Aucune clé API disponible.");
 }
 
+// Même appel, mais en flux : onText reçoit chaque morceau de texte dès qu'il arrive. Renvoie le texte complet.
+// Tant que rien n'a été reçu, on peut encore changer de clé ou de modèle ; après, une coupure est une erreur.
+async function streamClaude(system, messages, model, maxTokens, onText) {
+  const n = API_KEYS.length || 1; const start = KEY_CURSOR; KEY_CURSOR = (KEY_CURSOR + 1) % n; let lastErr = null;
+  const models = [model || MODEL]; if (models[0] !== FALLBACK_MODEL) models.push(FALLBACK_MODEL);
+  for (const mdl of models) {
+    const body = JSON.stringify({ model: mdl, max_tokens: maxTokens || 4096, stream: true, system, messages: messages.map((m) => ({ role: m.role, content: m.content })) });
+    for (let i = 0; i < n; i++) {
+      let r;
+      try { r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": API_KEYS[(start + i) % n], "anthropic-version": "2023-06-01" }, body }); }
+      catch (e) { lastErr = e; continue; }
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        lastErr = Object.assign(new Error((data && data.error && data.error.message) || ("Erreur IA " + r.status)), { status: r.status });
+        if (r.status === 404) break;            // modèle refusé : on passe au modèle de secours
+        if (r.status === 400) throw lastErr;
+        if ((r.status === 429 || r.status === 529) && i < n - 1) await sleep(600);
+        continue;
+      }
+      let full = "", buf = ""; const dec = new TextDecoder();
+      for await (const chunk of r.body) {
+        buf += dec.decode(chunk, { stream: true });
+        let k;
+        while ((k = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, k).trim(); buf = buf.slice(k + 1);
+          if (!line.startsWith("data:")) continue;
+          let ev; try { ev = JSON.parse(line.slice(5)); } catch (e) { continue; }
+          if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta" && ev.delta.text) { full += ev.delta.text; onText(ev.delta.text); }
+          else if (ev.type === "error") throw Object.assign(new Error((ev.error && ev.error.message) || "La génération a été interrompue."), { status: 502 });
+        }
+      }
+      return full.trim();
+    }
+    if (!(lastErr && lastErr.status === 404)) break;
+    console.error("Modèle " + mdl + " refusé par l'API (flux) :", lastErr.message);
+  }
+  throw lastErr || new Error("Aucune clé API disponible.");
+}
+
 // ---------- Invites IA (agriculture durable) ----------
 const DURABLE_CONTEXT = `Tu es un ingénieur agronome spécialisé en AGRICULTURE DURABLE et en AGROÉCOLOGIE, avec une grande expérience du climat tropical et de l'Afrique de l'Ouest (notamment la Côte d'Ivoire). Tu t'adresses à des agriculteurs et agricultrices qui ne sont pas des experts : sois clair, concret, bienveillant, en français simple.
 
@@ -1024,12 +1063,20 @@ async function handlePlan(req, res) {
 
   // 2) GÉNÉRATION par l'IA (compte dans la limite journalière et dans le coût).
   if (!rateOk("plan:" + user.id, 20, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Vous avez généré beaucoup de plans aujourd'hui. Reprenez plus tard." });
+  // Mode « au fil de l'eau » : le texte part vers le téléphone à mesure que l'IA l'écrit (une ligne JSON
+  // par morceau), au lieu de faire attendre plusieurs minutes devant un écran vide.
+  const live = p.stream === true;
+  const send = (o) => { try { res.write(JSON.stringify(o) + "\n"); } catch (e) { /* lecteur parti : on finit et on enregistre quand même */ } };
+  if (live) { res.writeHead(200, { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-cache, no-transform", "x-accel-buffering": "no" }); send({ t: "start" }); }
+  const reply = (code, obj) => { if (!live) return sendJson(res, code, obj); send(code === 200 ? Object.assign({ t: "done" }, obj) : { t: "error", error: obj.error }); res.end(); };
   try {
-    const content = await callClaude(planSystem(), [{ role: "user", content: planUserMessage(clean, soilBlock) }], null, PLAN_MAX_TOKENS);
+    const msgs = [{ role: "user", content: planUserMessage(clean, soilBlock) }];
+    const content = live ? await streamClaude(planSystem(), msgs, null, PLAN_MAX_TOKENS, (d) => send({ t: "delta", d })) : await callClaude(planSystem(), msgs, null, PLAN_MAX_TOKENS);
+    if (!content) throw new Error("La génération a échoué.");
     const rec = { id: newId(), user_id: user.id, title: crop + (clean.region ? " — " + clean.region : ""), crop, region: clean.region || null, area: clean.area || null, soil: clean.soil || null, season: clean.season || null, goal: clean.goal || null, notes: clean.notes || null, content, created_at: new Date().toISOString() };
     await savePlan(rec);
-    sendJson(res, 200, { plan: rec, reused: false });
-  } catch (e) { sendJson(res, e.status || 500, { error: e.message || "La génération a échoué." }); }
+    reply(200, { plan: rec, reused: false });
+  } catch (e) { reply(e.status || 500, { error: e.message || "La génération a échoué." }); }
 }
 // --- Fiche pratique terrain (version courte et imprimable de l'itinéraire) ---
 const FICHE_CACHE = new Map(); // repli si la colonne trv_plans.fiche n'existe pas encore
