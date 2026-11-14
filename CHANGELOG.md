@@ -1,5 +1,11 @@
 # Journal des versions — Terravive
 
+## v8.3.1 — 14 novembre 2026 : fiabilité sur réseau faible
+- **Aucun doublon dans le carnet** : chaque saisie porte un identifiant créé par le téléphone ; si elle est renvoyée (réseau coupé au mauvais moment, file d'attente), le serveur ne la garde qu'une fois.
+- **Plus d'attente sans fin** : si l'enregistrement ne répond pas en 15 s, la saisie passe « en attente » et repart toute seule.
+- **Ouverture plus rapide sur réseau lent** : si le réseau ne répond pas (6 s pour une page, 10 s pour les données) et qu'une version est déjà sur le téléphone, elle s'affiche tout de suite ; la version à jour est récupérée en arrière-plan.
+- Service worker v23.
+
 ## v8.3 — 11 novembre 2026 : une application plus facile à utiliser
 - **Écran « Aujourd'hui »** en haut du tableau de bord : la culture et le jour depuis le semis, les tâches de cette semaine et de la suivante (tirées du calendrier de la fiche terrain), les alertes de la station, un gros bouton « Noter ce que j'ai fait » et un bouton « Écouter ». Nouvelle route `GET /api/today?parcel=` et module `lib/today.js`.
 - **Mesures du terrain dans le carnet** : arrosoirs, seaux, bidons, fûts, pulvérisateurs, brouettes, sacs, cageots, paniers. La quantité est convertie en litres ou en kilos ; la taille de chaque contenant se règle une fois (gardée sur le téléphone) ; la note garde la trace (« 12 arrosoirs de 10 L »).

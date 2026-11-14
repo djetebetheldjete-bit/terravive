@@ -335,17 +335,18 @@ async function deleteParcelPair(userId, parcelId) {
 }
 async function addFieldLog(rec) {
   if (USE_DB) {
-    try { await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); }
+    // ignore-duplicates : une saisie renvoyée deux fois par un téléphone (réseau coupé) n'est gardée qu'une fois.
+    try { await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal,resolution=ignore-duplicates" }, body: JSON.stringify([rec]) }); }
     catch (e) {
       // Colonnes v8.0 (season, product) pas encore créées : on enregistre quand même l'essentiel.
       if (!/season|product|column/i.test(e.message)) throw e;
       const { season: _s, product: _p, ...base } = rec;
-      await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([base]) });
+      await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal,resolution=ignore-duplicates" }, body: JSON.stringify([base]) });
       return "partial";
     }
     return;
   }
-  const s = loadStore(); s.fieldLog.push(rec); saveStore(s);
+  const s = loadStore(); if (s.fieldLog.some((x) => x.id === rec.id)) return; s.fieldLog.push(rec); saveStore(s);
 }
 async function deleteFieldLog(userId, id) {
   if (USE_DB) { await sb(`/trv_field_log?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); return; }
@@ -1202,7 +1203,9 @@ async function handleFieldLogAdd(req, res) {
   if (!rateOk("log:" + user.id, 200, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Beaucoup d'entrées aujourd'hui. Reprenez demain." });
   const season = String(p.season || "").trim().slice(0, 60) || IMPACT.defaultSeason(date);
   const product = ["engrais", "traitement", "compost"].includes(kind) ? (String(p.product || "").trim().slice(0, 60) || null) : null;
-  const rec = { id: newId(), user_id: user.id, parcel_id: parcel.id, date, kind, qty, unit: LOG_KINDS[kind] || null, product, season, note, created_at: new Date().toISOString() };
+  // Identifiant choisi par le téléphone : renvoyer la même saisie ne crée pas de doublon.
+  const cid = String(p.client_id || "");
+  const rec = { id: /^[a-f0-9]{24}$/.test(cid) ? cid : newId(), user_id: user.id, parcel_id: parcel.id, date, kind, qty, unit: LOG_KINDS[kind] || null, product, season, note, created_at: new Date().toISOString() };
   let partial = null;
   try { partial = await addFieldLog(rec); } catch (e) { console.error("addFieldLog:", e.message); return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
   sendJson(res, 200, partial ? { ok: true, entry: rec, warning: "Entrée enregistrée sans la saison ni le produit : exécutez la partie v8.0 de schema.sql (trv_field_log)." } : { ok: true, entry: rec });

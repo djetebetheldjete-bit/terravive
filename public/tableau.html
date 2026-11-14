@@ -766,6 +766,12 @@ html.simple .adv{display:none!important}
 
   // ---- Carnet hors ligne : les saisies sans réseau attendent sur le téléphone ----
   const QKEY="trv-log-queue"; let qBusy=false;
+  function newClientId(){ try{ const a=new Uint8Array(12); crypto.getRandomValues(a); return Array.from(a).map(x=>x.toString(16).padStart(2,"0")).join(""); }catch(e){ return ""; } }
+  // Envoi avec délai maximal : sur un réseau très lent, on n'attend pas indéfiniment (la saisie passe en attente).
+  function postLog(p, ms){
+    const c=("AbortController" in window)?new AbortController():null, t=c?setTimeout(function(){ c.abort(); }, ms):null;
+    return fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(p),signal:c?c.signal:undefined}).finally(function(){ if(t) clearTimeout(t); });
+  }
   function qGet(){ try{ const a=JSON.parse(localStorage.getItem(QKEY)||"[]"); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
   function qSet(a){ try{ localStorage.setItem(QKEY,JSON.stringify(a)); }catch(e){} showQueue(); }
   function qAdd(p){ const a=qGet(); a.push({ p:p, t:Date.now() }); qSet(a); }
@@ -781,7 +787,7 @@ html.simple .adv{display:none!important}
     if(qBusy) return; const a=qGet(); if(!a.length||navigator.onLine===false) return;
     qBusy=true; const keep=[]; let sent=0, refused=0;
     for(const it of a){
-      try{ const r=await fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(it.p)}); if(r.ok) sent++; else if(r.status===400||r.status===404) refused++; else keep.push(it); }
+      try{ const r=await postLog(it.p, 20000); if(r.ok) sent++; else if(r.status===400||r.status===404) refused++; else keep.push(it); }
       catch(e){ keep.push(it); }
     }
     qBusy=false; qSet(keep.concat(qGet().slice(a.length)));
@@ -886,14 +892,14 @@ html.simple .adv{display:none!important}
     $("logAdd").addEventListener("click", async function(){
       const b=this, k=$("logKind").value, m=measured();
       const note=[m.label, $("logNote").value.trim()].filter(Boolean).join(" · ").slice(0,300);
-      const payload={ parcel_id:$("logParcel").value, date:$("logDate").value, kind:k, qty:m.qty, product:$("logProd").value.trim(), season:$("logSeason").value.trim(), note:note };
+      const payload={ client_id:newClientId(), parcel_id:$("logParcel").value, date:$("logDate").value, kind:k, qty:m.qty, product:$("logProd").value.trim(), season:$("logSeason").value.trim(), note:note };
       try{ localStorage.setItem("trv-log-season-"+payload.parcel_id,payload.season); }catch(e){}
       const done=function(msg){ $("logMsg").textContent=msg; $("logQty").value=""; $("logNote").value=""; $("logProd").value=""; convPreview(); };
       const keepOffline=function(){ qAdd(payload); done("Pas de réseau : saisie gardée sur ce téléphone. Elle sera envoyée automatiquement dès que le réseau revient."); };
       if(navigator.onLine===false){ keepOffline(); return; }
       b.disabled=true; $("logMsg").textContent="Enregistrement…";
       try{
-        const r=await fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
+        const r=await postLog(payload, 15000);
         let d={}; try{ d=await r.json(); }catch(e){}
         if(r.status===502||r.status===503||r.status===504) keepOffline();
         else if(!r.ok){ $("logMsg").textContent="Erreur : "+(d.error||"enregistrement impossible."); }
