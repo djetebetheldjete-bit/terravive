@@ -40,7 +40,9 @@ const API_KEYS = (function () {
   return all;
 })();
 const API_KEY = API_KEYS[0];
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
+// Modèle de secours : si le modèle demandé est refusé (identifiant inconnu de l'API), on repasse sur celui-ci.
+const FALLBACK_MODEL = "claude-sonnet-5";
 // Longueur max (tokens) pour la génération du plan — l'itinéraire complet (18 sections,
 // fiches d'action chiffrées, budget, résumé) est long : 8000 coupait vers la section 13,
 // 16000 vers la section 17. Relevé à 24000 (le modèle accepte cette longueur) et le prompt
@@ -658,6 +660,14 @@ const RETRYABLE = [408, 409, 429, 500, 502, 503, 504, 529];
 let KEY_CURSOR = 0;
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 async function callClaude(system, messages, model, maxTokens) {
+  const wanted = model || MODEL;
+  try { return await callClaudeOnce(system, messages, wanted, maxTokens); }
+  catch (e) {
+    if (e && e.status === 404 && wanted !== FALLBACK_MODEL) { console.error("Modèle " + wanted + " refusé par l'API, secours " + FALLBACK_MODEL + " :", e.message); return callClaudeOnce(system, messages, FALLBACK_MODEL, maxTokens); }
+    throw e;
+  }
+}
+async function callClaudeOnce(system, messages, model, maxTokens) {
   const body = JSON.stringify({ model: model || MODEL, max_tokens: maxTokens || 4096, system, messages: messages.map((m) => ({ role: m.role, content: m.content })) });
   const n = API_KEYS.length || 1; const start = KEY_CURSOR; KEY_CURSOR = (KEY_CURSOR + 1) % n; let lastErr = null;
   for (let i = 0; i < n; i++) {
@@ -1183,32 +1193,64 @@ async function handleFieldLogGet(req, res) {
   let entries; try { entries = await listFieldLog(user.id, parcel.id); } catch (e) { return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
   sendJson(res, 200, { parcel: { id: parcel.id, name: parcel.name, area_m2: FERT.zoneAreaM2(parcel.zone) }, entries, totals: fieldLogTotals(entries) });
 }
+// Vérifie une saisie du carnet et construit l'enregistrement (partagé : producteur, ou animateur pour un membre).
+function buildFieldLogRec(p, ownerId, parcel, rateKey, notePrefix) {
+  const kind = String(p.kind || "");
+  if (!Object.prototype.hasOwnProperty.call(LOG_KINDS, kind)) return { code: 400, error: "Type d'intervention inconnu." };
+  const date = parseIsoDate(p.date || new Date().toISOString().slice(0, 10));
+  if (!date) return { code: 400, error: "Date invalide (format AAAA-MM-JJ)." };
+  if (date > new Date(Date.now() + 86400000).toISOString().slice(0, 10)) return { code: 400, error: "La date ne peut pas être dans le futur." };
+  let qty = null;
+  if (p.qty !== undefined && p.qty !== null && String(p.qty).trim() !== "") {
+    qty = Number(String(p.qty).replace(",", "."));
+    if (!isFinite(qty) || qty < 0 || qty > 1e7) return { code: 400, error: "Quantité invalide." };
+  }
+  const own = String(p.note || "").trim();
+  if (qty == null && !own) return { code: 400, error: "Indiquez une quantité ou une note." };
+  const note = [notePrefix, own].filter(Boolean).join(" · ").slice(0, 300) || null;
+  if (!rateOk("log:" + rateKey, 200, 24 * 60 * 60 * 1000)) return { code: 429, error: "Beaucoup d'entrées aujourd'hui. Reprenez demain." };
+  const season = String(p.season || "").trim().slice(0, 60) || IMPACT.defaultSeason(date);
+  const product = ["engrais", "traitement", "compost"].includes(kind) ? (String(p.product || "").trim().slice(0, 60) || null) : null;
+  // Identifiant choisi par le téléphone : renvoyer la même saisie ne crée pas de doublon.
+  const cid = String(p.client_id || "");
+  return { rec: { id: /^[a-f0-9]{24}$/.test(cid) ? cid : newId(), user_id: ownerId, parcel_id: parcel.id, date, kind, qty, unit: LOG_KINDS[kind] || null, product, season, note, created_at: new Date().toISOString() } };
+}
+async function saveFieldLogRec(res, rec) {
+  let partial = null;
+  try { partial = await addFieldLog(rec); } catch (e) { console.error("addFieldLog:", e.message); return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
+  sendJson(res, 200, partial ? { ok: true, entry: rec, warning: "Entrée enregistrée sans la saison ni le produit : exécutez la partie v8.0 de schema.sql (trv_field_log)." } : { ok: true, entry: rec });
+}
 async function handleFieldLogAdd(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
   let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
   const parcel = await findUserParcel(user.id, String(p.parcel_id || ""));
   if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
-  const kind = String(p.kind || "");
-  if (!Object.prototype.hasOwnProperty.call(LOG_KINDS, kind)) return sendJson(res, 400, { error: "Type d'intervention inconnu." });
-  const date = parseIsoDate(p.date || new Date().toISOString().slice(0, 10));
-  if (!date) return sendJson(res, 400, { error: "Date invalide (format AAAA-MM-JJ)." });
-  if (date > new Date(Date.now() + 86400000).toISOString().slice(0, 10)) return sendJson(res, 400, { error: "La date ne peut pas être dans le futur." });
-  let qty = null;
-  if (p.qty !== undefined && p.qty !== null && String(p.qty).trim() !== "") {
-    qty = Number(String(p.qty).replace(",", "."));
-    if (!isFinite(qty) || qty < 0 || qty > 1e7) return sendJson(res, 400, { error: "Quantité invalide." });
-  }
-  const note = String(p.note || "").trim().slice(0, 300) || null;
-  if (qty == null && !note) return sendJson(res, 400, { error: "Indiquez une quantité ou une note." });
-  if (!rateOk("log:" + user.id, 200, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Beaucoup d'entrées aujourd'hui. Reprenez demain." });
-  const season = String(p.season || "").trim().slice(0, 60) || IMPACT.defaultSeason(date);
-  const product = ["engrais", "traitement", "compost"].includes(kind) ? (String(p.product || "").trim().slice(0, 60) || null) : null;
-  // Identifiant choisi par le téléphone : renvoyer la même saisie ne crée pas de doublon.
-  const cid = String(p.client_id || "");
-  const rec = { id: /^[a-f0-9]{24}$/.test(cid) ? cid : newId(), user_id: user.id, parcel_id: parcel.id, date, kind, qty, unit: LOG_KINDS[kind] || null, product, season, note, created_at: new Date().toISOString() };
-  let partial = null;
-  try { partial = await addFieldLog(rec); } catch (e) { console.error("addFieldLog:", e.message); return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
-  sendJson(res, 200, partial ? { ok: true, entry: rec, warning: "Entrée enregistrée sans la saison ni le produit : exécutez la partie v8.0 de schema.sql (trv_field_log)." } : { ok: true, entry: rec });
+  const b = buildFieldLogRec(p, user.id, parcel, user.id, "");
+  if (b.error) return sendJson(res, b.code, { error: b.error });
+  return saveFieldLogRec(res, b.rec);
+}
+// Carnet d'un membre tenu par l'animateur (membre sans téléphone) : la saisie est rangée dans le carnet
+// du membre et sa note commence par « Saisi par l'animateur », pour garder l'origine de la donnée.
+async function handleCoopMemberLogGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const memberId = new URL(req.url, "http://x").searchParams.get("memberId") || "";
+  if (!(await animateurMemberCoop(user, memberId))) return sendJson(res, 403, { error: "Réservé à l'animateur de la coopérative de ce membre." });
+  const logs = await listFieldLogForUser(memberId);
+  const parcels = ((await listParcelsForUser(memberId)) || []).map((p) => ({ id: p.id, name: p.name,
+    recent: logs.filter((e) => e.parcel_id === p.id).sort((x, y) => String(y.date).localeCompare(String(x.date)) || String(y.created_at).localeCompare(String(x.created_at))).slice(0, 5)
+      .map((e) => ({ date: e.date, kind: e.kind, qty: e.qty, unit: e.unit, note: e.note || null })) }));
+  sendJson(res, 200, { parcels, kinds: LOG_KINDS });
+}
+async function handleCoopMemberLogAdd(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const memberId = String(p.memberId || "");
+  if (!(await animateurMemberCoop(user, memberId))) return sendJson(res, 403, { error: "Réservé à l'animateur de la coopérative de ce membre." });
+  const parcel = await findUserParcel(memberId, String(p.parcel_id || ""));
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const b = buildFieldLogRec(p, memberId, parcel, user.id, "Saisi par l'animateur" + (user.name ? " " + String(user.name).slice(0, 40) : ""));
+  if (b.error) return sendJson(res, b.code, { error: b.error });
+  return saveFieldLogRec(res, b.rec);
 }
 async function handleFieldLogDelete(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
@@ -3269,6 +3311,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && url === "/api/coop/join") return handleCoopJoin(req, res);
   if (req.method === "POST" && url === "/api/coop/leave") return handleCoopLeave(req, res);
   if (req.method === "GET" && url === "/api/coop/overview") return handleCoopOverview(req, res);
+  if (req.method === "GET" && url.startsWith("/api/coop/member/fieldlog")) return handleCoopMemberLogGet(req, res);
+  if (req.method === "POST" && url === "/api/coop/member/fieldlog") return handleCoopMemberLogAdd(req, res);
   if (req.method === "GET" && url.startsWith("/api/coop/member/plans")) return handleCoopMemberPlans(req, res);
   if (req.method === "GET" && url.startsWith("/api/coop/member/plan")) return handleCoopMemberPlanGet(req, res);
   if (req.method === "POST" && url === "/api/coop/member/plan") return handleCoopMemberPlanCreate(req, res);

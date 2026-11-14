@@ -1,5 +1,11 @@
 # Journal des versions — Terravive
 
+## v8.4 — 14 novembre 2026
+- **Carnet d'un membre tenu par l'animateur** (membre sans téléphone) : dans la page Coopérative, la fiche d'un membre a un volet « Carnet de champ du membre ». L'animateur choisit la parcelle, le type, la quantité, la date ; la saisie va dans le carnet du membre avec la mention « Saisi par l'animateur ». Routes `GET` et `POST /api/coop/member/fieldlog`, réservées à l'animateur de la coopérative du membre.
+- **Modèle d'IA** : `claude-sonnet-5-5` par défaut (au lieu de `claude-sonnet-5`), avec retour automatique sur l'ancien modèle si l'API refuse le nouveau. La variable `ANTHROPIC_MODEL` garde la priorité.
+- **Base** : `search_path` fixé sur la fonction `trv_stock_validate_sale` (avertissement de sécurité Supabase).
+- Service worker v24.
+
 ## v8.3.1 — 14 novembre 2026 : fiabilité sur réseau faible
 - **Aucun doublon dans le carnet** : chaque saisie porte un identifiant créé par le téléphone ; si elle est renvoyée (réseau coupé au mauvais moment, file d'attente), le serveur ne la garde qu'une fois.
 - **Plus d'attente sans fin** : si l'enregistrement ne répond pas en 15 s, la saisie passe « en attente » et repart toute seule.
