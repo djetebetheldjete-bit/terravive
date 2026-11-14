@@ -254,6 +254,7 @@
         <div id="planContent" style="display:none;">
           <div id="reuseNote" style="display:none;"></div>
           <div id="planPills"></div>
+          <div id="planReview"></div>
           <div class="doc" id="planDoc"></div>
           <div class="toolbar">
             <button class="btn sun" id="pdfBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:15px;height:15px;vertical-align:-2px;margin-right:5px;"><path d="M6 3h8l4 4v14a0 0 0 0 1 0 0H6a0 0 0 0 1 0 0z"/><path d="M14 3v4h4"/><path d="M12 11v6M9 14l3 3 3-3"/></svg>Télécharger en PDF</button>
@@ -673,11 +674,41 @@
     const pills=[["Culture",plan.crop],["Région",plan.region],["Surface",plan.area],["Sol",plan.soil],["Saison",plan.season]].filter(x=>x[1]);
     $("planPills").innerHTML = pills.map(x=>'<span class="pill">'+x[0]+' : <b>'+esc(x[1])+'</b></span>').join("");
     $("planDoc").innerHTML = renderMd(plan.content);
+    loadReview(plan);
     { const lb=$("listenBtn"); if(lb){ if(window.trvCanSpeak && window.trvCanSpeak()){ lb.style.display="inline-block"; lb.innerHTML=ICON_SPEAK+"Écouter le plan"; } else { lb.style.display="none"; } try{ if(window.trvStop) window.trvStop(); }catch(e){} } }
     $("chatCard").style.display="block"; { var _b=document.getElementById("budgetCard"); if(_b) _b.style.display="block"; } $("thread").innerHTML="";
     $("chatHint").innerHTML='Une question sur votre culture de <b>'+esc(plan.crop)+'</b> ? Un problème observé ? Demandez ici.';
     window.scrollTo({top:0,behavior:"smooth"});
     loadFiche(plan);
+  }
+  // ---- Statut du plan : proposé par l'IA, ou relu par un agronome nommé ----
+  let currentReview=null;
+  function reviewLine(){ return currentReview ? ("Relu par "+currentReview.by+" le "+new Date(currentReview.at).toLocaleDateString("fr-FR")) : "Proposé par l'IA, non relu par un agronome"; }
+  function renderReview(plan, d){
+    const box=$("planReview"); if(!box) return; const r=d.review; currentReview=r||null;
+    let h=r
+      ? '<div style="border:1px solid #cfe3d4;border-left:4px solid #2E7D4F;background:#f1f8f3;border-radius:10px;padding:10px 14px;margin:10px 0;font-size:.9rem;color:#14261A;"><b>Relu par '+esc(r.by)+'</b> le '+esc(new Date(r.at).toLocaleDateString("fr-FR"))+'.'+(r.note?' <span>'+esc(r.note)+'</span>':'')+' <span style="opacity:.75;">Le plan reste à adapter à ce que vous observez sur votre parcelle.</span></div>'
+      : '<div style="border:1px solid #ead9b0;border-left:4px solid #C98A1B;background:#fdf8ec;border-radius:10px;padding:10px 14px;margin:10px 0;font-size:.9rem;color:#14261A;"><b>Proposé par l\'IA, non relu par un agronome.</b> Faites confirmer les variétés, les dates et les doses par un technicien avant d\'engager des dépenses. Pour tout produit de traitement, suivez l\'étiquette.</div>';
+    if(d.can_review){
+      h+='<details style="margin:-2px 0 10px;font-size:.86rem;"><summary style="cursor:pointer;color:var(--leaf);font-weight:600;">'+(r?'Modifier ou retirer la relecture':'Enregistrer la relecture d\'un agronome')+'</summary>'
+        +'<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;max-width:520px;">'
+        +'<input id="rvBy" maxlength="120" aria-label="Nom et qualité de l\'agronome" placeholder="Nom et qualité (ex. K. Yao, ingénieur agronome, ANADER)" value="'+esc(r?r.by:"")+'">'
+        +'<input id="rvNote" maxlength="300" aria-label="Remarque de l\'agronome" placeholder="Remarque (facultatif)" value="'+esc(r&&r.note?r.note:"")+'">'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn primary" type="button" id="rvSave">Enregistrer</button>'+(r?'<button class="btn" type="button" id="rvDel">Retirer la relecture</button>':'')+'<span id="rvMsg" style="color:var(--faint);"></span></div>'
+        +'<div style="color:var(--faint);">À n\'enregistrer que si cette personne a réellement relu ce plan : son nom sera affiché à tous ceux qui le consultent.</div></div></details>';
+    }
+    box.innerHTML=h;
+    // La fiche envoyée sur WhatsApp porte le même statut que le plan.
+    try{ if(currentFiche&&currentFiche.text&&$("ficheWa")) $("ficheWa").href="https://wa.me/?text="+encodeURIComponent(currentFiche.text+"\n"+reviewLine()+"."); }catch(e){}
+    const send=async function(body){ $("rvMsg").textContent="Enregistrement…"; try{ const x=await fetch("/api/plan/review",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}); const y=await x.json(); if(!x.ok){ $("rvMsg").textContent=y.error||"Enregistrement impossible."; return; } renderReview(plan,{review:y.review,can_review:true}); }catch(e){ $("rvMsg").textContent="Serveur injoignable."; } };
+    if($("rvSave")) $("rvSave").onclick=function(){ send({id:plan.id,reviewer:$("rvBy").value,note:$("rvNote").value}); };
+    if($("rvDel")) $("rvDel").onclick=function(){ send({id:plan.id,remove:true}); };
+  }
+  async function loadReview(plan){
+    const box=$("planReview"); if(box) box.innerHTML=""; currentReview=null; if(!plan||!plan.id) return;
+    let d={review:null,can_review:false};
+    try{ const r=await fetch("/api/plan/review?id="+encodeURIComponent(plan.id)); if(r.ok) d=await r.json(); }catch(e){}
+    if(currentPlan&&currentPlan.id===plan.id) renderReview(plan,d);
   }
   async function openPlan(id){
     try{ const r=await fetch("/api/plan?id="+encodeURIComponent(id)); const d=await r.json(); if(r.ok) showPlan(d.plan); }catch(e){}
@@ -699,7 +730,7 @@
         const reader=r.body.getReader(), dec=new TextDecoder(); let buf="", text="", last=0, shown=false, finalPlan=null, failed=null;
         const paint=function(force){
           const now=Date.now(); if(!force && now-last<700) return; last=now;
-          if(!shown){ shown=true; $("planPlaceholder").style.display="none"; $("planContent").style.display="block"; $("reuseNote").style.display="none"; $("planPills").innerHTML='<span class="pill">Culture : <b>'+esc(crop)+'</b></span><span class="pill">Rédaction en cours…</span>'; $("chatCard").style.display="none"; { const fc=$("ficheCard"); if(fc) fc.style.display="none"; } { const lb=$("listenBtn"); if(lb) lb.style.display="none"; } try{ $("planContent").scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){} }
+          if(!shown){ shown=true; $("planPlaceholder").style.display="none"; $("planContent").style.display="block"; $("reuseNote").style.display="none"; { const pr=$("planReview"); if(pr) pr.innerHTML=""; } $("planPills").innerHTML='<span class="pill">Culture : <b>'+esc(crop)+'</b></span><span class="pill">Rédaction en cours…</span>'; $("chatCard").style.display="none"; { const fc=$("ficheCard"); if(fc) fc.style.display="none"; } { const lb=$("listenBtn"); if(lb) lb.style.display="none"; } try{ $("planContent").scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){} }
           $("planDoc").innerHTML=renderMd(text)+'<p class="muted" style="margin-top:10px;"><span class="spin"></span> La suite arrive…</p>';
           btn.innerHTML='<span class="spin"></span> Rédaction en cours… ('+Math.round(text.length/100)/10+' k caractères)';
         };
@@ -776,7 +807,7 @@
       if(!r.ok){ $("ficheBody").innerHTML='<div class="hint" style="color:var(--bad);">'+esc(d.error||"La fiche n'a pas pu être créée.")+' <button class="btn" type="button" id="ficheRetry">Réessayer</button></div>'; const b=$("ficheRetry"); if(b) b.onclick=function(){ loadFiche(plan); }; return; }
       currentFiche=d;
       $("ficheBody").innerHTML=ficheHtml(d.fiche,d.parcel); bindFicheChecks();
-      $("ficheWa").href="https://wa.me/?text="+encodeURIComponent(d.text);
+      $("ficheWa").href="https://wa.me/?text="+encodeURIComponent(d.text+"\n"+reviewLine()+".");
       $("ficheActions").style.display="flex";
     }catch(e){ $("ficheBody").innerHTML='<div class="hint">Serveur injoignable.</div>'; }
   }
@@ -793,7 +824,7 @@
       +'.brief{border:2px solid #1B5E34;border-radius:6px;padding:6px 10px}.pbox{border:1.5px dashed #b7791f;border-radius:6px;padding:6px 10px}.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 10px}.pgrid b{display:block;font-size:14px}'
       +'.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.mat{display:grid;grid-template-columns:repeat(3,1fr);gap:3px 10px}.mat label{display:flex;align-items:center}'
       +'.notes{margin-top:12px;border:1px solid #bbb;border-radius:6px;height:90px;padding:4px 8px;color:#777;font-size:11px}.f{margin-top:8px;font-size:10px;color:#666}'
-      +'</style></head><body><div class="h"><b>'+esc(F.titre)+'</b><span>Terravive · '+date+(currentPlan&&currentPlan.region?' · '+esc(currentPlan.region):'')+'</span></div>'
+      +'</style></head><body><div class="h"><b>'+esc(F.titre)+'</b><span>Terravive · '+date+(currentPlan&&currentPlan.region?' · '+esc(currentPlan.region):'')+'</span></div><div style="font-size:11px;color:#333;margin:-4px 0 8px;">'+esc(reviewLine())+'.</div>'
       +body+'<div class="notes">Mes notes :</div><div class="f">Fiche tirée de votre itinéraire technique Terravive. Conseils indicatifs, à adapter au terrain ; en cas de doute (maladie grave, produits), demandez à un agronome local.</div>'
       +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.focus();window.print();},300);};</scr'+'ipt></body></html>';
     const w=window.open("","_blank"); if(!w){ alert("Autorisez les fenêtres pop-up de ce site pour imprimer la fiche."); return; }

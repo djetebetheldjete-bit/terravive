@@ -1190,6 +1190,47 @@ async function handlePlanGet(req, res) {
   if (!plan || plan.user_id !== user.id) return sendJson(res, 404, { error: "Plan introuvable." });
   sendJson(res, 200, { plan });
 }
+// --- Relecture d'un plan par un agronome ---
+// Par défaut, un plan est « proposé par l'IA, non relu ». Un administrateur ou un auditeur Quality Guard
+// peut enregistrer qu'un agronome NOMMÉ l'a relu : c'est une déclaration datée, affichée avec le plan.
+// Rangement : table trv_quality_audits, ligne kind = "review" (une par plan), sans changement de schéma.
+async function getPlanReview(planId) {
+  let row = null;
+  if (USE_DB) { try { const rows = await sb(`/trv_quality_audits?id=eq.${encodeURIComponent("review-" + planId)}&select=id,kind,alerts,created_at,created_by&limit=1`); row = rows && rows[0]; } catch (e) { console.error("getPlanReview:", e.message); return null; } }
+  else { const st = loadStore(); row = (st.planReviews || {})[planId] || null; }
+  if (!row || row.kind !== "review") return null;
+  const a = (Array.isArray(row.alerts) ? row.alerts[0] : null) || {};
+  if (!a.reviewer) return null;
+  return { by: String(a.reviewer), note: a.note ? String(a.note) : null, at: row.created_at };
+}
+async function savePlanReview(plan, user, reviewer, note) {
+  const row = { id: "review-" + plan.id, plan_id: plan.id, title: plan.title || plan.crop || "", plan_title: plan.title || plan.crop || "", kind: "review", status: "relu", alert_count: 0, alerts: [{ reviewer, note: note || null }], created_at: new Date().toISOString(), created_by: user.email };
+  if (USE_DB) { await sb("/trv_quality_audits", { method: "POST", headers: { Prefer: "return=minimal,resolution=merge-duplicates" }, body: JSON.stringify([row]) }); return; }
+  const st = loadStore(); if (!st.planReviews) st.planReviews = {}; st.planReviews[plan.id] = row; saveStore(st);
+}
+async function deletePlanReview(planId) {
+  if (USE_DB) { await sb(`/trv_quality_audits?id=eq.${encodeURIComponent("review-" + planId)}&kind=eq.review`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); return; }
+  const st = loadStore(); if (st.planReviews) { delete st.planReviews[planId]; saveStore(st); }
+}
+async function handlePlanReviewGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const id = new URL(req.url, "http://x").searchParams.get("id") || "";
+  if (!/^[a-f0-9]{8,40}$/.test(id)) return sendJson(res, 400, { error: "Plan invalide." });
+  sendJson(res, 200, { review: await getPlanReview(id), can_review: qualityCan(user, "audit") });
+}
+async function handlePlanReviewSet(req, res) {
+  const user = await qualityGuard(req, res, "audit"); if (!user) return;
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const plan = p.id ? await getPlan(String(p.id)) : null;
+  if (!plan) return sendJson(res, 404, { error: "Plan introuvable." });
+  try {
+    if (p.remove === true) { await deletePlanReview(plan.id); return sendJson(res, 200, { review: null }); }
+    const reviewer = String(p.reviewer || "").replace(/\s+/g, " ").trim().slice(0, 120);
+    if (reviewer.length < 5) return sendJson(res, 400, { error: "Indiquez le nom et la qualité de l'agronome qui a relu le plan (ex. « K. Yao, ingénieur agronome, ANADER »)." });
+    await savePlanReview(plan, user, reviewer, String(p.note || "").trim().slice(0, 300));
+    sendJson(res, 200, { review: await getPlanReview(plan.id) });
+  } catch (e) { console.error("plan/review:", e.message); sendJson(res, 500, { error: "Enregistrement impossible." }); }
+}
 // --- Parcelles enregistrées ---
 async function handleParcelsList(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
@@ -2465,7 +2506,7 @@ async function qualityListAudits() {
       // select=* : robuste si une colonne (kind, score…) n'existe pas encore en base.
       const rows = (await sb("/trv_quality_audits?select=*&order=created_at.desc&limit=100")) || [];
       // Les enregistrements de banc de tests ne sont pas des audits d'itinéraires.
-      return rows.filter((row) => row.kind !== "tests").slice(0, 50);
+      return rows.filter((row) => row.kind !== "tests" && row.kind !== "review").slice(0, 50);
     }
     catch (e) { console.warn("Quality Guard history unavailable:", e.message); return []; }
   }
@@ -3380,6 +3421,8 @@ async function routeRequest(req, res) {
   if (req.method === "GET" && url === "/api/auth/me") return handleMe(req, res);
   if (req.method === "POST" && url === "/api/plan") return handlePlan(req, res);
   if (req.method === "GET" && url === "/api/plans") return handlePlansList(req, res);
+  if (req.method === "GET" && url === "/api/plan/review") return handlePlanReviewGet(req, res);
+  if (req.method === "POST" && url === "/api/plan/review") return handlePlanReviewSet(req, res);
   if (req.method === "GET" && url === "/api/plan") return handlePlanGet(req, res);
   if (req.method === "POST" && url === "/api/plan/fiche") return handlePlanFiche(req, res);
   if (req.method === "GET" && url === "/api/today") return handleToday(req, res);

@@ -1,5 +1,10 @@
 # Journal des versions — Terravive
 
+## v8.7 — 14 novembre 2026 : statut de relecture des plans de culture
+- **Chaque plan affiche son statut** : « Proposé par l'IA, non relu par un agronome » (par défaut, avec le rappel de faire confirmer variétés, dates et doses) ou « Relu par [nom et qualité] le [date] ». Le statut figure aussi sur la fiche terrain imprimée et dans le message WhatsApp.
+- **Enregistrer une relecture** : réservé aux administrateurs et aux auditeurs Quality Guard, depuis la page du plan (nom et qualité de l'agronome obligatoires, remarque facultative ; la relecture peut être retirée). Routes `GET` et `POST /api/plan/review`. Rangement dans `trv_quality_audits` (ligne `kind = "review"`), sans changement de base.
+- Service worker v27.
+
 ## v8.6 — 14 novembre 2026 : robustesse, accessibilité, tests automatiques
 - **Serveur plus robuste** : une adresse ou un cookie mal formé ne peut plus arrêter le serveur (réponse 400, le service continue). Toute erreur imprévue d'une requête renvoie une réponse au lieu de couper le service.
 - **Anti-force brute** : 10 essais de connexion par compte et 30 par connexion sur 10 minutes, 10 créations de compte par heure et par connexion (réponse 429 au-delà).
