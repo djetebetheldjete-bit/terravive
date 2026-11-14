@@ -659,16 +659,31 @@ async function fetchWeatherLatLon(lat, lon) {
 const RETRYABLE = [408, 409, 429, 500, 502, 503, 504, 529];
 let KEY_CURSOR = 0;
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
-async function callClaude(system, messages, model, maxTokens) {
+// Réglages de rapidité (documentation Anthropic, paramètre « effort ») : le modèle rédige sans longue
+// réflexion préalable. Mesuré en ligne le 14/11/2026 : sans ce réglage, 79 s d'attente avant la première
+// ligne d'un plan de culture. PLAN_THINKING=adaptive rétablit la réflexion ; PLAN_EFFORT règle l'effort.
+function speedOpts(effort) {
+  const o = { output_config: { effort } };
+  if ((process.env.PLAN_THINKING || "direct") !== "adaptive") o.thinking = { type: "between_tools" };
+  return o;
+}
+const PLAN_OPTS = speedOpts(process.env.PLAN_EFFORT || "medium");
+const FICHE_OPTS = speedOpts("low");
+// extra : champs ajoutés à la requête (réglages ci-dessus). Si l'API les refuse (400), on renvoie sans eux.
+async function callClaude(system, messages, model, maxTokens, extra) {
   const wanted = model || MODEL;
-  try { return await callClaudeOnce(system, messages, wanted, maxTokens); }
+  const run = async (mdl) => {
+    try { return await callClaudeOnce(system, messages, mdl, maxTokens, extra); }
+    catch (e) { if (e && e.status === 400 && extra) { console.error("Réglages de rapidité refusés par l'API (" + mdl + ") :", e.message); return callClaudeOnce(system, messages, mdl, maxTokens, null); } throw e; }
+  };
+  try { return await run(wanted); }
   catch (e) {
-    if (e && e.status === 404 && wanted !== FALLBACK_MODEL) { console.error("Modèle " + wanted + " refusé par l'API, secours " + FALLBACK_MODEL + " :", e.message); return callClaudeOnce(system, messages, FALLBACK_MODEL, maxTokens); }
+    if (e && e.status === 404 && wanted !== FALLBACK_MODEL) { console.error("Modèle " + wanted + " refusé par l'API, secours " + FALLBACK_MODEL + " :", e.message); return run(FALLBACK_MODEL); }
     throw e;
   }
 }
-async function callClaudeOnce(system, messages, model, maxTokens) {
-  const body = JSON.stringify({ model: model || MODEL, max_tokens: maxTokens || 4096, system, messages: messages.map((m) => ({ role: m.role, content: m.content })) });
+async function callClaudeOnce(system, messages, model, maxTokens, extra) {
+  const body = JSON.stringify(Object.assign({ model: model || MODEL, max_tokens: maxTokens || 4096, system, messages: messages.map((m) => ({ role: m.role, content: m.content })) }, extra || {}));
   const n = API_KEYS.length || 1; const start = KEY_CURSOR; KEY_CURSOR = (KEY_CURSOR + 1) % n; let lastErr = null;
   for (let i = 0; i < n; i++) {
     const key = API_KEYS[(start + i) % n];
@@ -686,19 +701,21 @@ async function callClaudeOnce(system, messages, model, maxTokens) {
 
 // Même appel, mais en flux : onText reçoit chaque morceau de texte dès qu'il arrive. Renvoie le texte complet.
 // Tant que rien n'a été reçu, on peut encore changer de clé ou de modèle ; après, une coupure est une erreur.
-async function streamClaude(system, messages, model, maxTokens, onText) {
+async function streamClaude(system, messages, model, maxTokens, onText, extra) {
+  let ex = extra || null;
   const n = API_KEYS.length || 1; const start = KEY_CURSOR; KEY_CURSOR = (KEY_CURSOR + 1) % n; let lastErr = null;
   const models = [model || MODEL]; if (models[0] !== FALLBACK_MODEL) models.push(FALLBACK_MODEL);
   for (const mdl of models) {
-    const body = JSON.stringify({ model: mdl, max_tokens: maxTokens || 4096, stream: true, system, messages: messages.map((m) => ({ role: m.role, content: m.content })) });
+    const mk = () => JSON.stringify(Object.assign({ model: mdl, max_tokens: maxTokens || 4096, stream: true, system, messages: messages.map((m) => ({ role: m.role, content: m.content })) }, ex || {}));
     for (let i = 0; i < n; i++) {
-      let r;
+      const body = mk(); let r;
       try { r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": API_KEYS[(start + i) % n], "anthropic-version": "2023-06-01" }, body }); }
       catch (e) { lastErr = e; continue; }
       if (!r.ok) {
         const data = await r.json().catch(() => ({}));
         lastErr = Object.assign(new Error((data && data.error && data.error.message) || ("Erreur IA " + r.status)), { status: r.status });
         if (r.status === 404) break;            // modèle refusé : on passe au modèle de secours
+        if (r.status === 400 && ex) { console.error("Réglages de rapidité refusés par l'API (" + mdl + ") :", lastErr.message); ex = null; i--; continue; }
         if (r.status === 400) throw lastErr;
         if ((r.status === 429 || r.status === 529) && i < n - 1) await sleep(600);
         continue;
@@ -1071,7 +1088,7 @@ async function handlePlan(req, res) {
   const reply = (code, obj) => { if (!live) return sendJson(res, code, obj); send(code === 200 ? Object.assign({ t: "done" }, obj) : { t: "error", error: obj.error }); res.end(); };
   try {
     const msgs = [{ role: "user", content: planUserMessage(clean, soilBlock) }];
-    const content = live ? await streamClaude(planSystem(), msgs, null, PLAN_MAX_TOKENS, (d) => send({ t: "delta", d })) : await callClaude(planSystem(), msgs, null, PLAN_MAX_TOKENS);
+    const content = live ? await streamClaude(planSystem(), msgs, null, PLAN_MAX_TOKENS, (d) => send({ t: "delta", d }), PLAN_OPTS) : await callClaude(planSystem(), msgs, null, PLAN_MAX_TOKENS, PLAN_OPTS);
     if (!content) throw new Error("La génération a échoué.");
     const rec = { id: newId(), user_id: user.id, title: crop + (clean.region ? " — " + clean.region : ""), crop, region: clean.region || null, area: clean.area || null, soil: clean.soil || null, season: clean.season || null, goal: clean.goal || null, notes: clean.notes || null, content, created_at: new Date().toISOString() };
     await savePlan(rec);
@@ -1120,7 +1137,7 @@ async function handlePlanFiche(req, res) {
     let lastErr = null;
     for (let attempt = 0; attempt < 2 && !fiche; attempt++) {
       let raw = "";
-      try { raw = await callClaude(FICHE.ficheSystem(), [{ role: "user", content: FICHE.ficheUserMessage(plan) }], null, 8000); fiche = FICHE.parseFiche(raw, plan.crop); }
+      try { raw = await callClaude(FICHE.ficheSystem(), [{ role: "user", content: FICHE.ficheUserMessage(plan) }], null, 8000, FICHE_OPTS); fiche = FICHE.parseFiche(raw, plan.crop); }
       catch (e) { lastErr = e; if (e.status) break; console.error("Fiche illisible (essai " + (attempt + 1) + ", " + raw.length + " caractères) : début « " + raw.slice(0, 80).replace(/\s+/g, " ") + " » fin « " + raw.slice(-80).replace(/\s+/g, " ") + " »"); }
     }
     if (!fiche) return sendJson(res, (lastErr && lastErr.status) || 502, { error: (lastErr && lastErr.message) || "La fiche n'a pas pu être créée." });

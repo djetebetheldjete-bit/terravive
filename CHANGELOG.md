@@ -1,5 +1,8 @@
 # Journal des versions — Terravive
 
+## v8.5.1 — 14 novembre 2026
+- **Plan de culture et fiche terrain plus rapides** : mesure en ligne, le modèle réfléchissait 79 s avant d'écrire la première ligne. Le plan (effort « medium ») et la fiche (effort « low ») sont maintenant rédigés sans réflexion préalable (`thinking: between_tools`). Si l'API refuse ces réglages, la requête repart sans eux. Variables facultatives : `PLAN_EFFORT`, `PLAN_THINKING=adaptive`.
+
 ## v8.5 — 14 novembre 2026
 - **Le plan de culture s'écrit sous les yeux du producteur** : le texte s'affiche à mesure que l'IA le rédige (premières lignes en quelques secondes), au lieu d'un écran d'attente de plusieurs minutes. Le plan complet est enregistré à la fin, même si le téléphone perd la connexion entre-temps. `POST /api/plan` accepte `stream: true` (réponse en lignes JSON : `start`, `delta`, `done` ou `error`). Service worker v25.
 
