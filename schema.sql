@@ -126,9 +126,9 @@ create table if not exists trv_field_log (
   user_id text,
   parcel_id text,
   date date,
-  kind text,                  -- arrosage | compost | engrais | traitement | semis | recolte | observation
+  kind text,                  -- arrosage | pluie | compost | engrais | traitement | semis | recolte | perte | residu | germination | incident | observation
   qty numeric,
-  unit text,                  -- L ou kg
+  unit text,                  -- L, kg, mm ou % (test de germination)
   note text,
   created_at timestamptz default now()
 );

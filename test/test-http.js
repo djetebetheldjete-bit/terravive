@@ -215,6 +215,77 @@ async function main() {
       assert.strictEqual(r.status, 403);
     });
 
+    // ------------------------------------- Résidus valorisés et germination
+    t.section("Carnet de champ : résidus valorisés et test de germination");
+    let parcelId = "";
+    const log = (body, cookie) => req("POST", "/api/fieldlog", { json: Object.assign({ parcel_id: parcelId, date: "2026-04-10" }, body), cookie: cookie === undefined ? farmerCookie : cookie });
+    await t.test("le guide des résidus est servi au navigateur et la page du tableau de bord l'utilise", async () => {
+      const js = await req("GET", "/residus.js");
+      assert.strictEqual(js.status, 200); assert.ok(/javascript/.test(js.headers["content-type"] || ""), js.headers["content-type"]);
+      const html = fs.readFileSync(path.join(PUBLIC, "tableau.html"), "utf8");
+      for (const id of ["resCard", "resPick", "resPanel", "logResidue", "logRoute", "logGermWrap", "gSown", "gRefUp"]) assert.ok(html.includes('id="' + id + '"'), "élément absent : " + id);
+      assert.ok(html.includes('src="/residus.js"'));
+      assert.ok(fs.readFileSync(path.join(PUBLIC, "sw.js"), "utf8").includes('"/residus.js"'), "residus.js absent du cache hors ligne");
+    });
+    await t.test("résidus valorisés : quantité obligatoire, voie reconnue, résidu rappelé dans la note", async () => {
+      const p = await req("POST", "/api/parcels", { json: { name: "Champ maïs", zone: { polygon: [[5.36, -3.99], [5.3601, -3.99], [5.3601, -3.98985], [5.36, -3.98985]] } }, cookie: farmerCookie });
+      assert.strictEqual(p.status, 200, p.text); parcelId = p.json.parcel.id;
+      assert.strictEqual((await log({ kind: "residu", note: "des tiges" })).status, 400, "sans quantité");
+      assert.strictEqual((await log({ kind: "residu", qty: 0 })).status, 400, "quantité nulle");
+      const a = await log({ kind: "residu", qty: "120", residue: "tiges", route: "compost", note: "6 brouettes de 20 kg" });
+      assert.strictEqual(a.status, 200, a.text);
+      assert.strictEqual(a.json.entry.unit, "kg"); assert.strictEqual(a.json.entry.qty, 120); assert.strictEqual(a.json.entry.product, "Compost");
+      assert.strictEqual(a.json.entry.note, "Résidu : Tiges de maïs, mil, sorgho · 6 brouettes de 20 kg");
+      const b = await log({ kind: "residu", qty: "35,5", route: "Paillis" });
+      assert.strictEqual(b.json.entry.product, "Paillis"); assert.strictEqual(b.json.entry.qty, 35.5);
+      const c = await log({ kind: "residu", qty: 10, route: "<script>", residue: "inconnu" });
+      assert.strictEqual(c.status, 200); assert.strictEqual(c.json.entry.product, null, "une voie inconnue ne doit pas être enregistrée telle quelle"); assert.strictEqual(c.json.entry.note, null);
+    });
+    await t.test("test de germination : le pourcentage est calculé par le serveur, les saisies incohérentes sont refusées", async () => {
+      assert.strictEqual((await log({ kind: "germination", qty: 100 })).status, 400, "sans graines comptées");
+      assert.strictEqual((await log({ kind: "germination", germ: { sown: 20, up: 25 } })).status, 400);
+      assert.strictEqual((await log({ kind: "germination", germ: { sown: 20, up: 10, ref_sown: 20 } })).status, 400);
+      const g = await log({ kind: "germination", qty: 100, date: "2026-05-20", germ: { sown: 20, up: 14, ref_sown: 20, ref_up: 19, days: 7 } });
+      assert.strictEqual(g.status, 200, g.text);
+      assert.strictEqual(g.json.entry.qty, 73.7, "le pourcentage envoyé par le navigateur ne doit pas être pris tel quel");
+      assert.strictEqual(g.json.entry.unit, "%");
+      assert.strictEqual(g.json.entry.note, "Test de germination : compost 14/20 levées · témoin 19/20 · après 7 jours");
+      const solo = await log({ kind: "germination", germ: { sown: 20, up: 18 } });
+      assert.strictEqual(solo.status, 200); assert.ok(/sans témoin/.test(solo.json.entry.note));
+    });
+    await t.test("le bilan d'impact affiche les résidus valorisés (mesurés) et le dernier test de germination", async () => {
+      const r = await req("GET", "/api/impact?parcel=" + parcelId, { cookie: farmerCookie });
+      assert.strictEqual(r.status, 200, r.text);
+      const R = r.json.report;
+      assert.strictEqual(R.residues.total.v, 165.5); assert.strictEqual(R.residues.total.nature, "mesure");
+      assert.deepStrictEqual(R.residues.routes.map((x) => x.label), ["Compost", "Paillis", "Voie non précisée"]);
+      assert.ok(!R.residues.need, "sans fiche sol, aucun besoin n'est affiché");
+      assert.strictEqual(R.current.compost_kg, 0, "des résidus mis au compost ne sont pas du compost épandu");
+      assert.strictEqual(R.germination.date, "2026-05-20"); assert.strictEqual(R.germination.pct.v, 73.7); assert.strictEqual(R.germination.level, "moyen");
+      assert.strictEqual(R.germination.threshold.nature, "repere");
+      const csv = await req("GET", "/api/impact/csv?parcel=" + parcelId, { cookie: farmerCookie });
+      assert.strictEqual(csv.status, 200); assert.ok(/residus_valorises_kg/.test(csv.text) && /"165,5";"120";"73,7"/.test(csv.text), csv.text.slice(-200));
+      const sum = await req("GET", "/api/impact/summary", { cookie: farmerCookie });
+      assert.strictEqual(sum.json.residue_kg, 166);
+    });
+    await t.test("le carnet reste privé : ni visiteur ni autre compte ne peuvent y écrire ou le lire", async () => {
+      assert.strictEqual((await log({ kind: "residu", qty: 5 }, "")).status, 401);
+      const other = await register("voisin@test.ci", "secret123", "10.0.0.8");
+      const oc = cookieOf(other);
+      assert.strictEqual((await log({ kind: "residu", qty: 5 }, oc)).status, 404);
+      assert.strictEqual((await req("GET", "/api/fieldlog?parcel=" + parcelId, { cookie: oc })).status, 404);
+      assert.strictEqual((await req("GET", "/api/impact?parcel=" + parcelId, { cookie: oc })).status, 404);
+    });
+    await t.test("les autres saisies du carnet fonctionnent toujours (arrosage, compost avec produit)", async () => {
+      const a = await log({ kind: "arrosage", qty: 200 }); assert.strictEqual(a.status, 200); assert.strictEqual(a.json.entry.unit, "L");
+      const c = await log({ kind: "compost", qty: 50, product: "Fumier de volaille" }); assert.strictEqual(c.json.entry.product, "Fumier de volaille");
+      assert.strictEqual((await log({ kind: "inconnu", qty: 1 })).status, 400);
+      const list = await req("GET", "/api/fieldlog?parcel=" + parcelId, { cookie: farmerCookie });
+      assert.strictEqual(list.json.entries.length, 7);
+      assert.strictEqual(list.json.totals.residu.qty, 165.5);
+      assert.ok(!list.json.totals.germination.qty, "les pourcentages ne s'additionnent pas");
+    });
+
     // -------------------------------------------------- Limites anti-abus
     t.section("Limites anti-abus");
     await t.test("après 10 essais de mot de passe sur un compte, la connexion est bloquée (429)", async () => {

@@ -20,6 +20,7 @@ const FERT = require("./lib/fertil");
 const FICHE = require("./lib/fiche");
 const IMPACT = require("./lib/impact");
 const TODAY = require("./lib/today");
+const RESIDUS = require("./lib/residus"); // guide des résidus et test de germination (partagé avec le navigateur)
 
 // ---------- Configuration ----------
 function loadEnv(file) {
@@ -297,7 +298,10 @@ async function deleteParcelSoil(userId, parcelId) {
 }
 
 // ---------- Carnet de champ (interventions et récoltes, par parcelle) ----------
-const LOG_KINDS = { arrosage: "L", pluie: "mm", compost: "kg", engrais: "kg", traitement: "L", semis: "", recolte: "kg", perte: "kg", incident: "", observation: "" };
+// residu : résidus valorisés (compost, paillis…), en kg ; germination : test de maturité du compost, en % de la levée du témoin.
+const LOG_KINDS = { arrosage: "L", pluie: "mm", compost: "kg", engrais: "kg", traitement: "L", semis: "", recolte: "kg", perte: "kg", residu: "kg", germination: "%", incident: "", observation: "" };
+// Le test de germination demande ses propres champs : il n'est pas proposé dans la saisie rapide de l'animateur.
+const COOP_LOG_KINDS = Object.fromEntries(Object.entries(LOG_KINDS).filter(([k]) => k !== "germination"));
 async function listFieldLog(userId, parcelId) {
   if (USE_DB) { try { return (await sb(`/trv_field_log?user_id=eq.${encodeURIComponent(userId)}&parcel_id=eq.${encodeURIComponent(parcelId)}&select=*&order=date.desc,created_at.desc&limit=500`)) || []; } catch (e) { console.error("listFieldLog:", e.message); throw e; } }
   return loadStore().fieldLog.filter((x) => x.user_id === userId && x.parcel_id === parcelId).sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.created_at).localeCompare(String(a.created_at))).slice(0, 500);
@@ -357,7 +361,7 @@ async function deleteFieldLog(userId, id) {
 }
 function fieldLogTotals(entries) {
   const t = {};
-  entries.forEach((e) => { if (e.qty == null || !isFinite(Number(e.qty))) { t[e.kind] = t[e.kind] || { n: 0, qty: 0, unit: e.unit || "" }; t[e.kind].n++; return; } const k = e.kind; t[k] = t[k] || { n: 0, qty: 0, unit: e.unit || LOG_KINDS[k] || "" }; t[k].n++; t[k].qty = Math.round((t[k].qty + Number(e.qty)) * 100) / 100; });
+  entries.forEach((e) => { if (e.kind === "germination" || e.qty == null || !isFinite(Number(e.qty))) { t[e.kind] = t[e.kind] || { n: 0, qty: 0, unit: e.unit || "" }; t[e.kind].n++; return; } const k = e.kind; t[k] = t[k] || { n: 0, qty: 0, unit: e.unit || LOG_KINDS[k] || "" }; t[k].n++; t[k].qty = Math.round((t[k].qty + Number(e.qty)) * 100) / 100; });
   return t;
 }
 
@@ -1316,11 +1320,26 @@ function buildFieldLogRec(p, ownerId, parcel, rateKey, notePrefix) {
     if (!isFinite(qty) || qty < 0 || qty > 1e7) return { code: 400, error: "Quantité invalide." };
   }
   const own = String(p.note || "").trim();
-  if (qty == null && !own) return { code: 400, error: "Indiquez une quantité ou une note." };
-  const note = [notePrefix, own].filter(Boolean).join(" · ").slice(0, 300) || null;
+  let product = ["engrais", "traitement", "compost"].includes(kind) ? (String(p.product || "").trim().slice(0, 60) || null) : null;
+  let auto = "";
+  if (kind === "residu") {
+    // Résidus valorisés : la quantité est obligatoire (c'est elle qui fait l'indicateur) ; la voie et le résidu viennent du guide.
+    if (qty == null || qty <= 0) return { code: 400, error: "Indiquez la quantité de résidus valorisés (en kg)." };
+    const route = RESIDUS.routeKey(p.route) || RESIDUS.routeKey(p.product);
+    product = route ? RESIDUS.ROUTES[route].label : null;
+    const res = RESIDUS.residueById(String(p.residue || ""));
+    if (res && res.id !== "autre") auto = "Résidu : " + res.label;
+  } else if (kind === "germination") {
+    // Test de germination : le pourcentage est calculé ici, à partir des graines comptées.
+    const g = RESIDUS.germinationResult(p.germ);
+    if (g.error) return { code: 400, error: g.error };
+    qty = g.pct;
+    auto = "Test de germination : " + g.summary + (g.kind === "absolu" ? " · sans témoin" : "");
+  }
+  if (qty == null && !own && !auto) return { code: 400, error: "Indiquez une quantité ou une note." };
+  const note = [notePrefix, auto, own].filter(Boolean).join(" · ").slice(0, 300) || null;
   if (!rateOk("log:" + rateKey, 200, 24 * 60 * 60 * 1000)) return { code: 429, error: "Beaucoup d'entrées aujourd'hui. Reprenez demain." };
   const season = String(p.season || "").trim().slice(0, 60) || IMPACT.defaultSeason(date);
-  const product = ["engrais", "traitement", "compost"].includes(kind) ? (String(p.product || "").trim().slice(0, 60) || null) : null;
   // Identifiant choisi par le téléphone : renvoyer la même saisie ne crée pas de doublon.
   const cid = String(p.client_id || "");
   return { rec: { id: /^[a-f0-9]{24}$/.test(cid) ? cid : newId(), user_id: ownerId, parcel_id: parcel.id, date, kind, qty, unit: LOG_KINDS[kind] || null, product, season, note, created_at: new Date().toISOString() } };
@@ -1349,7 +1368,7 @@ async function handleCoopMemberLogGet(req, res) {
   const parcels = ((await listParcelsForUser(memberId)) || []).map((p) => ({ id: p.id, name: p.name,
     recent: logs.filter((e) => e.parcel_id === p.id).sort((x, y) => String(y.date).localeCompare(String(x.date)) || String(y.created_at).localeCompare(String(x.created_at))).slice(0, 5)
       .map((e) => ({ date: e.date, kind: e.kind, qty: e.qty, unit: e.unit, note: e.note || null })) }));
-  sendJson(res, 200, { parcels, kinds: LOG_KINDS });
+  sendJson(res, 200, { parcels, kinds: COOP_LOG_KINDS });
 }
 async function handleCoopMemberLogAdd(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
@@ -1379,10 +1398,19 @@ async function recommendedCompost(user, parcel) {
     return f && f.organic && f.organic.dose_kg_m2 ? f.organic.dose_kg_m2[0] : null;
   } catch (e) { return null; }
 }
+// Matières brutes à réunir pour faire le compost conseillé par la fiche sol (fourchette en kg), ou null sans fiche sol.
+async function compostRawNeed(user, parcel) {
+  try {
+    const rec = await getParcelSoil(parcel.id);
+    if (!rec || rec.user_id !== user.id || !rec.estimate) return null;
+    const f = FERT.fertilityAdvice({ estimate: rec.estimate, crop: rec.crop, areaM2: FERT.zoneAreaM2(parcel.zone) });
+    return f && f.organic && f.organic.raw_kg ? f.organic.raw_kg : null;
+  } catch (e) { return null; }
+}
 async function parcelReport(user, parcel) {
   const entries = await listFieldLog(user.id, parcel.id);
   const ref = await getParcelRef(parcel.id);
-  const rep = IMPACT.impactReport({ entries, areaM2: FERT.zoneAreaM2(parcel.zone), ref: ref && ref.user_id === user.id ? ref : null, parcelName: parcel.name });
+  const rep = IMPACT.impactReport({ entries, areaM2: FERT.zoneAreaM2(parcel.zone), ref: ref && ref.user_id === user.id ? ref : null, parcelName: parcel.name, rawNeedKg: await compostRawNeed(user, parcel) });
   // Test côte à côte : cette parcelle (Terravive) face à sa parcelle témoin.
   const pair = await getParcelPair(parcel.id);
   if (pair && pair.user_id === user.id && pair.control_id) {
@@ -1457,17 +1485,17 @@ async function handleImpactSummary(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
   const parcels = (await listParcelsForUser(user.id)) || [];
   const all = await listFieldLogForUser(user.id);
-  const items = []; let compostKg = 0;
+  const items = []; let compostKg = 0, residueKg = 0;
   for (const row of parcels) {
     const parcel = await findUserParcel(user.id, row.id); if (!parcel) continue;
     const entries = all.filter((e) => e.parcel_id === parcel.id); if (!entries.length) continue;
     const rep = IMPACT.impactReport({ entries, areaM2: FERT.zoneAreaM2(parcel.zone) });
     if (!rep.current) continue;
     items.push({ t: rep.current, area_m2: FERT.zoneAreaM2(parcel.zone), rec_kg_m2: await recommendedCompost(user, parcel), name: parcel.name });
-    compostKg += rep.current.compost_kg || 0;
+    compostKg += rep.current.compost_kg || 0; residueKg += rep.current.residue_kg || 0;
   }
   const area = items.reduce((a, x) => a + (x.area_m2 || 0), 0);
-  sendJson(res, 200, { parcels: items.length, area_m2: area || null, durability: IMPACT.durabilityFromLog(items), carbon: IMPACT.compostCarbon(compostKg), compost_kg: Math.round(compostKg) });
+  sendJson(res, 200, { parcels: items.length, area_m2: area || null, durability: IMPACT.durabilityFromLog(items), carbon: IMPACT.compostCarbon(compostKg), compost_kg: Math.round(compostKg), residue_kg: Math.round(residueKg) });
 }
 // Bilan agrégé de la coopérative (animateur) : saison en cours de chaque parcelle suivie.
 async function handleCoopImpact(req, res) {
@@ -1475,7 +1503,7 @@ async function handleCoopImpact(req, res) {
   if (c.m.role !== "animateur") return sendJson(res, 403, { error: "Réservé à l'animateur de la coopérative." });
   const members = await listCoopMembers(c.m.coop_id);
   const names = await userNameMap(c.m.coop_id);
-  const rows = []; const tot = { parcels: 0, area_m2: 0, water_l: 0, compost_kg: 0, chem_kg: 0, harvest_kg: 0, incidents: 0 };
+  const rows = []; const tot = { parcels: 0, area_m2: 0, water_l: 0, compost_kg: 0, chem_kg: 0, harvest_kg: 0, residue_kg: 0, incidents: 0 };
   for (const mem of members) {
     const parcels = (await listParcelsForUser(mem.user_id)) || [];
     const logs = await listFieldLogForUser(mem.user_id);
@@ -1485,8 +1513,8 @@ async function handleCoopImpact(req, res) {
       const area = FERT.zoneAreaM2(parcel.zone);
       const rep = IMPACT.impactReport({ entries, areaM2: area });
       const t = rep.current; if (!t) continue;
-      rows.push({ member: names[mem.user_id] || "Membre", parcel: parcel.name, season: t.season, area_m2: area, water_l: t.water_l, water_l_m2: t.water_l_m2, compost_kg: t.compost_kg, chem_kg: t.chem_kg, chem_kg_ha: t.chem_kg_ha, harvest_kg: t.harvest_kg, yield_t_ha: t.yield_t_ha, incidents: t.incidents.length, entries: t.n });
-      tot.parcels++; tot.area_m2 += area || 0; tot.water_l += t.water_l || 0; tot.compost_kg += t.compost_kg || 0; tot.chem_kg += t.chem_kg || 0; tot.harvest_kg += t.harvest_kg || 0; tot.incidents += t.incidents.length;
+      rows.push({ member: names[mem.user_id] || "Membre", parcel: parcel.name, season: t.season, area_m2: area, water_l: t.water_l, water_l_m2: t.water_l_m2, compost_kg: t.compost_kg, chem_kg: t.chem_kg, chem_kg_ha: t.chem_kg_ha, harvest_kg: t.harvest_kg, yield_t_ha: t.yield_t_ha, residue_kg: t.residue_kg, incidents: t.incidents.length, entries: t.n });
+      tot.parcels++; tot.area_m2 += area || 0; tot.water_l += t.water_l || 0; tot.compost_kg += t.compost_kg || 0; tot.chem_kg += t.chem_kg || 0; tot.harvest_kg += t.harvest_kg || 0; tot.residue_kg += t.residue_kg || 0; tot.incidents += t.incidents.length;
     }
   }
   Object.keys(tot).forEach((k) => { tot[k] = Math.round(tot[k] * 10) / 10; });

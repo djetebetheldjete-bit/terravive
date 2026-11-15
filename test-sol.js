@@ -368,5 +368,81 @@ async function t(name, fn) { try { await fn(); passed++; console.log("  ok  " + 
     assert.ok(/Jour 14/.test(TD.speechText(x, "SP")) && /Butter/.test(TD.speechText(x, "SP")));
   });
 
+  // ---------- Résidus valorisés et test de germination (public/residus.js, lib/impact.js) ----------
+  const RS = require("./lib/residus");
+  await t("guide des résidus : chaque résidu a ses voies et un mode d'emploi", () => {
+    assert.ok(RS.RESIDUES.length >= 6);
+    const ids = new Set();
+    RS.RESIDUES.forEach((x) => {
+      assert.ok(!ids.has(x.id), "identifiant en double : " + x.id); ids.add(x.id);
+      assert.ok(x.label && x.nature && x.routes.length, x.id);
+      x.routes.forEach((k) => assert.ok(RS.ROUTES[k], x.id + " : voie inconnue " + k));
+      x.routes.filter((k) => k !== "autre").forEach((k) => assert.ok(x.how[k], x.id + " : pas de mode d'emploi pour " + k));
+      assert.ok(x.family === null || RS.FAMILIES[x.family], x.id);
+    });
+    assert.strictEqual(RS.routeKey("Compost"), "compost"); assert.strictEqual(RS.routeKey(" paillis "), "paillis"); assert.strictEqual(RS.routeKey("n'importe quoi"), null);
+    assert.strictEqual(RS.residueById("fumier").family, "animal"); assert.strictEqual(RS.residueById("x"), null);
+  });
+  await t("guide des résidus : aucun chiffre (ni dose ni quantité inventée), source citée", () => {
+    const texts = [];
+    RS.RESIDUES.forEach((x) => { texts.push(x.label, x.nature); Object.values(x.how).forEach((s) => texts.push(s)); x.care.forEach((s) => texts.push(s)); });
+    RS.RULES.forEach((s) => texts.push(s)); Object.values(RS.ROUTES).forEach((x) => texts.push(x.label, x.done));
+    texts.forEach((s) => assert.ok(!/\d/.test(s), "chiffre trouvé dans le guide : « " + s + " »"));
+    assert.ok(/Ouattara/.test(RS.SOURCE) && /San-Pédro/.test(RS.SOURCE));
+    assert.strictEqual(RS.GERMINATION.sources.length, 2); RS.GERMINATION.sources.forEach((s) => assert.ok(/^https:\/\//.test(s.url) && s.name));
+  });
+  await t("test de germination : calcul relatif au témoin et lecture par le repère publié", () => {
+    const ok = RS.germinationResult({ sown: 20, up: 18, ref_sown: 20, ref_up: 19, days: 7 });
+    assert.strictEqual(ok.pct, 94.7); assert.strictEqual(ok.level, "ok"); assert.strictEqual(ok.summary, "compost 18/20 levées · témoin 19/20 · après 7 jours");
+    assert.strictEqual(RS.germinationResult({ sown: 20, up: 16, ref_sown: 20, ref_up: 20 }).level, "ok");      // 80 % tout juste
+    assert.strictEqual(RS.germinationResult({ sown: 20, up: 14, ref_sown: 20, ref_up: 19 }).level, "moyen");   // 73,7 %
+    assert.strictEqual(RS.germinationResult({ sown: 20, up: 10, ref_sown: 20, ref_up: 20 }).level, "moyen");   // 50 % tout juste
+    assert.strictEqual(RS.germinationResult({ sown: 20, up: 9, ref_sown: 20, ref_up: 19 }).level, "faible");   // 47,4 %
+    // Semis de tailles différentes : on compare des taux, pas des nombres de graines.
+    assert.strictEqual(RS.germinationResult({ sown: 10, up: 9, ref_sown: 20, ref_up: 18 }).pct, 100);
+    // Un compost qui lève mieux que le témoin dépasse 100 % : on ne plafonne pas la mesure.
+    assert.strictEqual(RS.germinationResult({ sown: 20, up: 20, ref_sown: 20, ref_up: 16 }).pct, 125);
+  });
+  await t("test de germination : pas de conclusion sans témoin valable, saisies refusées si incohérentes", () => {
+    const solo = RS.germinationResult({ sown: 20, up: 18 });
+    assert.strictEqual(solo.level, "indetermine"); assert.strictEqual(solo.kind, "absolu"); assert.strictEqual(solo.pct, 90); assert.ok(/témoin/.test(solo.verdict));
+    const dead = RS.germinationResult({ sown: 20, up: 5, ref_sown: 20, ref_up: 0 });
+    assert.strictEqual(dead.level, "indetermine"); assert.strictEqual(dead.pct, null);
+    assert.ok(RS.germinationResult({ sown: 20, up: 8, ref_sown: 20, ref_up: 9 }).warnings.some((w) => /témoin/.test(w)));
+    assert.ok(RS.germinationResult({ sown: 5, up: 5, ref_sown: 5, ref_up: 5 }).warnings.some((w) => /Peu de graines/.test(w)));
+    [{}, { sown: 20 }, { sown: 20, up: 21 }, { sown: 0, up: 0 }, { sown: 2.5, up: 1 }, { sown: 20, up: -1 }, { sown: 20, up: 10, ref_sown: 20 }, { sown: 20, up: 10, ref_sown: 20, ref_up: 30 }, { sown: 20, up: 10, days: 0 }, { sown: 900, up: 10 }, { sown: "vingt", up: 3 }]
+      .forEach((g) => assert.ok(RS.germinationResult(g).error, "saisie acceptée à tort : " + JSON.stringify(g)));
+    assert.strictEqual(RS.germinationResult({ sown: "20", up: "18", ref_sown: "20", ref_up: "19" }).pct, 94.7); // champs de formulaire (texte)
+  });
+  await t("impact : résidus valorisés mesurés, par voie, et part mise au compost face au besoin de la fiche sol", () => {
+    const entries = [E("2026-04-08", "residu", 300, { product: "Compost" }), E("2026-04-09", "residu", 80.5, { product: "Paillis" }), E("2026-04-10", "residu", 20), E("2026-04-11", "compost", 100), E("2026-05-02", "recolte", 100)];
+    const rep = IM.impactReport({ entries, areaM2: 200, rawNeedKg: [900, 1350] });
+    assert.strictEqual(rep.current.residue_kg, 400.5); assert.strictEqual(rep.current.residue_n, 3);
+    assert.strictEqual(rep.current.compost_kg, 100, "les résidus ne doivent pas être comptés comme du compost épandu");
+    assert.strictEqual(rep.residues.total.v, 400.5); assert.strictEqual(rep.residues.total.nature, "mesure");
+    assert.deepStrictEqual(rep.residues.routes, [{ label: "Compost", kg: 300 }, { label: "Paillis", kg: 80.5 }, { label: "Voie non précisée", kg: 20 }]);
+    assert.strictEqual(rep.residues.composted.v, 300); assert.strictEqual(rep.residues.need.nature, "modele"); assert.deepStrictEqual(rep.residues.need_pct, [22, 33]);
+    const sans = IM.impactReport({ entries, areaM2: 200 });
+    assert.ok(sans.residues && !sans.residues.need && !sans.residues.need_pct, "sans fiche sol : pas de besoin affiché");
+    assert.strictEqual(IM.impactReport({ entries: [E("2026-04-08", "arrosage", 10)], areaM2: 200, rawNeedKg: [900, 1350] }).residues, null, "rien de noté : indicateur absent");
+    const csv = IM.reportCsv(rep); assert.ok(/"residus_valorises_kg";"dont_compost_kg";"dernier_test_germination_pct"/.test(csv)); assert.ok(/"400,5";"300";""/.test(csv));
+    // Les saisons restent séparées.
+    const two = IM.impactReport({ entries: [E("2025-04-08", "residu", 50, { product: "Compost" }), E("2026-04-08", "residu", 70, { product: "Compost" })] });
+    assert.strictEqual(two.seasons[0].residue_kg, 50); assert.strictEqual(two.residues.total.v, 70);
+  });
+  await t("impact : dernier test de germination de la saison, repère cité, jamais d'addition de pourcentages", () => {
+    const rep = IM.impactReport({ entries: [
+      E("2026-04-08", "germination", 47.4, { note: "Test de germination : compost 9/20 levées · témoin 19/20" }),
+      E("2026-05-20", "germination", 94.7, { note: "Test de germination : compost 18/20 levées · témoin 19/20 · après 7 jours" })] });
+    assert.strictEqual(rep.germination.tests, 2); assert.strictEqual(rep.germination.date, "2026-05-20"); assert.strictEqual(rep.germination.pct.v, 94.7); assert.strictEqual(rep.germination.level, "ok");
+    assert.strictEqual(rep.germination.pct.nature, "mesure"); assert.strictEqual(rep.germination.threshold.nature, "repere"); assert.deepStrictEqual(rep.germination.threshold.v, [50, 80]);
+    assert.ok(/UF\/IFAS/.test(rep.germination.threshold.source) && /UC ANR/.test(rep.germination.threshold.source));
+    assert.strictEqual(IM.impactReport({ entries: [E("2026-04-08", "germination", 47.4, { note: "x" })] }).germination.level, "faible");
+    assert.strictEqual(IM.impactReport({ entries: [E("2026-04-08", "germination", 90, { note: "Test de germination : compost 18/20 levées · sans témoin" })] }).germination.level, "indetermine");
+    assert.strictEqual(IM.impactReport({ entries: [E("2026-04-08", "germination", null, { note: "témoin 0/20" })] }).germination.pct, null);
+    assert.strictEqual(IM.impactReport({ entries: [E("2026-04-08", "arrosage", 10)] }).germination, null);
+    assert.ok(IM.NATURES.repere);
+  });
+
   console.log(process.exitCode ? "\nDes tests ont échoué." : `\n${passed} tests réussis.`);
 })();

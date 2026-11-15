@@ -137,7 +137,8 @@
   .alertshare{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; } .alertshare .btn{ padding:5px 10px; font-size:.8rem; }
   .pairtab td.up, .pairtab td.down{ font-weight:700; } .impact h4 .ico{ color:var(--leaf); margin-right:4px; }
   .kindlabel{ font-size:.8rem; margin-bottom:6px; }
-  .kindpick{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; }
+  .kindpick{ display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
+  @media(max-width:1250px){ .kindpick{ grid-template-columns:repeat(4,minmax(0,1fr)); } }
   .kind{ display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; column-gap:10px; align-items:center; text-align:left; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--ink); font:inherit; cursor:pointer; transition:border-color .15s, background .15s, box-shadow .15s; }
   .kind .ico{ grid-row:1 / span 2; width:22px; height:22px; color:var(--soft); margin:0; }
   .kind .kt{ font-weight:600; font-size:.9rem; line-height:1.2; }
@@ -157,6 +158,25 @@
   .nat.mesure{ color:#1f7a45; border-color:#9fd3b2; background:#eaf7ef; } .nat.declare{ color:#1e5f99; border-color:#a9cbea; background:#eef5fc; }
   .nat.satellite{ color:#6a3fa0; border-color:#cdb7ea; background:#f5effc; } .nat.modele{ color:#9a5b00; border-color:#ecc98a; background:#fdf4e4; }
   .nat.hypothese{ color:#5d6670; border-color:#c9ced4; background:#f2f4f6; }
+  .nat.repere{ color:#0b6b74; border-color:#9fd0d5; background:#e9f6f7; }
+  /* Guide « Valoriser mes résidus » et test de germination */
+  .resgrid{ display:grid; grid-template-columns:minmax(220px,300px) 1fr; gap:14px; margin-top:12px; align-items:start; }
+  @media(max-width:800px){ .resgrid{ grid-template-columns:1fr; } }
+  .respanel{ border:1px solid var(--line); border-radius:14px; padding:12px 14px; background:var(--surface2); }
+  #resPick{ font-family:inherit; font-size:.95rem; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); cursor:pointer; }
+  .resroutes{ display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 8px; }
+  .resroute{ border:1px solid var(--line); border-radius:999px; padding:6px 13px; background:var(--surface); color:var(--ink); font:inherit; font-size:.86rem; font-weight:600; cursor:pointer; }
+  .resroute:hover{ border-color:var(--leaf); } .resroute:focus-visible{ outline:2px solid var(--leaf); outline-offset:2px; }
+  .resroute[aria-pressed="true"]{ border-color:var(--leaf); background:color-mix(in srgb, var(--leaf) 10%, var(--surface)); box-shadow:inset 0 0 0 1px var(--leaf); }
+  .resroute .best{ font-weight:400; color:var(--soft); font-size:.74rem; margin-left:5px; }
+  .rescare{ margin:4px 0 0 18px; padding:0; font-size:.86rem; line-height:1.5; }
+  #resCard details{ margin-top:12px; } #resCard summary{ cursor:pointer; font-weight:700; color:var(--leaf); }
+  #resCard a{ color:var(--leaf); }
+  .germgrid{ display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; }
+  .germgrid fieldset{ border:1px solid var(--line); border-radius:10px; padding:4px 10px 9px; margin:0; display:flex; gap:10px; }
+  .germgrid legend{ font-size:.78rem; font-weight:700; color:var(--deep); padding:0 4px; }
+  .germgrid label{ font-size:.8rem; color:var(--soft); display:block; }
+  .germgrid input{ display:block; width:92px; margin-top:4px; }
   :root[data-theme="sombre"] .nat{ background:transparent; }
   .impact{ margin-top:12px; border:1px solid var(--line); border-radius:14px; padding:12px 14px; background:var(--surface2); }
   .impact table{ width:100%; border-collapse:collapse; font-size:.86rem; margin-top:6px; }
@@ -256,6 +276,7 @@ html.simple .adv{display:none!important}
 <script src="/mobile.js" defer></script>
 <script src="/anims.js" defer></script>
 <script src="/icons.js"></script>
+<script src="/residus.js"></script>
 <script src="/voice.js"></script>
 </head>
 <body>
@@ -459,22 +480,44 @@ html.simple .adv{display:none!important}
         </div>
       </div>
         <div id="soilOut" class="wide section-gap"></div>
+          <div class="card wide section-gap" id="resCard">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;"><h2 class="ct" style="margin:0;"><span data-ico="recycle"></span>Valoriser mes résidus</h2><span class="muted" style="font-size:.82rem;">Tiges, pailles, fumier, cabosses : ce sont des ressources. Choisissez ce que vous avez, Terravive vous indique quoi en faire.</span></div>
+            <div class="resgrid">
+              <label class="muted" style="font-size:.8rem;">J'ai…<select class="sel" id="resPick" style="width:100%;margin-top:4px;"></select></label>
+              <div class="respanel" id="resPanel" aria-live="polite"></div>
+            </div>
+            <details id="resRules"><summary>Les règles d'un bon tas de compost</summary><ul class="rescare" id="resRulesList" style="margin-top:8px;"></ul></details>
+            <details id="resGerm"><summary>Mon compost est-il mûr ? Le test de germination</summary><div id="resGermBody"></div></details>
+            <div class="muted" id="resSource" style="font-size:.74rem;margin-top:12px;"></div>
+          </div>
           <div class="card wide section-gap" id="logCard">
             <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;"><h2 class="ct" style="margin:0;"><span data-ico="notebook"></span>Carnet de champ</h2><span class="muted" style="font-size:.82rem;">Notez ce que vous faites et ce que vous récoltez : c'est ce qui prouve les résultats.</span></div>
             <div id="logEmpty" class="muted section-gap" style="display:none;">Enregistrez d'abord une parcelle sur la carte pour tenir son carnet.</div>
             <div id="logBody" style="display:none;">
               <div class="kindlabel muted section-gap" id="kindLabel">Intervention</div>
               <div class="kindpick" id="kindPick" role="radiogroup" aria-labelledby="kindLabel"></div>
-              <select id="logKind" hidden aria-hidden="true" tabindex="-1"><option value="arrosage">Arrosage</option><option value="pluie">Pluie</option><option value="compost">Compost / fumier</option><option value="engrais">Engrais chimique</option><option value="traitement">Traitement</option><option value="semis">Semis / plantation</option><option value="recolte">Récolte</option><option value="perte">Récolte invendable</option><option value="incident">Incident</option><option value="observation">Observation</option></select>
+              <select id="logKind" hidden aria-hidden="true" tabindex="-1"><option value="arrosage">Arrosage</option><option value="pluie">Pluie</option><option value="compost">Compost / fumier</option><option value="engrais">Engrais chimique</option><option value="traitement">Traitement</option><option value="semis">Semis / plantation</option><option value="recolte">Récolte</option><option value="perte">Récolte invendable</option><option value="residu">Résidus valorisés</option><option value="germination">Test de germination</option><option value="incident">Incident</option><option value="observation">Observation</option></select>
               <div class="maprow logform" style="align-items:flex-end;margin-top:12px;">
                 <label class="muted" style="min-width:160px;flex:1;font-size:.8rem;">Parcelle<select class="sel" id="logParcel" style="width:100%;margin-top:4px;"></select></label>
                 <label class="muted" style="width:150px;font-size:.8rem;">Date<input class="sel" type="date" id="logDate" style="width:100%;margin-top:4px;"></label>
                 <label class="muted" id="logQtyWrap" style="min-width:230px;flex:1;font-size:.8rem;">Quantité <span id="logUnit">(L)</span><span class="qtyrow"><input class="sel" id="logQty" inputmode="decimal" placeholder="ex. 12" style="width:90px;"><select class="sel" id="logMeasure" aria-label="Mesure"></select></span><span class="qtysize" id="logSizeWrap" style="display:none;">1 <span id="logSizeName">arrosoir</span> = <input class="sel" id="logSize" inputmode="decimal" style="width:70px;"> <span id="logSizeUnit">L</span> <span class="muted">(réglez une fois)</span></span><span class="qtyconv" id="logConv"></span></label>
                 <label class="muted" id="logProdWrap" style="width:170px;font-size:.8rem;display:none;">Produit / type<input class="sel" id="logProd" maxlength="60" list="logProdList" placeholder="ex. NPK 15-15-15" style="width:100%;margin-top:4px;"><datalist id="logProdList"></datalist></label>
+                <label class="muted" id="logResWrap" style="min-width:190px;flex:1;font-size:.8rem;display:none;">Résidu<select class="sel" id="logResidue" style="width:100%;margin-top:4px;"></select></label>
+                <label class="muted" id="logRouteWrap" style="min-width:170px;flex:1;font-size:.8rem;display:none;">Ce que j'en ai fait<select class="sel" id="logRoute" style="width:100%;margin-top:4px;"></select></label>
+                <div id="logGermWrap" style="display:none;flex:1 1 100%;">
+                  <div class="germgrid">
+                    <fieldset><legend>Sur le compost</legend><label>Graines semées<input class="sel" id="gSown" inputmode="numeric" placeholder="ex. 20"></label><label>Graines levées<input class="sel" id="gUp" inputmode="numeric" placeholder="ex. 18"></label></fieldset>
+                    <fieldset><legend>Sur le témoin</legend><label>Graines semées<input class="sel" id="gRefSown" inputmode="numeric" placeholder="ex. 20"></label><label>Graines levées<input class="sel" id="gRefUp" inputmode="numeric" placeholder="ex. 19"></label></fieldset>
+                    <label>Jours avant le comptage<input class="sel" id="gDays" inputmode="numeric" value="7"></label>
+                  </div>
+                  <div class="valert" id="logGermOut" style="display:none;" aria-live="polite"></div>
+                  <div class="muted" style="font-size:.8rem;margin-top:6px;"><a href="#resGerm" id="germHow" style="color:var(--leaf);font-weight:600;">Comment faire le test ?</a></div>
+                </div>
                 <label class="muted adv" style="width:190px;font-size:.8rem;">Saison / campagne<input class="sel" id="logSeason" maxlength="60" list="logSeasonList" style="width:100%;margin-top:4px;"><datalist id="logSeasonList"></datalist></label>
                 <label class="muted" style="flex:2;min-width:180px;font-size:.8rem;">Note (facultatif)<input class="sel" id="logNote" maxlength="300" placeholder="ex. tomates, 2ᵉ cueillette" style="width:100%;margin-top:4px;"></label>
                 <button class="btn primary" type="button" id="logAdd">Enregistrer</button>
               </div>
+              <div id="logResHint" style="display:none;margin-top:8px;font-size:.86rem;line-height:1.5;padding:8px 12px;border-left:3px solid var(--leaf);background:color-mix(in srgb,var(--leaf) 6%,transparent);border-radius:6px;" aria-live="polite"></div>
               <div class="muted" id="logMsg" style="margin-top:4px;font-size:.84rem;"></div>
               <div class="maprow" style="margin-top:10px;align-items:center;"><span class="muted" style="font-size:.82rem;">Totaux :</span><select class="sel" id="logSeasonFilter" aria-label="Saison des totaux" style="width:auto;"></select></div>
               <div id="logTotals" class="vchips"></div>
@@ -654,9 +697,9 @@ html.simple .adv{display:none!important}
 
   // ===== Parcelles enregistrées (limites sauvegardées sur le compte) =====
   // ---------- Carnet de champ ----------
-  const LOG_LABEL={arrosage:"Arrosage",pluie:"Pluie",compost:"Compost / fumier",engrais:"Engrais chimique",traitement:"Traitement",semis:"Semis / plantation",recolte:"Récolte",perte:"Récolte invendable",incident:"Incident",observation:"Observation"};
-  const LOG_ICON={arrosage:"water",pluie:"rain",compost:"compost",engrais:"fertilizer",traitement:"treatment",semis:"sowing",recolte:"harvest",perte:"loss",incident:"incident",observation:"observation"};
-  const LOG_HINT={arrosage:"litres",pluie:"mm au pluviomètre",compost:"kg",engrais:"kg + produit",traitement:"litres + produit",semis:"date, variété",recolte:"kg",perte:"kg abîmés, invendus",incident:"maladie, ravageur…",observation:"note libre"};
+  const LOG_LABEL={arrosage:"Arrosage",pluie:"Pluie",compost:"Compost / fumier",engrais:"Engrais chimique",traitement:"Traitement",semis:"Semis / plantation",recolte:"Récolte",perte:"Récolte invendable",residu:"Résidus valorisés",germination:"Test de germination",incident:"Incident",observation:"Observation"};
+  const LOG_ICON={arrosage:"water",pluie:"rain",compost:"compost",engrais:"fertilizer",traitement:"treatment",semis:"sowing",recolte:"harvest",perte:"loss",residu:"recycle",germination:"sprout",incident:"incident",observation:"observation"};
+  const LOG_HINT={arrosage:"litres",pluie:"mm au pluviomètre",compost:"kg",engrais:"kg + produit",traitement:"litres + produit",semis:"date, variété",recolte:"kg",perte:"kg abîmés, invendus",residu:"kg mis au compost, en paillis…",germination:"compost mûr ou non",incident:"maladie, ravageur…",observation:"note libre"};
   function ico(n){ return window.trvIcon?trvIcon(n):""; }
   function buildKindPick(){
     const box=$("kindPick"); if(!box) return;
@@ -666,8 +709,8 @@ html.simple .adv{display:none!important}
     btns.forEach((b,i)=>{ b.addEventListener("click",()=>pick(b.dataset.kind)); b.addEventListener("keydown",e=>{ const d={ArrowRight:1,ArrowDown:1,ArrowLeft:-1,ArrowUp:-1}[e.key]; if(!d) return; e.preventDefault(); const j=(i+d+btns.length)%btns.length; pick(btns[j].dataset.kind,true); }); });
     pick($("logKind").value||"arrosage");
   }
-  const LOG_UNIT={arrosage:"L",pluie:"mm",compost:"kg",engrais:"kg",traitement:"L",semis:"",recolte:"kg",perte:"kg",incident:"",observation:""};
-  const NAT={mesure:["Mesuré","noté dans le carnet de champ"],declare:["Déclaré","référence saisie à la main"],satellite:["Estimé satellite","images ou cartes satellitaires"],modele:["Estimé (calcul)","calcul à partir d'autres chiffres et d'hypothèses écrites"],hypothese:["Hypothèse","valeur supposée, à confirmer"]};
+  const LOG_UNIT={arrosage:"L",pluie:"mm",compost:"kg",engrais:"kg",traitement:"L",semis:"",recolte:"kg",perte:"kg",residu:"kg",germination:"%",incident:"",observation:""};
+  const NAT={mesure:["Mesuré","noté dans le carnet de champ"],declare:["Déclaré","référence saisie à la main"],satellite:["Estimé satellite","images ou cartes satellitaires"],modele:["Estimé (calcul)","calcul à partir d'autres chiffres et d'hypothèses écrites"],hypothese:["Hypothèse","valeur supposée, à confirmer"],repere:["Repère général","valeur publiée, source citée"]};
   function natTag(n){ const x=NAT[n]; return x?'<span class="nat '+n+'" title="'+esc(x[1])+'">'+esc(x[0])+'</span>':''; }
   function defaultSeason(date){ const d=new Date(String(date||"")+"T12:00:00Z"); if(isNaN(d)) return "Sans saison"; const m=d.getUTCMonth()+1, y=d.getUTCFullYear(); if(m>=3&&m<=7) return y+" · grande saison"; if(m>=8&&m<=11) return y+" · petite saison"; return (m===12?y:y-1)+"-"+(m===12?y+1:y)+" · saison sèche"; }
   function seasonOf(e){ return (e.season&&String(e.season).trim())||defaultSeason(e.date); }
@@ -706,7 +749,8 @@ html.simple .adv{display:none!important}
   function renderLog(d){
     logArea=d.parcel&&d.parcel.area_m2; fillSeasons();
     const fs=$("logSeasonFilter").value;
-    const T=seasonTotalsClient(fs?logEntries.filter(e=>seasonOf(e)===fs):logEntries), area=logArea;
+    const shown=fs?logEntries.filter(e=>seasonOf(e)===fs):logEntries;
+    const T=seasonTotalsClient(shown), area=logArea;
     let t="";
     const rec=T.recolte; if(rec&&rec.qty) t+=chip("Récolté", nf(rec.qty)+" kg", rec.n+" récolte"+(rec.n>1?"s":"")+(area?" · "+nf(Math.round(rec.qty/area*10000/100)/10)+" t/ha":""));
     const ar=T.arrosage; if(ar) t+=chip("Arrosages", String(ar.n), ar.qty?nf(ar.qty)+" L"+(area?" · "+nf(Math.round(ar.qty/area*10)/10)+" L/m²":""):"");
@@ -715,6 +759,8 @@ html.simple .adv{display:none!important}
     const tr=T.traitement; if(tr) t+=chip("Traitements", String(tr.n), tr.qty?nf(tr.qty)+" L":"");
     const pl=T.pluie; if(pl) t+=chip("Pluie", nf(pl.qty)+" mm", pl.n+" relevé"+(pl.n>1?"s":"")+" · "+nf(pl.qty)+" L/m²");
     const pe=T.perte; if(pe&&pe.qty) t+=chip("Invendable", nf(pe.qty)+" kg", rec&&rec.qty?"vendable : "+nf(Math.max(0,Math.round((rec.qty-pe.qty)*100)/100))+" kg":"");
+    const rs=T.residu; if(rs&&rs.qty){ const by={}; shown.forEach(e=>{ if(e.kind==="residu"&&e.qty!=null){ const k=e.product||"voie non précisée"; by[k]=Math.round(((by[k]||0)+Number(e.qty))*100)/100; } }); t+=chip("Résidus valorisés", nf(rs.qty)+" kg", Object.keys(by).map(k=>k.toLowerCase()+" "+nf(by[k])+" kg").join(" · ")); }
+    const gt=shown.filter(e=>e.kind==="germination").sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]; if(gt) t+=chip("Test de germination", gt.qty!=null?nf(gt.qty)+" %":"à refaire", "le "+new Date(gt.date+"T12:00:00").toLocaleDateString("fr-FR")+(gt.qty!=null&&!/sans témoin/.test(gt.note||"")?" · de la levée du témoin":""));
     const inc=T.incident; if(inc) t+=chip("Incidents", String(inc.n), "notés");
     $("logTotals").innerHTML=t||'<div class="muted" style="font-size:.84rem;">Rien de noté pour cette saison.</div>';
     if(!logEntries.length){ $("logList").innerHTML='<div class="muted">Aucune entrée pour cette parcelle. Commencez par noter votre prochain arrosage ou apport de compost.</div>'; return; }
@@ -733,11 +779,16 @@ html.simple .adv{display:none!important}
     compost:[["kg","kg",1],["brouette","brouettes",50],["sac","sacs",50],["seau","seaux",10]],
     engrais:[["kg","kg",1],["sac","sacs",50]],
     recolte:[["kg","kg",1],["sac","sacs",50],["cageot","cageots",20],["panier","paniers",15],["seau","seaux",10]],
-    perte:[["kg","kg",1],["sac","sacs",50],["cageot","cageots",20],["panier","paniers",15],["seau","seaux",10]]
+    perte:[["kg","kg",1],["sac","sacs",50],["cageot","cageots",20],["panier","paniers",15],["seau","seaux",10]],
+    // Résidus : pas de poids par défaut. Une brouette de paille et une brouette de fumier ne pèsent pas pareil :
+    // le producteur pèse une fois, et la taille est gardée pour chaque résidu.
+    residu:[["kg","kg",1],["brouette","brouettes",0],["sac","sacs",0],["seau","seaux",0],["botte","bottes",0]]
   };
-  const MEAS_ONE={arrosoir:"arrosoir",seau:"seau",bidon:"bidon",fut:"fût",pulve:"pulvérisateur",brouette:"brouette",sac:"sac",cageot:"cageot",panier:"panier"};
+  const MEAS_ONE={arrosoir:"arrosoir",seau:"seau",bidon:"bidon",fut:"fût",pulve:"pulvérisateur",brouette:"brouette",sac:"sac",cageot:"cageot",panier:"panier",botte:"botte"};
+  // Clé de rangement des tailles : par type de saisie, et pour les résidus par type de résidu.
+  function sizeKind(){ const k=$("logKind").value; return k==="residu"?"residu-"+($("logResidue").value||"autre"):k; }
   function mSizes(){ try{ const o=JSON.parse(localStorage.getItem("trv-units")||"{}"); return o&&typeof o==="object"?o:{}; }catch(e){ return {}; } }
-  function mSize(kind,code){ const own=Number(mSizes()[kind+":"+code]); if(own>0) return own; const m=(MEASURES[kind]||[]).find(x=>x[0]===code); return m?m[2]:1; }
+  function mSize(kind,code){ const own=Number(mSizes()[kind+":"+code]); if(own>0) return own; const m=(MEASURES[kind.split("-")[0]]||[]).find(x=>x[0]===code); return m?m[2]:1; }
   function numIn(v){ const x=parseFloat(String(v==null?"":v).replace(/\s/g,"").replace(",",".")); return isFinite(x)?x:null; }
   function fillMeasure(){
     const k=$("logKind").value, list=MEASURES[k], sel=$("logMeasure");
@@ -750,7 +801,7 @@ html.simple .adv{display:none!important}
     const k=$("logKind").value, code=$("logMeasure").value, base=LOG_UNIT[k];
     try{ if(code) localStorage.setItem("trv-measure-"+k,code); }catch(e){}
     const isBase=!code||code===base; $("logSizeWrap").style.display=isBase?"none":"";
-    if(!isBase){ $("logSizeName").textContent=MEAS_ONE[code]||code; $("logSize").value=String(mSize(k,code)).replace(".",","); $("logSizeUnit").textContent=base; }
+    if(!isBase){ const sz=mSize(sizeKind(),code); $("logSizeName").textContent=MEAS_ONE[code]||code; $("logSize").value=sz>0?String(sz).replace(".",","):""; $("logSize").placeholder=sz>0?"":"à peser"; $("logSizeUnit").textContent=base; }
     convPreview();
   }
   // Quantité à enregistrer (toujours en L ou kg) et trace lisible de la mesure du terrain.
@@ -758,11 +809,73 @@ html.simple .adv{display:none!important}
     const k=$("logKind").value, base=LOG_UNIT[k], code=$("logMeasure").value, n=numIn($("logQty").value);
     if(n==null) return { qty:$("logQty").value.trim(), label:"" };
     if(!MEASURES[k]||!code||code===base) return { qty:String(n), label:"" };
-    const size=numIn($("logSize").value)||mSize(k,code), total=Math.round(n*size*100)/100;
+    const size=numIn($("logSize").value)||mSize(sizeKind(),code);
+    if(!(size>0)) return { qty:"", label:"", needSize:MEAS_ONE[code]||code };
+    const total=Math.round(n*size*100)/100;
     const plural=(MEASURES[k].find(m=>m[0]===code)||[])[1]||code;
     return { qty:String(total), label:nf(n)+" "+(n>1?plural:(MEAS_ONE[code]||plural))+" de "+nf(size)+" "+base };
   }
-  function convPreview(){ const k=$("logKind").value, m=measured(); $("logConv").textContent=m.label&&numIn(m.qty)!=null?"= "+nf(numIn(m.qty))+" "+LOG_UNIT[k]:""; }
+  function convPreview(){ const k=$("logKind").value, m=measured(); $("logConv").textContent=m.needSize?"Pesez une fois un(e) "+m.needSize+" de ce résidu et indiquez son poids.":m.label&&numIn(m.qty)!=null?"= "+nf(numIn(m.qty))+" "+LOG_UNIT[k]:""; }
+
+  // ---------- Résidus valorisés et test de germination (contenus : /residus.js) ----------
+  const RES=window.TRV_RESIDUS||null;
+  function fillLogRoutes(){
+    if(!RES) return; const sel=$("logRoute"), r=RES.residueById($("logResidue").value), adv=r?r.routes:[], want=sel.dataset.want||"";
+    sel.innerHTML=adv.concat(Object.keys(RES.ROUTES).filter(k=>adv.indexOf(k)<0)).map(k=>'<option value="'+k+'">'+esc(RES.ROUTES[k].label)+(adv.indexOf(k)===0?" (conseillé)":"")+'</option>').join("");
+    if(want&&RES.ROUTES[want]) sel.value=want; sel.dataset.want=""; logResHint();
+  }
+  function logResHint(){
+    const box=$("logResHint"); if(!box) return;
+    const r=RES&&$("logKind").value==="residu"?RES.residueById($("logResidue").value):null; if(!r){ box.style.display="none"; return; }
+    const k=$("logRoute").value, how=r.how[k];
+    box.innerHTML='<b>'+esc(r.nature)+'</b> '+(how?esc(how):(k!=="autre"&&r.routes.indexOf(k)<0?"Ce n'est pas la voie la plus adaptée à ce résidu : regardez le guide « Valoriser mes résidus » ci-dessus.":""));
+    box.style.display="";
+  }
+  function germInput(){ return { sown:$("gSown").value, up:$("gUp").value, ref_sown:$("gRefSown").value, ref_up:$("gRefUp").value, days:$("gDays").value }; }
+  function germPreview(){
+    const box=$("logGermOut"), g=germInput(); if(!RES||!String(g.sown).trim()||!String(g.up).trim()){ box.style.display="none"; return; }
+    const x=RES.germinationResult(g); box.style.display="";
+    if(x.error){ box.className="valert warn"; box.textContent=x.error; return; }
+    box.className="valert "+({ok:"ok",moyen:"warn",faible:"bad"}[x.level]||"");
+    box.innerHTML='<b>'+esc(x.verdict)+'</b>'+x.warnings.map(w=>'<div style="font-size:.82rem;margin-top:3px;">'+esc(w)+'</div>').join("")
+      +(x.kind==="relatif"&&x.pct!=null?'<div class="muted" style="font-size:.76rem;margin-top:4px;">Repère de lecture : '+RES.GERMINATION.ok_pct+' % et plus, satisfaisant ; moins de '+RES.GERMINATION.low_pct+' %, poursuivre le compostage.'+natTag("repere")+'</div>':'');
+  }
+  // Depuis le guide : prépare la saisie dans le carnet (type, résidu, voie) et y conduit.
+  function toLog(kind, residue, route){
+    const b=document.querySelector('#kindPick .kind[data-kind="'+kind+'"]'); if(b) b.click();
+    if(kind==="residu"&&RES){ $("logResidue").value=residue; $("logRoute").dataset.want=route||""; fillLogRoutes(); measureChanged(); }
+    const c=$("logCard"); if(c) c.scrollIntoView({ behavior:"smooth", block:"start" });
+    const f=kind==="germination"?$("gSown"):$("logQty");
+    if(f&&$("logBody").style.display!=="none") setTimeout(function(){ try{ f.focus({ preventScroll:true }); }catch(e){} },450);
+  }
+  function bindResidus(){
+    if(!RES||!$("resCard")) return;
+    const pick=$("resPick"); pick.innerHTML=RES.RESIDUES.map(r=>'<option value="'+r.id+'">'+esc(r.label)+'</option>').join("");
+    try{ const w=localStorage.getItem("trv-residu"); if(w&&RES.residueById(w)) pick.value=w; }catch(e){}
+    let route="";
+    function show(){
+      const r=RES.residueById(pick.value); if(!r) return; if(r.routes.indexOf(route)<0) route=r.routes[0];
+      try{ localStorage.setItem("trv-residu",r.id); }catch(e){}
+      $("resPanel").innerHTML=(r.family?'<div class="muted" style="font-size:.76rem;">'+esc(RES.FAMILIES[r.family])+'</div>':'')
+        +'<div style="font-weight:700;margin-top:2px;">'+esc(r.nature)+'</div>'
+        +'<div class="resroutes" role="group" aria-label="Que faire de ce résidu">'+r.routes.map((k,i)=>'<button type="button" class="resroute" data-route="'+k+'" aria-pressed="'+(k===route?"true":"false")+'">'+esc(RES.ROUTES[k].label)+(i===0?'<span class="best">conseillé en premier</span>':'')+'</button>').join("")+'</div>'
+        +'<div style="font-size:.92rem;line-height:1.55;">'+esc(r.how[route]||"")+'</div>'
+        +(r.care.length?'<div style="font-weight:700;font-size:.84rem;margin-top:10px;">Précautions</div><ul class="rescare">'+r.care.map(c=>'<li>'+esc(c)+'</li>').join("")+'</ul>':'')
+        +'<div class="maprow"><button type="button" class="btn primary" id="resLog">'+ico("notebook")+'Noter dans le carnet</button><span class="muted" style="font-size:.8rem;flex:1;min-width:180px;">Notez la quantité à chaque fois : c\'est elle qui apparaît dans le bilan d\'impact.</span></div>';
+      $("resPanel").querySelectorAll(".resroute").forEach(b=>b.addEventListener("click", function(){ route=b.dataset.route; show(); const n=$("resPanel").querySelector('.resroute[data-route="'+route+'"]'); if(n) n.focus(); }));
+      $("resLog").addEventListener("click", function(){ toLog("residu", r.id, route); });
+    }
+    pick.addEventListener("change", function(){ route=""; show(); }); show();
+    $("resRulesList").innerHTML=RES.RULES.map(x=>'<li>'+esc(x)+'</li>').join("");
+    const G=RES.GERMINATION;
+    $("resGermBody").innerHTML='<div class="muted" style="font-size:.86rem;margin:8px 0;">'+esc(G.why)+'</div>'
+      +'<ol style="margin:0 0 0 20px;padding:0;font-size:.9rem;line-height:1.6;">'+G.steps.map(s=>'<li>'+esc(s)+'</li>').join("")+'</ol>'
+      +'<div style="font-size:.88rem;margin-top:8px;"><b>Lire le résultat.</b> À partir de '+G.ok_pct+' % de la levée du témoin, le compost est jugé satisfaisant ; en dessous de '+G.low_pct+' %, il faut poursuivre le compostage.'+natTag("repere")+'</div>'
+      +'<div class="muted" style="font-size:.76rem;margin-top:4px;">'+esc(G.note)+' Sources : '+G.sources.map(s=>'<a href="'+esc(s.url)+'" target="_blank" rel="noopener">'+esc(s.name)+'</a>').join(" ; ")+'.</div>'
+      +'<div class="maprow"><button type="button" class="btn primary" id="resGermLog">'+ico("notebook")+'Noter le résultat dans le carnet</button></div>';
+    $("resGermLog").addEventListener("click", function(){ toLog("germination"); });
+    $("resSource").textContent=RES.SOURCE;
+  }
 
   // ---- Carnet hors ligne : les saisies sans réseau attendent sur le téléphone ----
   const QKEY="trv-log-queue"; let qBusy=false;
@@ -879,22 +992,43 @@ html.simple .adv{display:none!important}
     if(!$("logCard")) return;
     $("logDate").value=new Date().toISOString().slice(0,10);
     $("logParcel").addEventListener("change", loadLog);
-    function unit(){ const k=$("logKind").value, u=LOG_UNIT[k]; $("logUnit").textContent=u?"("+u+")":""; $("logQty").disabled=!u; if(!u) $("logQty").value=""; $("logProdWrap").style.display=(k==="engrais"||k==="traitement"||k==="compost")?"":"none"; fillMeasure(); }
+    function unit(){ const k=$("logKind").value, u=LOG_UNIT[k]; $("logUnit").textContent=u?"("+u+")":""; $("logQty").disabled=!u; if(!u) $("logQty").value=""; $("logProdWrap").style.display=(k==="engrais"||k==="traitement"||k==="compost")?"":"none";
+      const isRes=k==="residu", isGerm=k==="germination";
+      $("logResWrap").style.display=$("logRouteWrap").style.display=isRes?"":"none";
+      $("logGermWrap").style.display=isGerm?"":"none"; $("logQtyWrap").style.display=isGerm?"none":"";
+      fillMeasure(); logResHint(); }
+    if(RES){
+      $("logResidue").innerHTML=RES.RESIDUES.map(r=>'<option value="'+r.id+'">'+esc(r.label)+'</option>').join(""); fillLogRoutes();
+      $("logResidue").addEventListener("change", function(){ fillLogRoutes(); measureChanged(); });
+      $("logRoute").addEventListener("change", logResHint);
+      ["gSown","gUp","gRefSown","gRefUp","gDays"].forEach(i=>$(i).addEventListener("input", germPreview));
+      $("germHow").addEventListener("click", function(e){ e.preventDefault(); const d=$("resGerm"); if(d){ d.open=true; d.scrollIntoView({ behavior:"smooth", block:"center" }); } });
+    }
     $("logSeasonFilter").addEventListener("change", function(){ this.dataset.picked="1"; renderLog({ parcel:{ area_m2:logArea } }); });
     $("logParcel").addEventListener("change", function(){ $("logSeason").value=""; $("logSeasonFilter").dataset.picked=""; $("impactBox").style.display="none"; });
     $("impactBtn").addEventListener("click", function(){ const b=$("impactBox"); if(b.style.display==="none"){ b.style.display=""; loadImpact(); } else b.style.display="none"; });
     $("collectBtn").addEventListener("click", printCollect);
     $("logMeasure").addEventListener("change", measureChanged);
     $("logQty").addEventListener("input", convPreview);
-    $("logSize").addEventListener("change", function(){ const k=$("logKind").value, code=$("logMeasure").value, v=numIn(this.value); if(v>0){ const a=mSizes(); a[k+":"+code]=v; try{ localStorage.setItem("trv-units",JSON.stringify(a)); }catch(e){} } convPreview(); });
-    $("logSize").addEventListener("input", convPreview);
+    $("logSize").addEventListener("change", function(){ const k=sizeKind(), code=$("logMeasure").value, v=numIn(this.value); if(v>0){ const a=mSizes(); a[k+":"+code]=v; try{ localStorage.setItem("trv-units",JSON.stringify(a)); }catch(e){} } convPreview(); });
+    $("logSize").addEventListener("input", function(){ convPreview(); $("logMsg").textContent=""; });
     $("logKind").addEventListener("change", unit); unit();
     $("logAdd").addEventListener("click", async function(){
       const b=this, k=$("logKind").value, m=measured();
+      if(m.needSize&&k!=="germination"){ $("logMsg").textContent="Indiquez d'abord le poids d'un(e) "+m.needSize+" de ce résidu (pesez-en une fois), ou saisissez directement des kg."; $("logSize").focus(); return; }
       const note=[m.label, $("logNote").value.trim()].filter(Boolean).join(" · ").slice(0,300);
       const payload={ client_id:newClientId(), parcel_id:$("logParcel").value, date:$("logDate").value, kind:k, qty:m.qty, product:$("logProd").value.trim(), season:$("logSeason").value.trim(), note:note };
+      if(k==="residu"){
+        if(!(numIn(m.qty)>0)){ $("logMsg").textContent="Indiquez la quantité de résidus valorisés."; $("logQty").focus(); return; }
+        payload.residue=$("logResidue").value; payload.route=$("logRoute").value; payload.product="";
+      }
+      if(k==="germination"){
+        const g=germInput(), x=RES?RES.germinationResult(g):{ error:"Test indisponible : rechargez la page." };
+        if(x.error){ $("logMsg").textContent=x.error; return; }
+        payload.germ=g; payload.qty=""; payload.note=$("logNote").value.trim().slice(0,200);
+      }
       try{ localStorage.setItem("trv-log-season-"+payload.parcel_id,payload.season); }catch(e){}
-      const done=function(msg){ $("logMsg").textContent=msg; $("logQty").value=""; $("logNote").value=""; $("logProd").value=""; convPreview(); };
+      const done=function(msg){ $("logMsg").textContent=msg; $("logQty").value=""; $("logNote").value=""; $("logProd").value=""; if(k==="germination"){ ["gSown","gUp","gRefSown","gRefUp"].forEach(i=>{ $(i).value=""; }); germPreview(); } convPreview(); };
       const keepOffline=function(){ qAdd(payload); done("Pas de réseau : saisie gardée sur ce téléphone. Elle sera envoyée automatiquement dès que le réseau revient."); };
       if(navigator.onLine===false){ keepOffline(); return; }
       b.disabled=true; $("logMsg").textContent="Enregistrement…";
@@ -988,6 +1122,18 @@ html.simple .adv{display:none!important}
       const K=R.carbon;
       h+='<h4>Carbone apporté au sol par le compost noté</h4><div style="font-size:.86rem;">'+fv(K.carbon_kg)+natTag(K.carbon_kg.nature)+' soit '+fv(K.co2e_kg)+natTag(K.co2e_kg.nature)+', dont '+fv(K.retained_co2e_kg)+natTag(K.retained_co2e_kg.nature)+' resteraient durablement dans le sol.</div><div class="muted" style="font-size:.76rem;">Hypothèses : '+K.hypotheses.map(esc).join(" ; ")+'.</div>';
     }
+    if(R.residues){
+      const Z=R.residues;
+      h+='<h4>'+(forPrint?'':ico("recycle"))+'Résidus valorisés</h4><div style="font-size:.86rem;"><b>'+fv(Z.total)+'</b>'+natTag(Z.total.nature)+' de résidus valorisés cette saison'+(Z.routes.length?' : '+Z.routes.map(x=>esc(x.label.toLowerCase())+' '+nf(x.kg)+' kg').join(", "):'')+'.</div>';
+      if(Z.need) h+='<div style="font-size:.84rem;margin-top:4px;">Pour faire le compost conseillé par la fiche sol, il faut réunir '+fv(Z.need)+natTag(Z.need.nature)+' de matières. Déjà mis au compost : <b>'+(Z.composted?fv(Z.composted):'0 kg')+'</b>'+natTag("mesure")+', soit '+(Z.need_pct[0]===Z.need_pct[1]?Z.need_pct[0]:Z.need_pct[0]+' à '+Z.need_pct[1])+' % de ce besoin.</div>';
+      const older=R.seasons.filter(x=>C&&x.season!==C.season&&x.residue_n);
+      if(older.length) h+='<div class="muted" style="font-size:.8rem;margin-top:4px;">Saisons précédentes : '+older.map(x=>esc(x.season)+' : '+nf(x.residue_kg)+' kg').join(" ; ")+'.</div>';
+    }
+    if(R.germination){
+      const G=R.germination, vd={ok:"Le compost ne freine pas la levée.",moyen:"Compost à laisser mûrir encore, puis refaire le test.",faible:"Compost pas mûr : poursuivre le compostage avant de l'utiliser.",indetermine:"Test non concluant : à refaire avec un témoin."}[G.level]||"";
+      h+='<h4>'+(forPrint?'':ico("sprout"))+'Maturité du compost (test de germination)</h4><div style="font-size:.86rem;">Dernier test le '+esc(fd(G.date))+' : '+(G.pct?'<b>'+fv(G.pct)+'</b>'+natTag(G.pct.nature)+'. ':'')+esc(vd)+'</div>'
+        +'<div class="muted" style="font-size:.76rem;margin-top:2px;">'+esc(G.detail||"")+'. '+esc(G.reading)+natTag("repere")+' Sources : '+esc(G.threshold.source)+'.</div>';
+    }
     if(R.missing.length) h+='<h4>À compléter</h4><ul style="margin:2px 0 0 18px;font-size:.84rem;">'+R.missing.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>';
     if(!forPrint&&R.tips&&R.tips.length) h+='<div class="muted" style="font-size:.84rem;margin-top:10px;padding:8px 12px;border-left:3px solid var(--leaf);background:rgba(46,125,79,.06);border-radius:6px;"><b>Facultatif.</b> Votre bilan est complet. '+R.tips.map(esc).join(" ")+'</div>';
     if(forPrint) h+='<h4>Légende</h4><div style="font-size:.8rem;">'+Object.keys(NAT).map(k=>natTag(k)+' '+esc(NAT[k][1])).join(" &nbsp; ")+'</div>';
@@ -1024,6 +1170,8 @@ html.simple .adv{display:none!important}
   function impactText(d){
     const R=d.report, C=R.current, L=["Bilan Terravive — "+(R.parcel.name||"ma parcelle")];
     if(C){ L.push("Saison : "+C.season); if(C.water_l) L.push("Eau : "+nf(C.water_l)+" L"+(C.water_l_m2!=null?" ("+nf(C.water_l_m2)+" L/m²)":"")); if(C.compost_kg) L.push("Compost : "+nf(C.compost_kg)+" kg"); if(C.chem_n) L.push("Engrais chimique : "+nf(C.chem_kg)+" kg"); if(C.harvest_kg) L.push("Récolte : "+nf(C.harvest_kg)+" kg"+(C.yield_t_ha!=null?" ("+nf(C.yield_t_ha)+" t/ha)":"")); }
+    if(R.residues) L.push("Résidus valorisés : "+nf(R.residues.total.v)+" kg"+(R.residues.routes.length?" ("+R.residues.routes.map(x=>x.label.toLowerCase()+" "+nf(x.kg)+" kg").join(", ")+")":""));
+    if(R.germination&&R.germination.pct&&R.germination.level!=="indetermine") L.push("Test de germination du compost : "+nf(R.germination.pct.v)+" % de la levée du témoin");
     R.comparisons.forEach(c=>{ if(c.pct!=null) L.push((CMP_LABEL[c.key]||c.key)+" : "+(c.pct>0?"+":"")+c.pct+" % par rapport à avant"+(c.better?" ✓":"")); });
     if(R.pair&&R.pair.rows.length){ L.push(""); L.push("Test côte à côte (Terravive / témoin) :"); R.pair.rows.forEach(x=>{ if(x.terravive&&x.temoin) L.push(x.label+" : "+nf(x.terravive.v)+" / "+nf(x.temoin.v)+" "+x.unit+(x.verdict==="terravive"?" (Terravive mieux)":x.verdict==="temoin"?" (témoin mieux)":"")); }); }
     L.push("Chiffres notés dans le carnet de champ."); return L.join("\n");
@@ -1047,6 +1195,8 @@ html.simple .adv{display:none!important}
     if(R.pair) R.pair.rows.forEach(x=>{ if(x.terravive) rows.push([x.label+" — Terravive",fv(x.terravive),"mesure","carnet de champ « "+(R.pair.terravive.name||"")+" »"]); if(x.temoin) rows.push([x.label+" — témoin",fv(x.temoin),"mesure","carnet de champ « "+(R.pair.temoin.name||"")+" »"]); });
     Object.keys(R.savings).forEach(k=>{ const v=R.savings[k]; rows.push([k==="water_l"?"Eau économisée":"Engrais chimique évité",fv(v),v.nature,v.source]); });
     if(R.carbon){ ["carbon_kg","co2e_kg","retained_co2e_kg"].forEach(k=>{ const v=R.carbon[k]; rows.push([k==="carbon_kg"?"Carbone apporté":k==="co2e_kg"?"Équivalent CO₂ apporté":"Part restant dans le sol",fv(v),v.nature,v.source]); }); }
+    if(R.residues){ const Z=R.residues; rows.push(["Résidus valorisés (saison en cours)",fv(Z.total),Z.total.nature,Z.total.source+(Z.routes.length?" — "+Z.routes.map(x=>x.label.toLowerCase()+" "+nf(x.kg)+" kg").join(", "):"")]); if(Z.need) rows.push(["Matières à réunir pour le compost conseillé",fv(Z.need),Z.need.nature,Z.need.source]); }
+    if(R.germination&&R.germination.pct){ const G=R.germination; rows.push(["Test de germination du compost ("+fd(G.date)+")",fv(G.pct),G.pct.nature,G.detail||G.pct.source]); rows.push(["Repère de lecture du test",fv(G.threshold),G.threshold.nature,G.threshold.source]); }
     // Chiffres de la fiche sol de la parcelle (si elle existe)
     try{
       const r=await fetch("/api/parcels/soil?id="+encodeURIComponent($("logParcel").value)); const x=await r.json(); const f=x.fiche;
@@ -1074,7 +1224,7 @@ html.simple .adv{display:none!important}
     const P=myParcels.find(p=>p.id===$("logParcel").value)||{}, season=$("logSeason").value||defaultSeason(new Date().toISOString().slice(0,10));
     const line='<tr>'+'<td style="height:30px"></td>'.repeat(7)+'</tr>';
     let body='<div style="font-size:12px;">Parcelle : <b>'+esc(P.name||"……………………")+'</b> · Saison : <b>'+esc(season)+'</b> · Cultivateur : ………………………………… · Culture : ……………………</div>';
-    body+='<h4>Interventions et récoltes</h4><div class="muted" style="font-size:11px;">Type : A = arrosage (litres), C = compost (kg), E = engrais chimique (kg + nom), T = traitement (litres + produit), S = semis, R = récolte (kg), I = incident.</div>';
+    body+='<h4>Interventions et récoltes</h4><div class="muted" style="font-size:11px;">Type : A = arrosage (litres), C = compost (kg), E = engrais chimique (kg + nom), T = traitement (litres + produit), S = semis, R = récolte (kg), V = résidus valorisés (kg + ce que vous en avez fait : compost, paillis…), I = incident.</div>';
     body+='<table><thead><tr><th style="width:12%">Date</th><th style="width:8%">Type</th><th style="width:12%">Quantité</th><th style="width:16%">Produit</th><th>Observation</th><th style="width:12%">Humidité sol (%) ou au toucher</th><th style="width:8%">Saisi ✓</th></tr></thead><tbody>'+line.repeat(16)+'</tbody></table>';
     body+='<h4>Retour du cultivateur</h4><table><tbody>'
       +['Les conseils (arrosage, compost) étaient-ils clairs ?','Ce qui a bien marché','Ce qui a été difficile','Différence observée par rapport à avant (eau, rendement, sol)'].map(q=>'<tr><td style="width:40%">'+esc(q)+'</td><td style="height:38px"></td></tr>').join("")+'</tbody></table>';
@@ -1211,6 +1361,7 @@ html.simple .adv{display:none!important}
     if(g.raw_kg) h+=chip("Matières à composter", rng(g.raw_kg,"kg"), "déchets verts et secs, fumier");
     if(g.status) h+=chip("Matière organique", (g.mo_pct!=null?String(g.mo_pct).replace(".",",")+" %":"—"), g.status);
     h+='</div>';
+    if(g.raw_kg&&$("resCard")) h+='<div class="muted" style="font-size:.82rem;margin-top:6px;">Quelles matières réunir, et comment ? <a href="#resCard" style="color:var(--leaf);font-weight:600;">Voir « Valoriser mes résidus »</a>. Notez-les dans le carnet : le bilan d\'impact compare ce que vous avez déjà mis au compost à ce besoin.</div>';
     if(F.priorities&&F.priorities.length) h+='<ol class="fertlist">'+F.priorities.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ol>';
     if(F.ph&&F.ph.action) h+='<div class="valert'+(F.ph.lime_t_ha?' warn':'')+'" style="margin-top:8px;">'+esc(F.ph.action)+(F.ph.lime_total_kg?' Pour la parcelle : '+esc(rng(F.ph.lime_total_kg,"kg"))+' de chaux.':'')+'</div>';
     if(F.nutrients&&F.nutrients.length) h+='<div class="nutgrid">'+F.nutrients.map(n=>'<div class="nut '+(n.status==="faible"?'low':'')+'"><b>'+esc(n.k)+'</b> <span class="muted">· '+esc(n.status)+'</span><div>'+esc(n.action)+'</div></div>').join("")+'</div>';
@@ -1518,7 +1669,7 @@ html.simple .adv{display:none!important}
     // Actualisation automatique des mesures du capteur (toutes les 60 s) :
     // dès qu'une vraie carte envoie des données, elles apparaissent sans recharger la page.
     setInterval(refresh, 60000);
-    initMode(); bindLog(); bindToday(); buildKindPick(); loadParcels();
+    initMode(); bindLog(); bindResidus(); bindToday(); buildKindPick(); loadParcels();
     if(me && me.isAdmin){
       loadAdminQuestions(); initAdminAnimators();
       // Quality Guard apparaît uniquement dans le menu des administrateurs.
