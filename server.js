@@ -19,6 +19,8 @@ const { esp32Sketch } = require("./lib/esp32-sketch");
 const FERT = require("./lib/fertil");
 const FICHE = require("./lib/fiche");
 const IMPACT = require("./lib/impact");
+const TODAY = require("./lib/today");
+const RESIDUS = require("./lib/residus"); // guide des résidus et test de germination (partagé avec le navigateur)
 
 // ---------- Configuration ----------
 function loadEnv(file) {
@@ -39,7 +41,9 @@ const API_KEYS = (function () {
   return all;
 })();
 const API_KEY = API_KEYS[0];
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
+// Modèle de secours : si le modèle demandé est refusé (identifiant inconnu de l'API), on repasse sur celui-ci.
+const FALLBACK_MODEL = "claude-sonnet-5";
 // Longueur max (tokens) pour la génération du plan — l'itinéraire complet (18 sections,
 // fiches d'action chiffrées, budget, résumé) est long : 8000 coupait vers la section 13,
 // 16000 vers la section 17. Relevé à 24000 (le modèle accepte cette longueur) et le prompt
@@ -52,7 +56,8 @@ const SUPABASE_URL = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const USE_DB = !!(SUPABASE_URL && SUPABASE_KEY);
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-const DATA_DIR = path.join(__dirname, "data");
+// Dossier des données locales (mode sans base). DATA_DIR permet aux tests d'utiliser un dossier jetable.
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const PUBLIC_DIR = path.join(__dirname, "public");
 try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
 
@@ -87,7 +92,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.parcelSoil) s.parcelSoil = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; if (!s.fieldLog) s.fieldLog = []; if (!s.parcelRef) s.parcelRef = {}; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, parcelSoil: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [], fieldLog: [], parcelRef: {} }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.parcelSoil) s.parcelSoil = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; if (!s.fieldLog) s.fieldLog = []; if (!s.parcelRef) s.parcelRef = {}; if (!s.parcelPair) s.parcelPair = {}; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, parcelSoil: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [], fieldLog: [], parcelRef: {}, parcelPair: {} }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -132,7 +137,7 @@ async function getSessionUser(token) {
   }
   const s = loadStore(); const x = s.sessions[token]; if (!x) return null; if (Date.now() - (x.at || 0) > SESSION_TTL_MS) { delete s.sessions[token]; saveStore(s); return null; } return s.users[x.userId] || null;
 }
-function parseCookies(req) { const h = req.headers.cookie || ""; const out = {}; h.split(";").forEach((p) => { const i = p.indexOf("="); if (i > -1) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim()); }); return out; }
+function parseCookies(req) { const h = req.headers.cookie || ""; const out = {}; h.split(";").forEach((p) => { const i = p.indexOf("="); if (i > -1) { const v = p.slice(i + 1).trim(); let d = v; try { d = decodeURIComponent(v); } catch (e) { d = v; } out[p.slice(0, i).trim()] = d; } }); return out; }
 function setSessionCookie(res, token) { res.setHeader("Set-Cookie", `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax${COOKIE_SECURE}; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`); }
 function clearSessionCookie(res) { res.setHeader("Set-Cookie", `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax${COOKIE_SECURE}; Max-Age=0`); }
 // Code administrateur (facultatif). S'il est défini, un compte administrateur doit AUSSI
@@ -293,7 +298,10 @@ async function deleteParcelSoil(userId, parcelId) {
 }
 
 // ---------- Carnet de champ (interventions et récoltes, par parcelle) ----------
-const LOG_KINDS = { arrosage: "L", compost: "kg", engrais: "kg", traitement: "L", semis: "", recolte: "kg", incident: "", observation: "" };
+// residu : résidus valorisés (compost, paillis…), en kg ; germination : test de maturité du compost, en % de la levée du témoin.
+const LOG_KINDS = { arrosage: "L", pluie: "mm", compost: "kg", engrais: "kg", traitement: "L", semis: "", recolte: "kg", perte: "kg", residu: "kg", germination: "%", incident: "", observation: "" };
+// Le test de germination demande ses propres champs : il n'est pas proposé dans la saisie rapide de l'animateur.
+const COOP_LOG_KINDS = Object.fromEntries(Object.entries(LOG_KINDS).filter(([k]) => k !== "germination"));
 async function listFieldLog(userId, parcelId) {
   if (USE_DB) { try { return (await sb(`/trv_field_log?user_id=eq.${encodeURIComponent(userId)}&parcel_id=eq.${encodeURIComponent(parcelId)}&select=*&order=date.desc,created_at.desc&limit=500`)) || []; } catch (e) { console.error("listFieldLog:", e.message); throw e; } }
   return loadStore().fieldLog.filter((x) => x.user_id === userId && x.parcel_id === parcelId).sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.created_at).localeCompare(String(a.created_at))).slice(0, 500);
@@ -315,19 +323,37 @@ async function deleteParcelRef(userId, parcelId) {
   if (USE_DB) { await sb(`/trv_parcel_ref?parcel_id=eq.${encodeURIComponent(parcelId)}&user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); return; }
   const s = loadStore(); if (s.parcelRef && s.parcelRef[parcelId] && s.parcelRef[parcelId].user_id === userId) { delete s.parcelRef[parcelId]; saveStore(s); }
 }
+// Parcelle témoin associée à une parcelle conduite avec Terravive (test côte à côte).
+async function getParcelPair(parcelId) {
+  if (USE_DB) { try { const r = await sb(`/trv_parcel_pair?parcel_id=eq.${encodeURIComponent(parcelId)}&select=*&limit=1`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return (loadStore().parcelPair || {})[parcelId] || null;
+}
+async function getPairAsControl(userId, parcelId) {
+  if (USE_DB) { try { const r = await sb(`/trv_parcel_pair?control_id=eq.${encodeURIComponent(parcelId)}&user_id=eq.${encodeURIComponent(userId)}&select=*&limit=1`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return Object.values(loadStore().parcelPair || {}).find((x) => x.control_id === parcelId && x.user_id === userId) || null;
+}
+async function saveParcelPair(rec) {
+  if (USE_DB) { await sb(`/trv_parcel_pair?on_conflict=parcel_id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([rec]) }); return; }
+  const s = loadStore(); s.parcelPair = s.parcelPair || {}; s.parcelPair[rec.parcel_id] = rec; saveStore(s);
+}
+async function deleteParcelPair(userId, parcelId) {
+  if (USE_DB) { await sb(`/trv_parcel_pair?parcel_id=eq.${encodeURIComponent(parcelId)}&user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); return; }
+  const s = loadStore(); if (s.parcelPair && s.parcelPair[parcelId] && s.parcelPair[parcelId].user_id === userId) { delete s.parcelPair[parcelId]; saveStore(s); }
+}
 async function addFieldLog(rec) {
   if (USE_DB) {
-    try { await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); }
+    // ignore-duplicates : une saisie renvoyée deux fois par un téléphone (réseau coupé) n'est gardée qu'une fois.
+    try { await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal,resolution=ignore-duplicates" }, body: JSON.stringify([rec]) }); }
     catch (e) {
       // Colonnes v8.0 (season, product) pas encore créées : on enregistre quand même l'essentiel.
       if (!/season|product|column/i.test(e.message)) throw e;
       const { season: _s, product: _p, ...base } = rec;
-      await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([base]) });
+      await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal,resolution=ignore-duplicates" }, body: JSON.stringify([base]) });
       return "partial";
     }
     return;
   }
-  const s = loadStore(); s.fieldLog.push(rec); saveStore(s);
+  const s = loadStore(); if (s.fieldLog.some((x) => x.id === rec.id)) return; s.fieldLog.push(rec); saveStore(s);
 }
 async function deleteFieldLog(userId, id) {
   if (USE_DB) { await sb(`/trv_field_log?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); return; }
@@ -335,7 +361,7 @@ async function deleteFieldLog(userId, id) {
 }
 function fieldLogTotals(entries) {
   const t = {};
-  entries.forEach((e) => { if (e.qty == null || !isFinite(Number(e.qty))) { t[e.kind] = t[e.kind] || { n: 0, qty: 0, unit: e.unit || "" }; t[e.kind].n++; return; } const k = e.kind; t[k] = t[k] || { n: 0, qty: 0, unit: e.unit || LOG_KINDS[k] || "" }; t[k].n++; t[k].qty = Math.round((t[k].qty + Number(e.qty)) * 100) / 100; });
+  entries.forEach((e) => { if (e.kind === "germination" || e.qty == null || !isFinite(Number(e.qty))) { t[e.kind] = t[e.kind] || { n: 0, qty: 0, unit: e.unit || "" }; t[e.kind].n++; return; } const k = e.kind; t[k] = t[k] || { n: 0, qty: 0, unit: e.unit || LOG_KINDS[k] || "" }; t[k].n++; t[k].qty = Math.round((t[k].qty + Number(e.qty)) * 100) / 100; });
   return t;
 }
 
@@ -638,8 +664,31 @@ async function fetchWeatherLatLon(lat, lon) {
 const RETRYABLE = [408, 409, 429, 500, 502, 503, 504, 529];
 let KEY_CURSOR = 0;
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
-async function callClaude(system, messages, model, maxTokens) {
-  const body = JSON.stringify({ model: model || MODEL, max_tokens: maxTokens || 4096, system, messages: messages.map((m) => ({ role: m.role, content: m.content })) });
+// Réglages de rapidité (documentation Anthropic, paramètre « effort ») : le modèle rédige sans longue
+// réflexion préalable. Mesuré en ligne le 14/11/2026 : sans ce réglage, 79 s d'attente avant la première
+// ligne d'un plan de culture. PLAN_THINKING=adaptive rétablit la réflexion ; PLAN_EFFORT règle l'effort.
+function speedOpts(effort) {
+  const o = { output_config: { effort } };
+  if ((process.env.PLAN_THINKING || "direct") !== "adaptive") o.thinking = { type: "between_tools" };
+  return o;
+}
+const PLAN_OPTS = speedOpts(process.env.PLAN_EFFORT || "medium");
+const FICHE_OPTS = speedOpts("low");
+// extra : champs ajoutés à la requête (réglages ci-dessus). Si l'API les refuse (400), on renvoie sans eux.
+async function callClaude(system, messages, model, maxTokens, extra) {
+  const wanted = model || MODEL;
+  const run = async (mdl) => {
+    try { return await callClaudeOnce(system, messages, mdl, maxTokens, extra); }
+    catch (e) { if (e && e.status === 400 && extra) { console.error("Réglages de rapidité refusés par l'API (" + mdl + ") :", e.message); return callClaudeOnce(system, messages, mdl, maxTokens, null); } throw e; }
+  };
+  try { return await run(wanted); }
+  catch (e) {
+    if (e && e.status === 404 && wanted !== FALLBACK_MODEL) { console.error("Modèle " + wanted + " refusé par l'API, secours " + FALLBACK_MODEL + " :", e.message); return run(FALLBACK_MODEL); }
+    throw e;
+  }
+}
+async function callClaudeOnce(system, messages, model, maxTokens, extra) {
+  const body = JSON.stringify(Object.assign({ model: model || MODEL, max_tokens: maxTokens || 4096, system, messages: messages.map((m) => ({ role: m.role, content: m.content })) }, extra || {}));
   const n = API_KEYS.length || 1; const start = KEY_CURSOR; KEY_CURSOR = (KEY_CURSOR + 1) % n; let lastErr = null;
   for (let i = 0; i < n; i++) {
     const key = API_KEYS[(start + i) % n];
@@ -651,6 +700,47 @@ async function callClaude(system, messages, model, maxTokens) {
       if (status === 400 || status === 404) throw lastErr;
       if ((status === 429 || status === 529) && i < n - 1) await sleep(600);
     } catch (e) { if (e && (e.status === 400 || e.status === 404)) throw e; lastErr = e; }
+  }
+  throw lastErr || new Error("Aucune clé API disponible.");
+}
+
+// Même appel, mais en flux : onText reçoit chaque morceau de texte dès qu'il arrive. Renvoie le texte complet.
+// Tant que rien n'a été reçu, on peut encore changer de clé ou de modèle ; après, une coupure est une erreur.
+async function streamClaude(system, messages, model, maxTokens, onText, extra) {
+  let ex = extra || null;
+  const n = API_KEYS.length || 1; const start = KEY_CURSOR; KEY_CURSOR = (KEY_CURSOR + 1) % n; let lastErr = null;
+  const models = [model || MODEL]; if (models[0] !== FALLBACK_MODEL) models.push(FALLBACK_MODEL);
+  for (const mdl of models) {
+    const mk = () => JSON.stringify(Object.assign({ model: mdl, max_tokens: maxTokens || 4096, stream: true, system, messages: messages.map((m) => ({ role: m.role, content: m.content })) }, ex || {}));
+    for (let i = 0; i < n; i++) {
+      const body = mk(); let r;
+      try { r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": API_KEYS[(start + i) % n], "anthropic-version": "2023-06-01" }, body }); }
+      catch (e) { lastErr = e; continue; }
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        lastErr = Object.assign(new Error((data && data.error && data.error.message) || ("Erreur IA " + r.status)), { status: r.status });
+        if (r.status === 404) break;            // modèle refusé : on passe au modèle de secours
+        if (r.status === 400 && ex) { console.error("Réglages de rapidité refusés par l'API (" + mdl + ") :", lastErr.message); ex = null; i--; continue; }
+        if (r.status === 400) throw lastErr;
+        if ((r.status === 429 || r.status === 529) && i < n - 1) await sleep(600);
+        continue;
+      }
+      let full = "", buf = ""; const dec = new TextDecoder();
+      for await (const chunk of r.body) {
+        buf += dec.decode(chunk, { stream: true });
+        let k;
+        while ((k = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, k).trim(); buf = buf.slice(k + 1);
+          if (!line.startsWith("data:")) continue;
+          let ev; try { ev = JSON.parse(line.slice(5)); } catch (e) { continue; }
+          if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta" && ev.delta.text) { full += ev.delta.text; onText(ev.delta.text); }
+          else if (ev.type === "error") throw Object.assign(new Error((ev.error && ev.error.message) || "La génération a été interrompue."), { status: 502 });
+        }
+      }
+      return full.trim();
+    }
+    if (!(lastErr && lastErr.status === 404)) break;
+    console.error("Modèle " + mdl + " refusé par l'API (flux) :", lastErr.message);
   }
   throw lastErr || new Error("Aucune clé API disponible.");
 }
@@ -928,6 +1018,7 @@ async function handleRegister(req, res) {
     const email = normEmail(p.email);
     if (!validEmail(email)) return sendJson(res, 400, { error: "Adresse e-mail invalide." });
     if (typeof p.password !== "string" || p.password.length < 6) return sendJson(res, 400, { error: "Le mot de passe doit contenir au moins 6 caractères." });
+    if (!rateOk("register-ip:" + clientIp(req), 10, 60 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de créations de compte depuis cette connexion. Réessayez plus tard." });
     if (await findUserByEmail(email)) return sendJson(res, 409, { error: "Un compte existe déjà avec cette adresse. Connectez-vous." });
     const user = await createUser({ email, name: p.name, password: p.password, region: p.region, profile: p.profile });
     const token = await createSession(user.id); setSessionCookie(res, token);
@@ -937,6 +1028,8 @@ async function handleRegister(req, res) {
 async function handleLogin(req, res) {
   try {
     let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+    // Anti-force brute : nombre de tentatives limité par adresse IP et par e-mail.
+    if (!rateOk("login-ip:" + clientIp(req), 30, 10 * 60 * 1000) || !rateOk("login:" + normEmail(p.email).slice(0, 200), 10, 10 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de tentatives de connexion. Réessayez dans quelques minutes." });
     const user = await findUserByEmail(p.email);
     if (!user || !verifyPassword(p.password, user.pass)) return sendJson(res, 401, { error: "E-mail ou mot de passe incorrect." });
     // Onglet « Administrateur » + code administrateur configuré : le code est exigé.
@@ -995,12 +1088,20 @@ async function handlePlan(req, res) {
 
   // 2) GÉNÉRATION par l'IA (compte dans la limite journalière et dans le coût).
   if (!rateOk("plan:" + user.id, 20, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Vous avez généré beaucoup de plans aujourd'hui. Reprenez plus tard." });
+  // Mode « au fil de l'eau » : le texte part vers le téléphone à mesure que l'IA l'écrit (une ligne JSON
+  // par morceau), au lieu de faire attendre plusieurs minutes devant un écran vide.
+  const live = p.stream === true;
+  const send = (o) => { try { res.write(JSON.stringify(o) + "\n"); } catch (e) { /* lecteur parti : on finit et on enregistre quand même */ } };
+  if (live) { res.writeHead(200, { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-cache, no-transform", "x-accel-buffering": "no" }); send({ t: "start" }); }
+  const reply = (code, obj) => { if (!live) return sendJson(res, code, obj); send(code === 200 ? Object.assign({ t: "done" }, obj) : { t: "error", error: obj.error }); res.end(); };
   try {
-    const content = await callClaude(planSystem(), [{ role: "user", content: planUserMessage(clean, soilBlock) }], null, PLAN_MAX_TOKENS);
+    const msgs = [{ role: "user", content: planUserMessage(clean, soilBlock) }];
+    const content = live ? await streamClaude(planSystem(), msgs, null, PLAN_MAX_TOKENS, (d) => send({ t: "delta", d }), PLAN_OPTS) : await callClaude(planSystem(), msgs, null, PLAN_MAX_TOKENS, PLAN_OPTS);
+    if (!content) throw new Error("La génération a échoué.");
     const rec = { id: newId(), user_id: user.id, title: crop + (clean.region ? " — " + clean.region : ""), crop, region: clean.region || null, area: clean.area || null, soil: clean.soil || null, season: clean.season || null, goal: clean.goal || null, notes: clean.notes || null, content, created_at: new Date().toISOString() };
     await savePlan(rec);
-    sendJson(res, 200, { plan: rec, reused: false });
-  } catch (e) { sendJson(res, e.status || 500, { error: e.message || "La génération a échoué." }); }
+    reply(200, { plan: rec, reused: false });
+  } catch (e) { reply(e.status || 500, { error: e.message || "La génération a échoué." }); }
 }
 // --- Fiche pratique terrain (version courte et imprimable de l'itinéraire) ---
 const FICHE_CACHE = new Map(); // repli si la colonne trv_plans.fiche n'existe pas encore
@@ -1043,14 +1144,47 @@ async function handlePlanFiche(req, res) {
     if (!rateOk("fiche:" + user.id, 30, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Beaucoup de fiches générées aujourd'hui. Reprenez demain." });
     let lastErr = null;
     for (let attempt = 0; attempt < 2 && !fiche; attempt++) {
-      try { fiche = FICHE.parseFiche(await callClaude(FICHE.ficheSystem(), [{ role: "user", content: FICHE.ficheUserMessage(plan) }], null, 4000), plan.crop); }
-      catch (e) { lastErr = e; if (e.status) break; }
+      let raw = "";
+      try { raw = await callClaude(FICHE.ficheSystem(), [{ role: "user", content: FICHE.ficheUserMessage(plan) }], null, 8000, FICHE_OPTS); fiche = FICHE.parseFiche(raw, plan.crop); }
+      catch (e) { lastErr = e; if (e.status) break; console.error("Fiche illisible (essai " + (attempt + 1) + ", " + raw.length + " caractères) : début « " + raw.slice(0, 80).replace(/\s+/g, " ") + " » fin « " + raw.slice(-80).replace(/\s+/g, " ") + " »"); }
     }
     if (!fiche) return sendJson(res, (lastErr && lastErr.status) || 502, { error: (lastErr && lastErr.message) || "La fiche n'a pas pu être créée." });
     FICHE_CACHE.set(plan.id, fiche); if (FICHE_CACHE.size > 500) FICHE_CACHE.delete(FICHE_CACHE.keys().next().value);
     try { await savePlan(Object.assign({}, plan, { fiche: JSON.stringify(fiche) })); } catch (e) { /* colonne absente : le cache mémoire suffit */ }
   }
   sendJson(res, 200, { fiche, parcel, text: FICHE.ficheText(fiche, parcel), cached });
+}
+// Écran « Aujourd'hui » : tâches de la semaine d'après la fiche terrain du plan de culture
+// de la parcelle (même culture), repérées par rapport à la date de semis notée dans « Sol & racines ».
+async function handleToday(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const id = new URL(req.url, "http://x").searchParams.get("parcel") || "";
+  const parcel = id ? await findUserParcel(user.id, id) : null;
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const soil = await getParcelSoil(parcel.id);
+  const crop = soil && soil.user_id === user.id ? (soil.crop || null) : null;
+  const sownAt = soil && soil.user_id === user.id ? (soil.sown_at || null) : null;
+  const today = new Date().toISOString().slice(0, 10);
+  const out = { parcel: { id: parcel.id, name: parcel.name }, crop, sown_at: sownAt, today, plan: null, fiche: false, tasks: null };
+  if (!crop) return sendJson(res, 200, out);
+  // Plan le plus récent de la même culture (liste déjà triée du plus récent au plus ancien).
+  const want = crop.toLowerCase();
+  let plan = null;
+  for (const p of (await listPlansForUser(user.id)).slice(0, 30)) {
+    if (String(p.crop || "").trim().toLowerCase() !== want) continue;
+    const full = await getPlan(p.id); if (!full) continue;
+    if (!plan) plan = full;
+    if (planFiche(full)) { plan = full; break; }
+  }
+  if (!plan) { try { const sh = await findSharedPlan(crop, ""); if (sh) plan = sh; } catch (e) {} }
+  if (!plan) return sendJson(res, 200, out);
+  out.plan = { id: plan.id, title: plan.title || plan.crop };
+  const fiche = planFiche(plan);
+  if (!fiche) return sendJson(res, 200, out);
+  out.fiche = true;
+  out.tasks = TODAY.tasksFor(fiche.calendrier, sownAt, today);
+  out.speech = TODAY.speechText(out.tasks, parcel.name);
+  sendJson(res, 200, out);
 }
 async function handlePlansList(req, res) { const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." }); sendJson(res, 200, { plans: await listPlansForUser(user.id) }); }
 async function handlePlanGet(req, res) {
@@ -1059,6 +1193,47 @@ async function handlePlanGet(req, res) {
   const plan = id ? await getPlan(id) : null;
   if (!plan || plan.user_id !== user.id) return sendJson(res, 404, { error: "Plan introuvable." });
   sendJson(res, 200, { plan });
+}
+// --- Relecture d'un plan par un agronome ---
+// Par défaut, un plan est « proposé par l'IA, non relu ». Un administrateur ou un auditeur Quality Guard
+// peut enregistrer qu'un agronome NOMMÉ l'a relu : c'est une déclaration datée, affichée avec le plan.
+// Rangement : table trv_quality_audits, ligne kind = "review" (une par plan), sans changement de schéma.
+async function getPlanReview(planId) {
+  let row = null;
+  if (USE_DB) { try { const rows = await sb(`/trv_quality_audits?id=eq.${encodeURIComponent("review-" + planId)}&select=id,kind,alerts,created_at,created_by&limit=1`); row = rows && rows[0]; } catch (e) { console.error("getPlanReview:", e.message); return null; } }
+  else { const st = loadStore(); row = (st.planReviews || {})[planId] || null; }
+  if (!row || row.kind !== "review") return null;
+  const a = (Array.isArray(row.alerts) ? row.alerts[0] : null) || {};
+  if (!a.reviewer) return null;
+  return { by: String(a.reviewer), note: a.note ? String(a.note) : null, at: row.created_at };
+}
+async function savePlanReview(plan, user, reviewer, note) {
+  const row = { id: "review-" + plan.id, plan_id: plan.id, title: plan.title || plan.crop || "", plan_title: plan.title || plan.crop || "", kind: "review", status: "relu", alert_count: 0, alerts: [{ reviewer, note: note || null }], created_at: new Date().toISOString(), created_by: user.email };
+  if (USE_DB) { await sb("/trv_quality_audits", { method: "POST", headers: { Prefer: "return=minimal,resolution=merge-duplicates" }, body: JSON.stringify([row]) }); return; }
+  const st = loadStore(); if (!st.planReviews) st.planReviews = {}; st.planReviews[plan.id] = row; saveStore(st);
+}
+async function deletePlanReview(planId) {
+  if (USE_DB) { await sb(`/trv_quality_audits?id=eq.${encodeURIComponent("review-" + planId)}&kind=eq.review`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); return; }
+  const st = loadStore(); if (st.planReviews) { delete st.planReviews[planId]; saveStore(st); }
+}
+async function handlePlanReviewGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const id = new URL(req.url, "http://x").searchParams.get("id") || "";
+  if (!/^[a-f0-9]{8,40}$/.test(id)) return sendJson(res, 400, { error: "Plan invalide." });
+  sendJson(res, 200, { review: await getPlanReview(id), can_review: qualityCan(user, "audit") });
+}
+async function handlePlanReviewSet(req, res) {
+  const user = await qualityGuard(req, res, "audit"); if (!user) return;
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const plan = p.id ? await getPlan(String(p.id)) : null;
+  if (!plan) return sendJson(res, 404, { error: "Plan introuvable." });
+  try {
+    if (p.remove === true) { await deletePlanReview(plan.id); return sendJson(res, 200, { review: null }); }
+    const reviewer = String(p.reviewer || "").replace(/\s+/g, " ").trim().slice(0, 120);
+    if (reviewer.length < 5) return sendJson(res, 400, { error: "Indiquez le nom et la qualité de l'agronome qui a relu le plan (ex. « K. Yao, ingénieur agronome, ANADER »)." });
+    await savePlanReview(plan, user, reviewer, String(p.note || "").trim().slice(0, 300));
+    sendJson(res, 200, { review: await getPlanReview(plan.id) });
+  } catch (e) { console.error("plan/review:", e.message); sendJson(res, 500, { error: "Enregistrement impossible." }); }
 }
 // --- Parcelles enregistrées ---
 async function handleParcelsList(req, res) {
@@ -1069,7 +1244,8 @@ async function handleParcelsList(req, res) {
   const parcels = (rows || []).map((p) => {
     let z = p.geom; if (typeof z === "string") { try { z = JSON.parse(z); } catch (e) { z = null; } }
     const so = soils[p.id];
-    return { id: p.id, name: p.name, zone: cleanZone(z), created_at: p.created_at, soil: so ? { crop: so.crop || null, sown_at: so.sown_at || null, analyzed: !!(so.estimate || so.manual) } : null };
+    const zc = cleanZone(z);
+    return { id: p.id, name: p.name, zone: zc, area_m2: zc ? FERT.zoneAreaM2(zc) : null, created_at: p.created_at, soil: so ? { crop: so.crop || null, sown_at: so.sown_at || null, analyzed: !!(so.estimate || so.manual) } : null };
   }).filter((p) => p.zone);
   sendJson(res, 200, { parcels });
 }
@@ -1131,30 +1307,79 @@ async function handleFieldLogGet(req, res) {
   let entries; try { entries = await listFieldLog(user.id, parcel.id); } catch (e) { return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
   sendJson(res, 200, { parcel: { id: parcel.id, name: parcel.name, area_m2: FERT.zoneAreaM2(parcel.zone) }, entries, totals: fieldLogTotals(entries) });
 }
+// Vérifie une saisie du carnet et construit l'enregistrement (partagé : producteur, ou animateur pour un membre).
+function buildFieldLogRec(p, ownerId, parcel, rateKey, notePrefix) {
+  const kind = String(p.kind || "");
+  if (!Object.prototype.hasOwnProperty.call(LOG_KINDS, kind)) return { code: 400, error: "Type d'intervention inconnu." };
+  const date = parseIsoDate(p.date || new Date().toISOString().slice(0, 10));
+  if (!date) return { code: 400, error: "Date invalide (format AAAA-MM-JJ)." };
+  if (date > new Date(Date.now() + 86400000).toISOString().slice(0, 10)) return { code: 400, error: "La date ne peut pas être dans le futur." };
+  let qty = null;
+  if (p.qty !== undefined && p.qty !== null && String(p.qty).trim() !== "") {
+    qty = Number(String(p.qty).replace(",", "."));
+    if (!isFinite(qty) || qty < 0 || qty > 1e7) return { code: 400, error: "Quantité invalide." };
+  }
+  const own = String(p.note || "").trim();
+  let product = ["engrais", "traitement", "compost"].includes(kind) ? (String(p.product || "").trim().slice(0, 60) || null) : null;
+  let auto = "";
+  if (kind === "residu") {
+    // Résidus valorisés : la quantité est obligatoire (c'est elle qui fait l'indicateur) ; la voie et le résidu viennent du guide.
+    if (qty == null || qty <= 0) return { code: 400, error: "Indiquez la quantité de résidus valorisés (en kg)." };
+    const route = RESIDUS.routeKey(p.route) || RESIDUS.routeKey(p.product);
+    product = route ? RESIDUS.ROUTES[route].label : null;
+    const res = RESIDUS.residueById(String(p.residue || ""));
+    if (res && res.id !== "autre") auto = "Résidu : " + res.label;
+  } else if (kind === "germination") {
+    // Test de germination : le pourcentage est calculé ici, à partir des graines comptées.
+    const g = RESIDUS.germinationResult(p.germ);
+    if (g.error) return { code: 400, error: g.error };
+    qty = g.pct;
+    auto = "Test de germination : " + g.summary + (g.kind === "absolu" ? " · sans témoin" : "");
+  }
+  if (qty == null && !own && !auto) return { code: 400, error: "Indiquez une quantité ou une note." };
+  const note = [notePrefix, auto, own].filter(Boolean).join(" · ").slice(0, 300) || null;
+  if (!rateOk("log:" + rateKey, 200, 24 * 60 * 60 * 1000)) return { code: 429, error: "Beaucoup d'entrées aujourd'hui. Reprenez demain." };
+  const season = String(p.season || "").trim().slice(0, 60) || IMPACT.defaultSeason(date);
+  // Identifiant choisi par le téléphone : renvoyer la même saisie ne crée pas de doublon.
+  const cid = String(p.client_id || "");
+  return { rec: { id: /^[a-f0-9]{24}$/.test(cid) ? cid : newId(), user_id: ownerId, parcel_id: parcel.id, date, kind, qty, unit: LOG_KINDS[kind] || null, product, season, note, created_at: new Date().toISOString() } };
+}
+async function saveFieldLogRec(res, rec) {
+  let partial = null;
+  try { partial = await addFieldLog(rec); } catch (e) { console.error("addFieldLog:", e.message); return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
+  sendJson(res, 200, partial ? { ok: true, entry: rec, warning: "Entrée enregistrée sans la saison ni le produit : exécutez la partie v8.0 de schema.sql (trv_field_log)." } : { ok: true, entry: rec });
+}
 async function handleFieldLogAdd(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
   let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
   const parcel = await findUserParcel(user.id, String(p.parcel_id || ""));
   if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
-  const kind = String(p.kind || "");
-  if (!Object.prototype.hasOwnProperty.call(LOG_KINDS, kind)) return sendJson(res, 400, { error: "Type d'intervention inconnu." });
-  const date = parseIsoDate(p.date || new Date().toISOString().slice(0, 10));
-  if (!date) return sendJson(res, 400, { error: "Date invalide (format AAAA-MM-JJ)." });
-  if (date > new Date(Date.now() + 86400000).toISOString().slice(0, 10)) return sendJson(res, 400, { error: "La date ne peut pas être dans le futur." });
-  let qty = null;
-  if (p.qty !== undefined && p.qty !== null && String(p.qty).trim() !== "") {
-    qty = Number(String(p.qty).replace(",", "."));
-    if (!isFinite(qty) || qty < 0 || qty > 1e7) return sendJson(res, 400, { error: "Quantité invalide." });
-  }
-  const note = String(p.note || "").trim().slice(0, 300) || null;
-  if (qty == null && !note) return sendJson(res, 400, { error: "Indiquez une quantité ou une note." });
-  if (!rateOk("log:" + user.id, 200, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Beaucoup d'entrées aujourd'hui. Reprenez demain." });
-  const season = String(p.season || "").trim().slice(0, 60) || IMPACT.defaultSeason(date);
-  const product = ["engrais", "traitement", "compost"].includes(kind) ? (String(p.product || "").trim().slice(0, 60) || null) : null;
-  const rec = { id: newId(), user_id: user.id, parcel_id: parcel.id, date, kind, qty, unit: LOG_KINDS[kind] || null, product, season, note, created_at: new Date().toISOString() };
-  let partial = null;
-  try { partial = await addFieldLog(rec); } catch (e) { console.error("addFieldLog:", e.message); return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
-  sendJson(res, 200, partial ? { ok: true, entry: rec, warning: "Entrée enregistrée sans la saison ni le produit : exécutez la partie v8.0 de schema.sql (trv_field_log)." } : { ok: true, entry: rec });
+  const b = buildFieldLogRec(p, user.id, parcel, user.id, "");
+  if (b.error) return sendJson(res, b.code, { error: b.error });
+  return saveFieldLogRec(res, b.rec);
+}
+// Carnet d'un membre tenu par l'animateur (membre sans téléphone) : la saisie est rangée dans le carnet
+// du membre et sa note commence par « Saisi par l'animateur », pour garder l'origine de la donnée.
+async function handleCoopMemberLogGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const memberId = new URL(req.url, "http://x").searchParams.get("memberId") || "";
+  if (!(await animateurMemberCoop(user, memberId))) return sendJson(res, 403, { error: "Réservé à l'animateur de la coopérative de ce membre." });
+  const logs = await listFieldLogForUser(memberId);
+  const parcels = ((await listParcelsForUser(memberId)) || []).map((p) => ({ id: p.id, name: p.name,
+    recent: logs.filter((e) => e.parcel_id === p.id).sort((x, y) => String(y.date).localeCompare(String(x.date)) || String(y.created_at).localeCompare(String(x.created_at))).slice(0, 5)
+      .map((e) => ({ date: e.date, kind: e.kind, qty: e.qty, unit: e.unit, note: e.note || null })) }));
+  sendJson(res, 200, { parcels, kinds: COOP_LOG_KINDS });
+}
+async function handleCoopMemberLogAdd(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const memberId = String(p.memberId || "");
+  if (!(await animateurMemberCoop(user, memberId))) return sendJson(res, 403, { error: "Réservé à l'animateur de la coopérative de ce membre." });
+  const parcel = await findUserParcel(memberId, String(p.parcel_id || ""));
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const b = buildFieldLogRec(p, memberId, parcel, user.id, "Saisi par l'animateur" + (user.name ? " " + String(user.name).slice(0, 40) : ""));
+  if (b.error) return sendJson(res, b.code, { error: b.error });
+  return saveFieldLogRec(res, b.rec);
 }
 async function handleFieldLogDelete(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
@@ -1173,10 +1398,35 @@ async function recommendedCompost(user, parcel) {
     return f && f.organic && f.organic.dose_kg_m2 ? f.organic.dose_kg_m2[0] : null;
   } catch (e) { return null; }
 }
+// Matières brutes à réunir pour faire le compost conseillé par la fiche sol (fourchette en kg), ou null sans fiche sol.
+async function compostRawNeed(user, parcel) {
+  try {
+    const rec = await getParcelSoil(parcel.id);
+    if (!rec || rec.user_id !== user.id || !rec.estimate) return null;
+    const f = FERT.fertilityAdvice({ estimate: rec.estimate, crop: rec.crop, areaM2: FERT.zoneAreaM2(parcel.zone) });
+    return f && f.organic && f.organic.raw_kg ? f.organic.raw_kg : null;
+  } catch (e) { return null; }
+}
 async function parcelReport(user, parcel) {
   const entries = await listFieldLog(user.id, parcel.id);
   const ref = await getParcelRef(parcel.id);
-  return IMPACT.impactReport({ entries, areaM2: FERT.zoneAreaM2(parcel.zone), ref: ref && ref.user_id === user.id ? ref : null, parcelName: parcel.name });
+  const rep = IMPACT.impactReport({ entries, areaM2: FERT.zoneAreaM2(parcel.zone), ref: ref && ref.user_id === user.id ? ref : null, parcelName: parcel.name, rawNeedKg: await compostRawNeed(user, parcel) });
+  // Test côte à côte : cette parcelle (Terravive) face à sa parcelle témoin.
+  const pair = await getParcelPair(parcel.id);
+  if (pair && pair.user_id === user.id && pair.control_id) {
+    const ctrl = await findUserParcel(user.id, pair.control_id);
+    if (ctrl) {
+      const repB = IMPACT.impactReport({ entries: await listFieldLog(user.id, ctrl.id), areaM2: FERT.zoneAreaM2(ctrl.zone), parcelName: ctrl.name });
+      rep.pair = IMPACT.compareParcels(rep, repB) || { terravive: { name: parcel.name }, temoin: { name: ctrl.name }, rows: [], warnings: ["Notez au moins une entrée dans le carnet de chacune des deux parcelles pour voir la comparaison."], score: { terravive: 0, temoin: 0 } };
+      rep.pair.control_id = ctrl.id;
+      // La parcelle témoin sert de comparaison : la référence « avant » n'est plus indispensable.
+      rep.tips = [];
+    }
+  } else {
+    const asCtrl = await getPairAsControl(user.id, parcel.id);
+    if (asCtrl) { const main = await findUserParcel(user.id, asCtrl.parcel_id); if (main) rep.control_of = { id: main.id, name: main.name }; }
+  }
+  return rep;
 }
 async function handleImpactGet(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
@@ -1213,22 +1463,39 @@ async function handleImpactRef(req, res) {
     await saveParcelRef(rec); sendJson(res, 200, { ok: true, ref: rec });
   } catch (e) { console.error("saveParcelRef:", e.message); sendJson(res, 500, { error: REF_SAVE_ERROR }); }
 }
+const PAIR_SAVE_ERROR = "Enregistrement impossible. Si vous utilisez Supabase, exécutez la partie « trv_parcel_pair » de schema.sql.";
+async function handleImpactPair(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const parcel = await findUserParcel(user.id, String(p.parcel_id || ""));
+  if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  try {
+    if (!p.control_id) { await deleteParcelPair(user.id, parcel.id); return sendJson(res, 200, { ok: true, pair: null }); }
+    const ctrl = await findUserParcel(user.id, String(p.control_id));
+    if (!ctrl) return sendJson(res, 404, { error: "Parcelle témoin introuvable." });
+    if (ctrl.id === parcel.id) return sendJson(res, 400, { error: "Choisissez une autre parcelle comme témoin." });
+    const back = await getParcelPair(ctrl.id);
+    if (back && back.user_id === user.id && back.control_id === parcel.id) return sendJson(res, 400, { error: "Cette parcelle est déjà le témoin de l'autre : une seule des deux doit être la parcelle Terravive." });
+    const rec = { parcel_id: parcel.id, user_id: user.id, control_id: ctrl.id, updated_at: new Date().toISOString() };
+    await saveParcelPair(rec); sendJson(res, 200, { ok: true, pair: rec });
+  } catch (e) { console.error("saveParcelPair:", e.message); sendJson(res, 500, { error: PAIR_SAVE_ERROR }); }
+}
 // Totaux mesurés de la saison en cours, toutes parcelles : pré-remplit l'indice de durabilité.
 async function handleImpactSummary(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
   const parcels = (await listParcelsForUser(user.id)) || [];
   const all = await listFieldLogForUser(user.id);
-  const items = []; let compostKg = 0;
+  const items = []; let compostKg = 0, residueKg = 0;
   for (const row of parcels) {
     const parcel = await findUserParcel(user.id, row.id); if (!parcel) continue;
     const entries = all.filter((e) => e.parcel_id === parcel.id); if (!entries.length) continue;
     const rep = IMPACT.impactReport({ entries, areaM2: FERT.zoneAreaM2(parcel.zone) });
     if (!rep.current) continue;
     items.push({ t: rep.current, area_m2: FERT.zoneAreaM2(parcel.zone), rec_kg_m2: await recommendedCompost(user, parcel), name: parcel.name });
-    compostKg += rep.current.compost_kg || 0;
+    compostKg += rep.current.compost_kg || 0; residueKg += rep.current.residue_kg || 0;
   }
   const area = items.reduce((a, x) => a + (x.area_m2 || 0), 0);
-  sendJson(res, 200, { parcels: items.length, area_m2: area || null, durability: IMPACT.durabilityFromLog(items), carbon: IMPACT.compostCarbon(compostKg), compost_kg: Math.round(compostKg) });
+  sendJson(res, 200, { parcels: items.length, area_m2: area || null, durability: IMPACT.durabilityFromLog(items), carbon: IMPACT.compostCarbon(compostKg), compost_kg: Math.round(compostKg), residue_kg: Math.round(residueKg) });
 }
 // Bilan agrégé de la coopérative (animateur) : saison en cours de chaque parcelle suivie.
 async function handleCoopImpact(req, res) {
@@ -1236,7 +1503,7 @@ async function handleCoopImpact(req, res) {
   if (c.m.role !== "animateur") return sendJson(res, 403, { error: "Réservé à l'animateur de la coopérative." });
   const members = await listCoopMembers(c.m.coop_id);
   const names = await userNameMap(c.m.coop_id);
-  const rows = []; const tot = { parcels: 0, area_m2: 0, water_l: 0, compost_kg: 0, chem_kg: 0, harvest_kg: 0, incidents: 0 };
+  const rows = []; const tot = { parcels: 0, area_m2: 0, water_l: 0, compost_kg: 0, chem_kg: 0, harvest_kg: 0, residue_kg: 0, incidents: 0 };
   for (const mem of members) {
     const parcels = (await listParcelsForUser(mem.user_id)) || [];
     const logs = await listFieldLogForUser(mem.user_id);
@@ -1246,8 +1513,8 @@ async function handleCoopImpact(req, res) {
       const area = FERT.zoneAreaM2(parcel.zone);
       const rep = IMPACT.impactReport({ entries, areaM2: area });
       const t = rep.current; if (!t) continue;
-      rows.push({ member: names[mem.user_id] || "Membre", parcel: parcel.name, season: t.season, area_m2: area, water_l: t.water_l, water_l_m2: t.water_l_m2, compost_kg: t.compost_kg, chem_kg: t.chem_kg, chem_kg_ha: t.chem_kg_ha, harvest_kg: t.harvest_kg, yield_t_ha: t.yield_t_ha, incidents: t.incidents.length, entries: t.n });
-      tot.parcels++; tot.area_m2 += area || 0; tot.water_l += t.water_l || 0; tot.compost_kg += t.compost_kg || 0; tot.chem_kg += t.chem_kg || 0; tot.harvest_kg += t.harvest_kg || 0; tot.incidents += t.incidents.length;
+      rows.push({ member: names[mem.user_id] || "Membre", parcel: parcel.name, season: t.season, area_m2: area, water_l: t.water_l, water_l_m2: t.water_l_m2, compost_kg: t.compost_kg, chem_kg: t.chem_kg, chem_kg_ha: t.chem_kg_ha, harvest_kg: t.harvest_kg, yield_t_ha: t.yield_t_ha, residue_kg: t.residue_kg, incidents: t.incidents.length, entries: t.n });
+      tot.parcels++; tot.area_m2 += area || 0; tot.water_l += t.water_l || 0; tot.compost_kg += t.compost_kg || 0; tot.chem_kg += t.chem_kg || 0; tot.harvest_kg += t.harvest_kg || 0; tot.residue_kg += t.residue_kg || 0; tot.incidents += t.incidents.length;
     }
   }
   Object.keys(tot).forEach((k) => { tot[k] = Math.round(tot[k] * 10) / 10; });
@@ -1852,6 +2119,7 @@ function serveStatic(req, res) {
   if (urlPath === "/stock") urlPath = "/stock.html";
   if (urlPath === "/boutique") urlPath = "/boutique.html";
   if (urlPath === "/comprendre") urlPath = "/comprendre.html";
+  if (urlPath === "/planteur" || urlPath === "/cultivateur") urlPath = "/planteur.html";
   if (urlPath === "/conseiller" || urlPath === "/chat") urlPath = "/conseiller.html";
   if (urlPath === "/cooperative" || urlPath === "/coop") urlPath = "/cooperative.html";
   if (urlPath === "/diagnostic" || urlPath === "/diagnostic.html") urlPath = "/diagnostic.html";
@@ -2267,7 +2535,7 @@ async function qualityListAudits() {
       // select=* : robuste si une colonne (kind, score…) n'existe pas encore en base.
       const rows = (await sb("/trv_quality_audits?select=*&order=created_at.desc&limit=100")) || [];
       // Les enregistrements de banc de tests ne sont pas des audits d'itinéraires.
-      return rows.filter((row) => row.kind !== "tests").slice(0, 50);
+      return rows.filter((row) => row.kind !== "tests" && row.kind !== "review").slice(0, 50);
     }
     catch (e) { console.warn("Quality Guard history unavailable:", e.message); return []; }
   }
@@ -3093,6 +3361,7 @@ async function handleShopProducts(req, res) {
 const CLIENT_BLOCKED_PAGES = new Set([
   "/tableau", "/tableau.html", "/dashboard",
   "/conseiller", "/conseiller.html", "/chat",
+  "/planteur", "/planteur.html", "/cultivateur",
   "/arduino", "/arduino.html",
   "/cooperative", "/cooperative.html", "/coop",
   "/comprendre", "/comprendre.html",
@@ -3123,7 +3392,30 @@ async function denyIfClient(req, res, url, method) {
 }
 
 // ---------- Routeur ----------
-const server = http.createServer(async (req, res) => {
+// Réponse de secours : une requête en erreur reçoit un message, le serveur continue de tourner.
+function failRequest(res, err) {
+  const bad = err instanceof URIError;
+  if (!bad) console.error("Requête en erreur :", (err && err.stack) || err);
+  try {
+    if (!res.headersSent) { res.writeHead(bad ? 400 : 500, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify({ error: bad ? "Adresse ou requête invalide." : "Erreur serveur." })); }
+    else if (!res.writableEnded) res.end();
+  } catch (e) {}
+}
+// Filets de sécurité : une erreur imprévue est journalisée au lieu d'arrêter le serveur.
+process.on("unhandledRejection", (e) => console.error("Rejet non géré :", (e && e.stack) || e));
+process.on("uncaughtException", (e) => console.error("Exception non gérée :", (e && e.stack) || e));
+// Purge horaire du limiteur de débit : on oublie les clés sans activité depuis 24 h.
+setInterval(() => { const now = Date.now(); for (const k of Object.keys(RL)) { const a = RL[k]; if (!a.length || now - a[a.length - 1] > 24 * 60 * 60 * 1000) delete RL[k]; } }, 60 * 60 * 1000).unref();
+
+const server = http.createServer((req, res) => {
+  // En-têtes de sécurité communs à toutes les réponses.
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  if (COOKIE_SECURE) res.setHeader("Strict-Transport-Security", "max-age=15552000");
+  routeRequest(req, res).catch((err) => failRequest(res, err));
+});
+async function routeRequest(req, res) {
   const url = (req.url || "").split("?")[0];
   // Point de contrôle de santé (pour un moniteur d'uptime : garde le service éveillé et signale les pannes).
   if (req.method === "GET" && (url === "/healthz" || url === "/api/health")) return sendJson(res, 200, { ok: true, service: "terravive", time: new Date().toISOString(), uptime_s: Math.round(process.uptime()), db: USE_DB ? "supabase" : "local", sol: SOL_SRC.isdaConfigured() ? "isda" : "soilgrids (ISDA_USERNAME/ISDA_PASSWORD absents)" });
@@ -3159,8 +3451,11 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url === "/api/auth/me") return handleMe(req, res);
   if (req.method === "POST" && url === "/api/plan") return handlePlan(req, res);
   if (req.method === "GET" && url === "/api/plans") return handlePlansList(req, res);
+  if (req.method === "GET" && url === "/api/plan/review") return handlePlanReviewGet(req, res);
+  if (req.method === "POST" && url === "/api/plan/review") return handlePlanReviewSet(req, res);
   if (req.method === "GET" && url === "/api/plan") return handlePlanGet(req, res);
   if (req.method === "POST" && url === "/api/plan/fiche") return handlePlanFiche(req, res);
+  if (req.method === "GET" && url === "/api/today") return handleToday(req, res);
   if (req.method === "GET" && url === "/api/parcels") return handleParcelsList(req, res);
   if (req.method === "POST" && url === "/api/parcels") return handleParcelSave(req, res);
   if (req.method === "POST" && url === "/api/parcels/delete") return handleParcelDelete(req, res);
@@ -3168,6 +3463,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url === "/api/impact/csv") return handleImpactCsv(req, res);
   if (req.method === "GET" && url === "/api/impact/summary") return handleImpactSummary(req, res);
   if (req.method === "POST" && url === "/api/impact/ref") return handleImpactRef(req, res);
+  if (req.method === "POST" && url === "/api/impact/pair") return handleImpactPair(req, res);
   if (req.method === "GET" && url === "/api/coop/impact") return handleCoopImpact(req, res);
   if (req.method === "GET" && url === "/api/fieldlog") return handleFieldLogGet(req, res);
   if (req.method === "POST" && url === "/api/fieldlog") return handleFieldLogAdd(req, res);
@@ -3180,6 +3476,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && url === "/api/coop/join") return handleCoopJoin(req, res);
   if (req.method === "POST" && url === "/api/coop/leave") return handleCoopLeave(req, res);
   if (req.method === "GET" && url === "/api/coop/overview") return handleCoopOverview(req, res);
+  if (req.method === "GET" && url.startsWith("/api/coop/member/fieldlog")) return handleCoopMemberLogGet(req, res);
+  if (req.method === "POST" && url === "/api/coop/member/fieldlog") return handleCoopMemberLogAdd(req, res);
   if (req.method === "GET" && url.startsWith("/api/coop/member/plans")) return handleCoopMemberPlans(req, res);
   if (req.method === "GET" && url.startsWith("/api/coop/member/plan")) return handleCoopMemberPlanGet(req, res);
   if (req.method === "POST" && url === "/api/coop/member/plan") return handleCoopMemberPlanCreate(req, res);
@@ -3230,7 +3528,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && url === "/api/quality/tests") return handleQualityTests(req, res);
   if (req.method === "GET") return serveStatic(req, res);
   res.writeHead(405); res.end("Méthode non autorisée");
-});
+}
 
 server.listen(PORT, () => {
   console.log(`\n  Terravive — agriculture durable accompagnée par l'IA`);

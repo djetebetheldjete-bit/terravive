@@ -38,10 +38,14 @@
   .wrap{ max-width:1180px; margin:0 auto; padding:20px 18px 60px; display:grid; grid-template-columns:390px 1fr; gap:20px; }
   @media(max-width:860px){ .wrap{ grid-template-columns:1fr; } }
   .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:0 4px 18px rgba(20,38,26,.05); }
-  h2.sec{ font-family:var(--f-display); color:var(--deep); font-size:1.15rem; margin:0 0 4px; }
+  h2.sec, h1.sec{ font-family:var(--f-display); color:var(--deep); font-size:1.15rem; margin:0 0 4px; }
   .hint{ color:var(--soft); font-size:.85rem; margin:0 0 14px; }
   label{ display:block; font-size:.8rem; color:var(--soft); font-weight:600; margin:10px 0 4px; }
   input,select,textarea{ width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:var(--surface2); color:var(--ink); font-family:inherit; font-size:.95rem; }
+
+  /* en-tête : le sélecteur de thème garde sa taille naturelle, les boutons ne se coupent pas */
+  .top select.themeSel{ width:auto; flex:0 0 auto; max-width:11.5rem; }
+  .top .btn, .top .navlink{ white-space:nowrap; flex:0 0 auto; }
   .pw-wrap{ position:relative; }
   .pw-wrap input{ padding-right:44px; }
   .pw-eye{ position:absolute; top:50%; right:7px; transform:translateY(-50%); width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; border:none; background:none; color:var(--soft); cursor:pointer; border-radius:7px; padding:0; }
@@ -161,21 +165,21 @@
     <!-- Colonne gauche : formulaire + mes plans -->
     <div>
       <div class="card">
-        <h2 class="sec">Créer mon itinéraire technique</h2>
-        <p class="hint">Décrivez votre parcelle. L'IA agronome bâtit un itinéraire technique complet, tourné vers l'agroécologie. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></p>
-        <label>Que voulez-vous cultiver ? *</label>
+        <h1 class="sec">Créer mon plan de culture <span style="font-weight:400;font-size:.8em;color:var(--faint);">(itinéraire technique)</span></h1>
+        <p class="hint">Décrivez votre parcelle. L'IA agronome prépare un plan de culture complet, du sol à la récolte, tourné vers l'agroécologie. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></p>
+        <label for="crop">Que voulez-vous cultiver ? *</label>
         <input id="crop" placeholder="ex. tomate, maïs, cacao, gombo…" maxlength="120">
         <div id="parcelPick" style="display:none;">
-          <label>Parcelle enregistrée <span style="color:var(--faint);font-weight:400;">(facultatif — pour adapter l'itinéraire à la nature de son sol)</span></label>
+          <label for="parcelSel">Parcelle enregistrée <span style="color:var(--faint);font-weight:400;">(facultatif — pour adapter l'itinéraire à la nature de son sol)</span></label>
           <select id="parcelSel"><option value="">— aucune —</option></select>
           <div id="parcelSoilNote" class="hint" style="margin-top:4px;"></div>
         </div>
         <div class="row2">
-          <div><label>Région / localité</label><input id="region" placeholder="ex. Yamoussoukro" maxlength="120"></div>
-          <div><label>Surface</label><input id="area" placeholder="ex. 500 m², 1 ha" maxlength="80"></div>
+          <div><label for="region">Région / localité</label><input id="region" placeholder="ex. Yamoussoukro" maxlength="120"></div>
+          <div><label for="area">Surface</label><input id="area" placeholder="ex. 500 m², 1 ha" maxlength="80"></div>
         </div>
         <div class="row2">
-          <div><label>Type de sol</label>
+          <div><label for="soil">Type de sol</label>
             <select id="soil">
               <option value="">— je ne sais pas —</option>
               <optgroup label="Textures simples">
@@ -189,7 +193,7 @@
               </optgroup>
             </select>
           </div>
-          <div><label>Saison / démarrage</label>
+          <div><label for="season">Saison / démarrage</label>
             <select id="season">
               <option value="">— à préciser —</option>
               <option>Début de saison des pluies</option><option>Pleine saison des pluies</option><option>Saison sèche (avec irrigation)</option><option>Maintenant</option>
@@ -197,7 +201,7 @@
           </div>
         </div>
         <div class="row2">
-          <div><label>Mode de conduite</label>
+          <div><label for="mode">Mode de conduite</label>
             <select id="mode" title="Type d'agrosystème — adapte tout l'itinéraire">
               <option value="">— à préciser —</option>
               <option value="Agroécologie / régénératif">Agroécologie / régénératif</option>
@@ -210,7 +214,7 @@
               Comprendre les 4 modes
             </button>
           </div>
-          <div><label>Structure de culture</label>
+          <div><label for="structure">Structure de culture</label>
             <select id="structure" title="Comment la parcelle est organisée">
               <option value="">— à préciser —</option>
               <option value="Monoculture">Monoculture (une seule culture)</option>
@@ -219,19 +223,19 @@
             </select>
           </div>
         </div>
-        <label>pH du sol <span style="color:var(--faint);font-weight:400;">(facultatif — laissez vide si vous ne le connaissez pas)</span></label>
+        <label for="ph">pH du sol <span style="color:var(--faint);font-weight:400;">(facultatif — laissez vide si vous ne le connaissez pas)</span></label>
         <input id="ph" placeholder="ex. 6,5" maxlength="40">
-        <label>Objectif principal</label>
+        <label for="goal">Objectif principal</label>
         <select id="goal">
           <option value="Produire durablement pour ma famille et vendre le surplus">Autoconsommation + vente du surplus</option>
           <option value="Produire pour vendre au marché (revenu)">Vente au marché (revenu)</option>
           <option value="Agriculture 100% biologique, sans produits chimiques">100% biologique</option>
           <option value="Restaurer et enrichir un sol fatigué">Restaurer un sol fatigué</option>
         </select>
-        <label>Moyens / contraintes (facultatif)</label>
+        <label for="notes">Moyens / contraintes (facultatif)</label>
         <textarea id="notes" placeholder="ex. peu d'eau disponible, pas de tracteur, budget limité, présence de fourmis…" maxlength="500"></textarea>
         <div class="err" id="formErr"></div>
-        <button class="btn primary" id="genBtn" type="button" style="width:100%;margin-top:6px;">Générer mon itinéraire</button>
+        <button class="btn primary" id="genBtn" type="button" style="width:100%;margin-top:6px;">Générer mon plan de culture</button>
       </div>
 
       <div class="card plans">
@@ -245,7 +249,7 @@
       <div class="card planbox" id="planCard">
         <div class="placeholder" id="planPlaceholder">
           <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 20c-.5-8 5-14.5 15-15.5.7 10.5-5.5 16.5-13.5 16.5"/><path d="M8.5 20c1.3-5 4-8.5 8.5-10.5"/></svg></div>
-          <p>Remplissez le formulaire à gauche et cliquez sur <b>« Générer mon itinéraire »</b>.<br>Votre itinéraire technique personnalisé s'affichera ici.</p>
+          <p>Remplissez le formulaire à gauche et cliquez sur <b>« Générer mon plan de culture »</b>.<br>Votre plan personnalisé s'affichera ici.</p>
         </div>
         <div id="planContent" style="display:none;">
           <div id="reuseNote" style="display:none;"></div>
@@ -253,7 +257,7 @@
           <div class="doc" id="planDoc"></div>
           <div class="toolbar">
             <button class="btn sun" id="pdfBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:15px;height:15px;vertical-align:-2px;margin-right:5px;"><path d="M6 3h8l4 4v14a0 0 0 0 1 0 0H6a0 0 0 0 1 0 0z"/><path d="M14 3v4h4"/><path d="M12 11v6M9 14l3 3 3-3"/></svg>Télécharger en PDF</button>
-            <button class="btn" id="listenBtn" type="button" style="display:none;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M19 6.5a8 8 0 0 1 0 11"/></svg>Écouter l'itinéraire</button>
+            <button class="btn" id="listenBtn" type="button" style="display:none;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M19 6.5a8 8 0 0 1 0 11"/></svg>Écouter le plan</button>
             <button class="btn" id="newBtn" type="button">Nouveau plan</button>
           </div>
         </div>
@@ -265,8 +269,9 @@
             <button class="btn sun" type="button" id="fichePrint"><span data-ico="printer"></span>Imprimer / PDF</button>
             <a class="btn" id="ficheWa" href="#" target="_blank" rel="noopener" style="text-decoration:none;background:#1f8f4e;border-color:#1f8f4e;color:#fff;"><span data-ico="send"></span>WhatsApp</a>
             <button class="btn" type="button" id="ficheCopy">Copier</button>
+            <button class="btn" type="button" id="ficheSpeak" style="display:none;"><span data-ico="speaker"></span>Écouter la fiche</button>
           </div></div>
-        <p class="hint" style="margin:6px 0 0;">La version courte de l'itinéraire, à emporter au champ : cochez les étapes au fur et à mesure.</p>
+        <p class="hint" style="margin:6px 0 0;">La version courte du plan de culture, à emporter au champ : cochez les étapes au fur et à mesure.</p>
         <div id="ficheBody" style="margin-top:10px;"></div>
       </div>
 
@@ -277,11 +282,11 @@
         <button class="btn" id="budAdd" type="button" style="margin-top:4px;">+ Ajouter un poste</button>
         <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;">
           <div style="flex:1;min-width:170px;">
-            <label>Rendement commercialisable (quantité à vendre)</label>
+            <label for="budYield">Rendement commercialisable (quantité à vendre)</label>
             <input id="budYield" type="text" inputmode="decimal" placeholder="ex. 1500 (kg)">
           </div>
           <div style="flex:1;min-width:170px;">
-            <label>Prix de vente (par kg ou unité)</label>
+            <label for="budPrice">Prix de vente (par kg ou unité)</label>
             <input id="budPrice" type="text" inputmode="decimal" placeholder="ex. 400 (F CFA)">
           </div>
         </div>
@@ -299,11 +304,11 @@
         var DEFAULTS = ["Semences ou plants","Fertilisation et amendements","Protection phytosanitaire","Irrigation","Main-d'œuvre","Transport","Emballage et commercialisation"];
         function rowHtml(nom){
           return '<div class="budline" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--surface2);">'
-            + '<div style="flex:2;min-width:150px;"><label>Poste</label><input class="b-nom" type="text" maxlength="60" value="'+(nom||"").replace(/"/g,"&quot;")+'"></div>'
-            + '<div style="flex:1;min-width:85px;"><label>Quantité</label><input class="b-qte" type="text" inputmode="decimal" placeholder="0"></div>'
-            + '<div style="flex:1;min-width:70px;"><label>Unité</label><input class="b-unite" type="text" maxlength="12" placeholder="kg, sac…"></div>'
-            + '<div style="flex:1;min-width:95px;"><label>Prix unitaire</label><input class="b-prix" type="text" inputmode="decimal" placeholder="0"></div>'
-            + '<div style="flex:1;min-width:120px;"><label>Type</label><select class="b-type"><option value="charge">Charge du cycle</option><option value="invest">Investissement</option></select></div>'
+            + '<div style="flex:2;min-width:150px;"><label>Poste</label><input class="b-nom" aria-label="Poste" type="text" maxlength="60" value="'+(nom||"").replace(/"/g,"&quot;")+'"></div>'
+            + '<div style="flex:1;min-width:85px;"><label>Quantité</label><input class="b-qte" aria-label="Quantité" type="text" inputmode="decimal" placeholder="0"></div>'
+            + '<div style="flex:1;min-width:70px;"><label>Unité</label><input class="b-unite" aria-label="Unité" type="text" maxlength="12" placeholder="kg, sac…"></div>'
+            + '<div style="flex:1;min-width:95px;"><label>Prix unitaire</label><input class="b-prix" aria-label="Prix unitaire" type="text" inputmode="decimal" placeholder="0"></div>'
+            + '<div style="flex:1;min-width:120px;"><label>Type</label><select class="b-type" aria-label="Type de dépense"><option value="charge">Charge du cycle</option><option value="invest">Investissement</option></select></div>'
             + '<div style="flex:1;min-width:95px;"><label>Coût total</label><div class="b-total" style="padding:10px 2px;font-weight:700;color:var(--deep);">—</div></div>'
             + '<button class="btn b-del" type="button" style="padding:9px 11px;">Retirer</button>'
             + '</div>';
@@ -353,7 +358,7 @@
         <div id="chatSug" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px;"></div>
         <div class="thread" id="thread"></div>
         <div class="composer">
-          <input id="chatInput" placeholder="ex. Mes feuilles de tomate jaunissent, que faire ?" maxlength="500">
+          <input id="chatInput" aria-label="Votre question au conseiller" placeholder="ex. Mes feuilles de tomate jaunissent, que faire ?" maxlength="500">
           <button class="btn sun" id="sendBtn" type="button">Envoyer</button>
         </div>
       </div>
@@ -463,12 +468,12 @@
         <button type="button" class="seg" data-type="admin" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>Administrateur</button>
       </div>
       <p id="authIntro">Gratuit — pour sauvegarder vos plans et suivre vos cultures.</p>
-      <div id="nameWrap"><label style="font-size:.8rem;color:var(--soft);font-weight:600;">Nom</label><input id="auName" placeholder="Votre nom" maxlength="80"></div>
-      <div id="regionWrap"><label style="font-size:.8rem;color:var(--soft);font-weight:600;">Région (facultatif)</label><input id="auRegion" placeholder="ex. Bouaké" maxlength="80"></div>
-      <label style="font-size:.8rem;color:var(--soft);font-weight:600;">E-mail</label><input id="auEmail" type="email" placeholder="vous@exemple.com" autocomplete="username">
-      <label style="font-size:.8rem;color:var(--soft);font-weight:600;">Mot de passe</label>
+      <div id="nameWrap"><label for="auName" style="font-size:.8rem;color:var(--soft);font-weight:600;">Nom</label><input id="auName" placeholder="Votre nom" maxlength="80"></div>
+      <div id="regionWrap"><label for="auRegion" style="font-size:.8rem;color:var(--soft);font-weight:600;">Région (facultatif)</label><input id="auRegion" placeholder="ex. Bouaké" maxlength="80"></div>
+      <label for="auEmail" style="font-size:.8rem;color:var(--soft);font-weight:600;">E-mail</label><input id="auEmail" type="email" placeholder="vous@exemple.com" autocomplete="username">
+      <label for="auPass" style="font-size:.8rem;color:var(--soft);font-weight:600;">Mot de passe</label>
       <div class="pw-wrap"><input id="auPass" type="password" placeholder="au moins 6 caractères" autocomplete="current-password"><button type="button" class="pw-eye" id="auPassEye" aria-label="Afficher le mot de passe" aria-pressed="false" title="Afficher le mot de passe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
-      <div id="codeWrap" style="display:none;margin-top:12px;"><label style="font-size:.8rem;color:var(--soft);font-weight:600;">Code administrateur</label><input id="auCode" type="password" placeholder="Code secret de l'administrateur" autocomplete="off"></div>
+      <div id="codeWrap" style="display:none;margin-top:12px;"><label for="auCode" style="font-size:.8rem;color:var(--soft);font-weight:600;">Code administrateur</label><input id="auCode" type="password" placeholder="Code secret de l'administrateur" autocomplete="off"></div>
       <div class="err" id="authErr"></div>
       <button class="btn primary" id="authGo" type="button" style="width:100%;">Créer mon compte</button>
       <div class="switch" id="authSwitch">Déjà un compte ? <button class="link" id="switchLink" type="button">Se connecter</button></div>
@@ -525,15 +530,20 @@
     try{
       const r=await fetch("/api/parcels"); const d=await r.json(); if(!r.ok) return;
       const list=d.parcels||[]; if(!list.length) return;
+      PARCEL_AREA={}; list.forEach(function(p){ PARCEL_AREA[p.id]=p.area_m2||null; });
       $("parcelSel").innerHTML='<option value="">— aucune —</option>'+list.map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.name)+(p.soil&&p.soil.analyzed?' — sol analysé':'')+'</option>'; }).join("");
       $("parcelPick").style.display="block";
       let want=""; try{ want=new URLSearchParams(location.search).get("parcelle")||""; }catch(e){}
       if(want && list.some(function(p){ return p.id===want; })){ $("parcelSel").value=want; onParcelPick(); }
     }catch(e){}
   }
+  var PARCEL_AREA={};
+  // Surface de la parcelle dessinée, écrite comme un producteur la dit (m² ou ha).
+  function areaLabel(m2){ if(!m2) return ""; const n=Math.round(m2); if(n<10000) return n.toLocaleString("fr-FR")+" m²"; return (Math.round(n/100)/100).toLocaleString("fr-FR")+" ha ("+n.toLocaleString("fr-FR")+" m²)"; }
   async function onParcelPick(){
     const id=$("parcelSel").value, note=$("parcelSoilNote"); note.textContent="";
     if(!id) return;
+    if($("area") && !$("area").value.trim() && PARCEL_AREA[id]) $("area").value=areaLabel(PARCEL_AREA[id]);
     try{
       const r=await fetch("/api/parcels/soil?id="+encodeURIComponent(id)); const d=await r.json();
       const f=r.ok?d.fiche:null;
@@ -553,6 +563,7 @@
     let params; try{ params=new URLSearchParams(location.search); }catch(e){ return; }
     const c=params.get("culture")||params.get("crop");
     deepLinkDone=true;
+    const pid=params.get("plan"); if(pid && me){ openPlan(pid); return; }
     if(!c) return;
     const inp=$("crop"); if(inp){ inp.value=c; }
     const reg=params.get("region"); if(reg && $("region") && !$("region").value){ $("region").value=reg; }
@@ -662,7 +673,7 @@
     const pills=[["Culture",plan.crop],["Région",plan.region],["Surface",plan.area],["Sol",plan.soil],["Saison",plan.season]].filter(x=>x[1]);
     $("planPills").innerHTML = pills.map(x=>'<span class="pill">'+x[0]+' : <b>'+esc(x[1])+'</b></span>').join("");
     $("planDoc").innerHTML = renderMd(plan.content);
-    { const lb=$("listenBtn"); if(lb){ if(window.trvCanSpeak && window.trvCanSpeak()){ lb.style.display="inline-block"; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; } else { lb.style.display="none"; } try{ if(window.trvStop) window.trvStop(); }catch(e){} } }
+    { const lb=$("listenBtn"); if(lb){ if(window.trvCanSpeak && window.trvCanSpeak()){ lb.style.display="inline-block"; lb.innerHTML=ICON_SPEAK+"Écouter le plan"; } else { lb.style.display="none"; } try{ if(window.trvStop) window.trvStop(); }catch(e){} } }
     $("chatCard").style.display="block"; { var _b=document.getElementById("budgetCard"); if(_b) _b.style.display="block"; } $("thread").innerHTML="";
     $("chatHint").innerHTML='Une question sur votre culture de <b>'+esc(plan.crop)+'</b> ? Un problème observé ? Demandez ici.';
     window.scrollTo({top:0,behavior:"smooth"});
@@ -676,7 +687,7 @@
     if(!me){ openAuth("register"); return; }
     const crop=$("crop").value.trim(), err=$("formErr"); err.textContent="";
     if(!crop){ err.textContent="Indiquez au moins ce que vous voulez cultiver."; return; }
-    const btn=$("genBtn"); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Génération de l\'itinéraire…';
+    const btn=$("genBtn"); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Préparation du plan de culture…';
     var rb=document.getElementById("regenBtn"); if(rb){ rb.disabled=true; rb.innerHTML='<span class="spin"></span> Génération…'; }
     try{
       const body={ parcel_id:($("parcelSel")&&$("parcelSel").value)||undefined, crop, region:$("region").value, area:$("area").value, soil:$("soil").value, ph:$("ph").value, season:$("season").value, mode:($("mode")?$("mode").value:""), structure:($("structure")?$("structure").value:""), goal:$("goal").value, notes:$("notes").value, fresh:fresh };
@@ -685,7 +696,7 @@
       if(!r.ok){ err.textContent=d.error||"La génération a échoué."; }
       else { showPlan(d.plan, { reused: d.reused===true, sector: d.sector }); if(d.reused!==true) loadPlans(); }
     }catch(e){ err.textContent="Serveur injoignable."; }
-    btn.disabled=false; btn.innerHTML="Générer mon itinéraire";
+    btn.disabled=false; btn.innerHTML="Générer mon plan de culture";
   }
 
 
@@ -849,6 +860,8 @@
   })();
   $("pdfBtn").addEventListener("click", exportPlanPDF);
   $("fichePrint").addEventListener("click", printFiche);
+  { const fs=$("ficheSpeak"); if(fs && window.trvCanSpeak && trvCanSpeak()){ fs.style.display=""; let on=false; const idle=fs.innerHTML;
+      fs.addEventListener("click", function(){ if(on){ if(window.trvStop) trvStop(); on=false; fs.innerHTML=idle; return; } if(!currentFiche||!currentFiche.text) return; on=true; fs.innerHTML=ICON_STOP+"Arrêter"; trvSpeak(currentFiche.text.replace(/https?:\/\/\S+/g,"").replace(/[•☐▢□]/g,""), function(){ on=false; fs.innerHTML=idle; }); }); } }
   $("ficheCopy").addEventListener("click", async function(){ if(!currentFiche) return; try{ await navigator.clipboard.writeText(currentFiche.text); this.textContent="Copié ✓"; }catch(e){ this.textContent="Copie impossible"; } const b=this; setTimeout(function(){ b.textContent="Copier"; },2000); });
   // Lecture à voix haute de l'itinéraire (en français).
   function planToSpeech(md){ return String(md||"")
@@ -856,7 +869,7 @@
       .replace(/\|/g," ")                         // tableaux
       .replace(/[#*_`>-]/g," ")                   // symboles markdown
       .replace(/\s+/g," ").trim(); }
-  { const lb=$("listenBtn"); if(lb){ let on=false; lb.addEventListener("click", function(){ if(on){ if(window.trvStop) trvStop(); on=false; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; return; } if(!currentPlan) return; on=true; lb.innerHTML=ICON_STOP+"Arrêter la lecture"; trvSpeak(planToSpeech(currentPlan.content), function(){ on=false; lb.innerHTML=ICON_SPEAK+"Écouter l'itinéraire"; }); }); } }
+  { const lb=$("listenBtn"); if(lb){ let on=false; lb.addEventListener("click", function(){ if(on){ if(window.trvStop) trvStop(); on=false; lb.innerHTML=ICON_SPEAK+"Écouter le plan"; return; } if(!currentPlan) return; on=true; lb.innerHTML=ICON_STOP+"Arrêter la lecture"; trvSpeak(planToSpeech(currentPlan.content), function(){ on=false; lb.innerHTML=ICON_SPEAK+"Écouter le plan"; }); }); } }
   $("newBtn").addEventListener("click", ()=>{ try{ if(window.trvStop) trvStop(); }catch(e){} $("planContent").style.display="none"; $("planPlaceholder").style.display="block"; $("chatCard").style.display="none"; $("ficheCard").style.display="none"; { var _b=document.getElementById("budgetCard"); if(_b) _b.style.display="none"; } window.scrollTo({top:0,behavior:"smooth"}); });
 
   loadMe();

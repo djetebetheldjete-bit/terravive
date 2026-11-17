@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Terravive — Planteur</title>
+<meta name="description" content="Vue planteur de Terravive : vos parcelles et ce qu'il y a à faire aujourd'hui, simplement.">
+<meta name="theme-color" content="#2E7D46">
+<link rel="icon" type="image/png" href="/favicon-32.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("trv-theme")||"nature");}catch(e){}</script>
+<style>
+  :root{ --leaf:#2E7D46; --deep:#1B5E34; --sun:#E0A93B; --ink:#14261A; --soft:#5b6b5f; --faint:#8a9a8d;
+    --bg:#eef4ec; --surface:#ffffff; --surface2:#f5f9f3; --line:#dde7dc; --good:#2E8B6F; --bad:#c0392b;
+    --f-display:Georgia,'Times New Roman',serif; }
+  :root[data-theme="clair"]{ --leaf:#2f855a; --deep:#276749; --sun:#b7791f; --line:#e6e9ec; --bg:#f3f5f7; --surface:#ffffff; --surface2:#f7f9fb; --ink:#1a2430; --soft:#5a6675; --faint:#95a0ae; }
+  :root[data-theme="sombre"]{ --leaf:#5bbf84; --deep:#8fd6a9; --sun:#e0b25a; --line:#223228; --bg:#0e1712; --surface:#15241b; --surface2:#1a2c21; --ink:#e7f1ea; --soft:#a6b7ad; --faint:#7c8d83; color-scheme:dark; }
+  :root[data-theme="terre"]{ --leaf:#7a6a3a; --deep:#5c4a22; --sun:#c7892f; --line:#e6ddcb; --bg:#f4efe3; --surface:#fffdf8; --surface2:#f7f1e5; --ink:#2a2416; --soft:#6b6150; --faint:#9a8f78; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Segoe UI",system-ui,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.5;
+    min-height:100vh;display:flex;flex-direction:column;padding-bottom:calc(68px + env(safe-area-inset-bottom,0px))}
+  a{color:var(--deep)}
+  .ico{width:1.15em;height:1.15em;vertical-align:-.2em;flex:none}
+  .top{display:flex;align-items:center;gap:11px;background:var(--surface);border-bottom:1px solid var(--line);
+    padding:max(10px,env(safe-area-inset-top,0px)) 16px 12px;position:sticky;top:0;z-index:30}
+  .brand{display:flex;align-items:center;gap:9px;font-family:var(--f-display);font-size:19px;color:var(--deep);font-weight:700;text-decoration:none}
+  .emblem{width:30px;height:30px;flex:none}.emblem img{width:100%;height:100%;object-fit:contain;display:block}
+  .ttl{font-family:var(--f-display);color:var(--deep);font-size:1.12rem;font-weight:700}
+  .back{background:none;border:none;color:var(--deep);font-size:1rem;font-weight:600;display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:0;font-family:inherit}
+  .spacer{flex:1}
+  .av{width:30px;height:30px;border-radius:50%;background:var(--deep);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;flex:none}
+  .wrap{flex:1;max-width:620px;width:100%;margin:0 auto;padding:16px}
+  .sec{font-family:var(--f-display);color:var(--deep);font-size:1.16rem;margin-bottom:3px}
+  .sub{color:var(--soft);font-size:.88rem;margin-bottom:12px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 4px 18px rgba(20,38,26,.05);margin-bottom:12px}
+  .btn{width:100%;font-family:inherit;font-weight:600;border-radius:9px;padding:13px;cursor:pointer;font-size:1rem;border:1px solid var(--line);background:var(--surface2);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:11px;text-decoration:none}
+  .btn.primary{border:none;background:var(--leaf);color:#fff}.btn.sun{border:none;background:var(--sun);color:#3a2a06}
+  .pcard{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:11px;cursor:pointer;box-shadow:0 4px 18px rgba(20,38,26,.05);font-family:inherit}
+  .ptile{width:46px;height:46px;border-radius:12px;background:var(--surface2);display:grid;place-items:center;flex:none;color:var(--leaf)}
+  .pcard .nm{font-family:var(--f-display);font-weight:700;font-size:1.04rem;color:var(--ink)}
+  .pcard .lu{font-size:.8rem;color:var(--soft)}.pcard .arr{margin-left:auto;color:var(--faint);font-size:1.1rem}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:.76rem;font-weight:700;border-radius:999px;padding:3px 10px;margin-top:5px}
+  .badge.todo{background:color-mix(in srgb,var(--sun) 22%,var(--surface));color:#8a6410}
+  .badge.ok{background:color-mix(in srgb,var(--leaf) 13%,var(--surface));color:var(--deep)}
+  .badge.none{background:var(--surface2);color:var(--soft)}
+  .day{font-family:var(--f-display);font-size:1.12rem;color:var(--ink);margin:0 0 2px}.date{font-size:.82rem;color:var(--soft);margin-bottom:13px}
+  .task .t2{display:flex;align-items:flex-start;gap:12px}
+  .task .ti{width:44px;height:44px;border-radius:12px;background:var(--surface2);display:grid;place-items:center;flex:none;color:var(--leaf)}
+  .task h3{font-family:var(--f-display);font-size:1.08rem;color:var(--ink);line-height:1.2}
+  .task .dt{color:var(--soft);font-size:.86rem;margin-top:3px}
+  .task .qd{font-size:.78rem;color:var(--faint);margin-top:3px}
+  .task.done{opacity:.6}.task.done h3{text-decoration:line-through}
+  .task.done .btn.primary{background:color-mix(in srgb,var(--leaf) 13%,var(--surface));color:var(--deep)}
+  .listen{display:inline-flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--leaf) 11%,var(--surface));color:var(--deep);border:none;border-radius:999px;padding:9px 15px;font-weight:700;font-size:.88rem;cursor:pointer;margin-bottom:13px;font-family:inherit}
+  .nextw{font-family:var(--f-display);color:var(--deep);font-size:1rem;margin:14px 0 6px}
+  .info{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:14px;color:var(--soft);font-size:.9rem;margin-bottom:12px}
+  .info b{color:var(--ink)}
+  .row{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line)}
+  .row .ri{width:38px;height:38px;border-radius:11px;background:var(--surface2);display:grid;place-items:center;color:var(--leaf);flex:none}
+  .row .rt{font-weight:600;color:var(--ink)}.row .rm{font-size:.8rem;color:var(--soft)}.row .ra{margin-left:auto;color:var(--faint)}
+  .logline{display:flex;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);font-size:.9rem;color:var(--ink)}
+  .logline .ld{color:var(--faint);font-size:.78rem;min-width:62px}.logline .ico{color:var(--leaf)}
+  .empty{text-align:center;color:var(--soft);padding:30px 14px}.empty .ic{width:54px;height:54px;border-radius:50%;background:color-mix(in srgb,var(--leaf) 12%,var(--surface));color:var(--leaf);display:grid;place-items:center;margin:0 auto 10px}
+  .nav{display:flex;border-top:1px solid var(--line);background:var(--surface);position:fixed;left:0;right:0;bottom:0;z-index:40;padding:5px 4px calc(7px + env(safe-area-inset-bottom,0px))}
+  .nav a{flex:1;text-decoration:none;color:var(--faint);font-size:.68rem;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;background:none;border:none;font-family:inherit}
+  .nav a .ico{width:23px;height:23px}.nav a.on{color:var(--leaf)}
+  .scr{display:none}.scr.on{display:block}
+  .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(18px);background:var(--ink);color:var(--surface);padding:11px 17px;border-radius:11px;font-size:.88rem;font-weight:600;opacity:0;transition:.25s;pointer-events:none;max-width:90%;z-index:50}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .load{text-align:center;color:var(--soft);padding:40px 10px}
+</style>
+</head>
+<body>
+<div class="top">
+  <a class="brand" href="/planteur" id="topBrand"><span class="emblem"><img src="/logo.png" alt="Terravive"></span>Terravive</a>
+  <span class="ttl" id="topTtl" style="display:none"></span>
+  <span class="spacer"></span>
+  <span class="av" id="topAv">?</span>
+</div>
+
+<div class="wrap">
+  <!-- ACCUEIL : VOS PARCELLES -->
+  <section class="scr on" data-s="home">
+    <h1 class="sec" id="hiName">Vos parcelles</h1>
+    <div class="sub">Touchez une parcelle pour voir ce qu'il y a à faire.</div>
+    <div id="parcelList"><div class="load">Chargement…</div></div>
+  </section>
+
+  <!-- AUJOURD'HUI (par parcelle) -->
+  <section class="scr" data-s="today">
+    <button class="back" onclick="go('home')">← Vos parcelles</button>
+    <div class="sec" id="tNom" style="margin-top:8px"></div>
+    <div class="sub" id="tCrop"></div>
+    <button class="listen" id="tListen" onclick="listen()" style="display:none"></button>
+    <div id="todayBody"></div>
+    <a class="btn sun" href="/diagnostic">Signaler un problème (photo)</a>
+    <a class="btn" id="ficheBtn" href="/app">Voir votre fiche de culture</a>
+  </section>
+
+  <!-- VOTRE TRAVAIL -->
+  <section class="scr" data-s="travail">
+    <button class="back" onclick="go('today')">← Retour</button>
+    <div class="sec" style="margin-top:8px">Votre travail</div>
+    <div class="sub">Ce que vous avez noté sur cette parcelle.</div>
+    <div id="travailBody"><div class="load">Chargement…</div></div>
+  </section>
+
+  <!-- PROFIL -->
+  <section class="scr" data-s="profil">
+    <div class="sec">Votre profil</div>
+    <div class="card" style="display:flex;align-items:center;gap:13px"><span class="av" id="pAv" style="width:50px;height:50px;font-size:1.2rem">?</span><div><div style="font-family:var(--f-display);font-size:1.1rem;color:var(--ink)" id="pName">—</div><div class="rm" style="color:var(--soft);font-size:.84rem" id="pMail"></div></div></div>
+    <a class="row" href="/cooperative" style="text-decoration:none"><span class="ri" id="icCoop"></span><div><div class="rt">Ma coopérative</div><div class="rm">Voir ma coopérative et mon animateur</div></div><span class="ra">→</span></a>
+    <a class="row" href="/tableau" style="text-decoration:none"><span class="ri" id="icFull"></span><div><div class="rt">Espace complet</div><div class="rm">Tableau de bord, bilan, carnet détaillé</div></div><span class="ra">→</span></a>
+    <button class="btn" style="margin-top:16px;color:var(--bad)" onclick="logout()">Se déconnecter</button>
+  </section>
+</div>
+
+<nav class="nav">
+  <a class="on" id="navHome" onclick="go('home')"></a>
+  <a href="/conseiller" id="navConseil"></a>
+  <a href="/diagnostic" id="navDiag"></a>
+  <a id="navProfil" onclick="go('profil')"></a>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script src="/voice.js" defer></script>
+<script>
+"use strict";
+var P={
+ water:'<path d="M12 3.2c-2.9 3.7-6 6.9-6 10.6a6 6 0 0 0 12 0c0-3.7-3.1-6.9-6-10.6z"/><path d="M9.2 14.6a2.9 2.9 0 0 0 2.6 2.6"/>',
+ sprout:'<path d="M12 20.5v-8.6"/><path d="M12 12.6c0-3.3-2.2-5.3-6.2-5.3 0 3.7 2.3 5.3 6.2 5.3z"/><path d="M12 10.4c0-2.9 2-4.8 5.8-4.8 0 3.3-2.1 4.8-5.8 4.8z"/><path d="M7.5 20.5h9"/>',
+ leaf:'<path d="M5 19c0-8.4 5.3-13.6 14-14-.4 8.7-5.6 14-14 14z"/><path d="M5 19l7.6-7.6"/>',
+ check:'<path d="M5 12.6l4.2 4.2L19 7"/>',
+ speaker:'<path d="M4 9.4h3.6L12.6 5v14l-5-4.4H4z"/><path d="M16 9.2a4 4 0 0 1 0 5.6"/><path d="M18.6 6.6a7.6 7.6 0 0 1 0 10.8"/>',
+ incident:'<path d="M10.4 4.3L2.9 17.6A1.8 1.8 0 0 0 4.5 20.3h15a1.8 1.8 0 0 0 1.6-2.7L13.6 4.3a1.8 1.8 0 0 0-3.2 0z"/><path d="M12 9.6v4.2"/><path d="M12 16.9h.01"/>',
+ notebook:'<path d="M6 3.4h11.4A1.6 1.6 0 0 1 19 5v14a1.6 1.6 0 0 1-1.6 1.6H6z"/><path d="M9.2 3.4v17.2"/><path d="M12.4 8.2h3.6"/><path d="M12.4 11.8h3.6"/><path d="M4 7h4M4 12h4M4 17h4"/>',
+ camera:'<path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.4"/>',
+ chat:'<path d="M20 4H4a1.6 1.6 0 0 0-1.6 1.6v9.2A1.6 1.6 0 0 0 4 16.4h3.2L12 20.4l4.8-4H20a1.6 1.6 0 0 0 1.6-1.6V5.6A1.6 1.6 0 0 0 20 4z"/>',
+ user:'<circle cx="12" cy="8" r="4"/><path d="M5 20.4v-1a7 7 0 0 1 14 0v1"/>',
+ users:'<circle cx="9" cy="8" r="3.4"/><path d="M3 20v-1a6 6 0 0 1 12 0v1"/><path d="M16 5.5a3.4 3.4 0 0 1 0 6.5"/><path d="M17 20v-1a6 6 0 0 0-3-5"/>',
+ grid:'<rect x="3.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.4"/>'
+};
+function ic(n,px){var s=px||22;return '<svg class="ico" viewBox="0 0 24 24" width="'+s+'" height="'+s+'" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:'+s+'px;height:'+s+'px">'+(P[n]||'')+'</svg>';}
+var $=function(id){return document.getElementById(id);},el=function(s){return document.querySelector(s);};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function initials(n){n=String(n||"").trim();if(!n)return"?";var p=n.split(/\s+/);return((p[0]||"")[0]||"")+(p.length>1?(p[p.length-1][0]||""):"")||"?";}
+var me=null, PARCELS=[], TODAY={}, cur=null;
+
+// Navigation (icônes de la barre)
+$("navHome").innerHTML=ic("sprout",23)+"Parcelles";
+$("navConseil").innerHTML=ic("chat",23)+"Conseiller";
+$("navDiag").innerHTML=ic("camera",23)+"Diagnostic";
+$("navProfil").innerHTML=ic("user",23)+"Profil";
+$("icCoop").innerHTML=ic("users",20);$("icFull").innerHTML=ic("grid",20);
+
+function go(name){
+  document.querySelectorAll(".scr").forEach(function(s){s.classList.toggle("on",s.dataset.s===name);});
+  $("navHome").classList.toggle("on",name==="home");
+  $("navProfil").classList.toggle("on",name==="profil");
+  $("topTtl").style.display="none";$("topBrand").style.display="flex";
+  window.scrollTo(0,0);
+}
+var tt;function toast(m){if(!m)return;var t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(tt);tt=setTimeout(function(){t.classList.remove("show");},2200);}
+
+async function boot(){
+  try{ var r=await fetch("/api/auth/me"); var d=await r.json(); me=d.user; }catch(e){}
+  if(!me){ location.href="/app"; return; }
+  if(me.profile==="client"){ location.href="/boutique"; return; }
+  $("topAv").textContent=initials(me.name);$("pAv").textContent=initials(me.name);
+  $("pName").textContent=me.name||"—";$("pMail").textContent=me.email||"";
+  $("hiName").textContent="Bonjour, "+(String(me.name||"").split(" ")[0]||"")+" — vos parcelles";
+  loadParcels();
+}
+async function loadParcels(){
+  try{ var r=await fetch("/api/parcels"); var d=await r.json(); PARCELS=(d.parcels||[]); }
+  catch(e){ $("parcelList").innerHTML='<div class="info">Impossible de charger vos parcelles. Vérifiez votre connexion.</div>'; return; }
+  if(!PARCELS.length){ $("parcelList").innerHTML='<div class="info"><b>Aucune parcelle enregistrée.</b> Dans l\'espace complet, dessinez votre parcelle sur la carte, puis revenez ici. <a href="/tableau">Ouvrir l\'espace complet →</a></div>'; return; }
+  // Charge « aujourd'hui » de chaque parcelle en parallèle (tâches réelles de la fiche)
+  await Promise.all(PARCELS.map(async function(p){
+    try{ var r=await fetch("/api/today?parcel="+encodeURIComponent(p.id)); TODAY[p.id]=r.ok?await r.json():null; }catch(e){ TODAY[p.id]=null; }
+  }));
+  renderParcels();
+}
+function todoCount(t){ if(!t||!t.tasks)return null; var k=t.tasks; if(k.day==null) return (k.start&&k.start.length)||0; return (k.now&&k.now.length)||0; }
+function renderParcels(){
+  $("parcelList").innerHTML=PARCELS.map(function(p){
+    var t=TODAY[p.id], n=todoCount(t), badge;
+    if(t&&!t.crop) badge='<span class="badge none">Culture à renseigner</span>';
+    else if(n>0) badge='<span class="badge todo">'+n+(n>1?' choses':' chose')+' à faire</span>';
+    else badge='<span class="badge ok">'+ic("check",13)+' À jour</span>';
+    return '<button class="pcard" onclick="openParcel(\''+esc(p.id)+'\')"><span class="ptile">'+ic("sprout",24)+'</span><span><span class="nm">'+esc(p.name)+'</span>'+(t&&t.crop?'<br><span class="lu">'+esc(t.crop)+'</span>':'')+'<br>'+badge+'</span><span class="arr">→</span></button>';
+  }).join("");
+}
+function openParcel(id){
+  cur=PARCELS.filter(function(p){return p.id===id;})[0]; if(!cur)return;
+  var t=TODAY[id]||{};
+  $("tNom").textContent=cur.name;
+  $("tCrop").textContent=t.crop?(t.crop.charAt(0).toUpperCase()+t.crop.slice(1))+(t.sown_at?" · semé le "+fdate(t.sown_at):""):"";
+  $("ficheBtn").href=t.plan?("/app?plan="+encodeURIComponent(t.plan.id)):"/app";
+  // Écouter
+  var lb=$("tListen");
+  if(window.trvCanSpeak&&trvCanSpeak()&&t.speech){ lb.style.display=""; lb.innerHTML=ic("speaker",18)+" Écouter"; } else lb.style.display="none";
+  renderTodayBody(t);
+  go("today");
+}
+function fdate(iso){ try{ return new Date(String(iso).slice(0,10)+"T12:00:00").toLocaleDateString("fr-FR"); }catch(e){ return iso; } }
+function taskCard(x,parcelId,i){
+  var doneKey="done:"+parcelId+":"+i, done=sessionDone[doneKey];
+  return '<div class="card task'+(done?' done':'')+'" data-k="'+doneKey+'"><div class="t2"><span class="ti">'+ic("leaf",24)+'</span><span><h3>'+esc(x.faire)+'</h3>'+(x.detail?'<div class="dt">'+esc(x.detail)+'</div>':'')+(x.quand?'<div class="qd">'+esc(x.quand)+'</div>':'')+'</span></div><button class="btn primary" onclick="markDone(this,\''+esc(parcelId)+'\','+i+',\''+esc(x.faire).replace(/'/g,"\\'")+'\')">'+(done?ic("check",16)+' Fait':'C\'est fait')+'</button></div>';
+}
+var sessionDone={};
+function renderTodayBody(t){
+  var h="";
+  if(!t||!t.crop){ h='<div class="info"><b>Culture pas encore renseignée.</b> Dans l\'espace complet, ouvrez « Sol &amp; racines » pour cette parcelle et indiquez la culture et la date de semis : vos tâches apparaîtront ici. <a href="/tableau">Ouvrir →</a></div>'; $("todayBody").innerHTML=h; return; }
+  if(!t.plan){ h='<div class="info"><b>Pas encore de fiche de culture pour '+esc(t.crop)+'.</b> Créez d\'abord le plan de culture. <a class="btn primary" href="/app">Créer le plan</a></div>'; $("todayBody").innerHTML=h; return; }
+  if(!t.fiche||!t.tasks){ h='<div class="info">Ouvrez une fois votre plan de culture pour préparer la fiche : vos tâches apparaîtront ici. <a class="btn" href="/app?plan='+encodeURIComponent(t.plan.id)+'">Ouvrir le plan</a></div>'; $("todayBody").innerHTML=h; return; }
+  var k=t.tasks, pid=t.parcel.id;
+  h+='<div class="day">Aujourd\'hui</div><div class="date">'+new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})+'</div>';
+  var main = (k.day==null) ? (k.start||[]) : (k.now||[]);
+  if(main.length){ h+=main.map(function(x,i){return taskCard(x,pid,i);}).join(""); }
+  else { h+='<div class="empty"><div class="ic">'+ic("check",30)+'</div><div style="font-family:var(--f-display);font-size:1.1rem;color:var(--ink)">Rien de prévu cette semaine</div><div>Surveillez votre culture et revenez demain.</div></div>'; }
+  if(k.next&&k.next.length){ h+='<div class="nextw">La semaine prochaine</div>'+k.next.map(function(x){return '<div class="card" style="padding:13px"><h3 style="font-family:var(--f-display);font-size:1rem">'+esc(x.faire)+'</h3>'+(x.detail?'<div class="dt" style="color:var(--soft);font-size:.86rem;margin-top:3px">'+esc(x.detail)+'</div>':'')+'</div>';}).join(""); }
+  h+='<button class="btn" onclick="openTravail()">'+ic("notebook",20)+' Votre travail noté</button>';
+  $("todayBody").innerHTML=h;
+}
+async function markDone(btn,parcelId,i,faire){
+  var key="done:"+parcelId+":"+i;
+  if(sessionDone[key]){ return; }
+  btn.disabled=true;
+  try{
+    var r=await fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({parcel_id:parcelId,kind:"observation",note:"Fait : "+faire})});
+    if(r.ok){ sessionDone[key]=true; var card=btn.closest(".task"); if(card){card.classList.add("done");} btn.innerHTML=ic("check",16)+" Fait"; toast("Bien joué ! C'est noté dans votre carnet."); }
+    else { var d={};try{d=await r.json();}catch(e){} toast(d.error||"Impossible d'enregistrer. Réessayez."); btn.disabled=false; }
+  }catch(e){ toast("Pas de réseau — réessayez quand la connexion revient."); btn.disabled=false; }
+}
+function listen(){ var t=cur?TODAY[cur.id]:null; if(t&&t.speech&&window.trvSpeak){ if(window.trvSpeaking&&trvSpeaking()){trvStop();return;} trvSpeak(t.speech,null,"fr"); toast("Lecture à voix haute…"); } }
+function openTravail(){
+  if(!cur)return;
+  $("travailBody").innerHTML='<div class="load">Chargement…</div>'; go("travail");
+  fetch("/api/fieldlog?parcel="+encodeURIComponent(cur.id)).then(function(r){return r.json();}).then(function(d){
+    var ents=(d.entries||[]).slice(0,20);
+    if(!ents.length){ $("travailBody").innerHTML='<div class="empty"><div class="ic">'+ic("notebook",30)+'</div><div>Rien de noté pour l\'instant. Cochez « C\'est fait » sur une tâche pour commencer.</div></div>'; return; }
+    $("travailBody").innerHTML=ents.map(function(e){
+      return '<div class="logline"><span class="ld">'+esc(fdate(e.date))+'</span>'+ic("leaf",18)+'<span>'+esc([e.note,(e.qty!=null?e.qty+" "+(e.unit||""):"")].filter(Boolean).join(" · ")||e.kind)+'</span></div>';
+    }).join("");
+  }).catch(function(){ $("travailBody").innerHTML='<div class="info">Impossible de charger votre carnet.</div>'; });
+}
+async function logout(){ try{ await fetch("/api/auth/logout",{method:"POST"}); }catch(e){} location.href="/app"; }
+boot();
+</script>
+</body>
+</html>

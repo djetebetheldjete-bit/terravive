@@ -1,0 +1,1948 @@
+<!doctype html>
+<html lang="fr" data-theme="nature">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Terravive — Tableau de bord</title>
+<meta name="description" content="Tableau de bord Terravive : météo, humidité du sol, capteurs de votre parcelle, plans et projets — en un coup d'œil.">
+<link rel="canonical" href="https://terravive.onrender.com/tableau">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<style>
+  /* ===== Thèmes (modes modifiables) ===== */
+  :root{
+    --leaf:#2E7D46; --deep:#174D2B; --sun:#C58A2A; --line:#dce6da;
+    --bg:#eef4ec; --surface:#ffffff; --surface2:#f4f9f2; --panel:#ffffff;
+    --ink:#15251B; --soft:#53625a; --faint:#8a988e;
+    --chart:#2E7D46; --chart2:#C58A2A; --good:#2E8B6F; --warn:#C58A2A; --bad:#c0392b;
+    --sidebar:#13351f; --sidebar-ink:#dfeee3; --sidebar-active:#ffffff; --sidebar-active-ink:#14261a;
+    --shadow:0 8px 28px rgba(20,50,30,.08);
+    --f-display:Georgia,'Times New Roman',serif;
+  }
+  :root[data-theme="clair"]{
+    --leaf:#2f855a; --deep:#276749; --sun:#b7791f; --line:#e6e9ec;
+    --bg:#f3f5f7; --surface:#ffffff; --surface2:#f7f9fb; --panel:#ffffff;
+    --ink:#1a2430; --soft:#5a6675; --faint:#95a0ae;
+    --chart:#2f855a; --chart2:#b7791f;
+    --sidebar:#ffffff; --sidebar-ink:#44515f; --sidebar-active:#eaf4ee; --sidebar-active-ink:#1f6b48;
+    --shadow:0 8px 28px rgba(30,40,60,.07);
+  }
+  :root[data-theme="sombre"]{
+    --leaf:#5bbf84; --deep:#8fd6a9; --sun:#e0b25a; --line:#223228;
+    --bg:#0e1712; --surface:#15241b; --surface2:#1a2c21; --panel:#15241b;
+    --ink:#e7f1ea; --soft:#a6b7ad; --faint:#7c8d83;
+    --chart:#5bbf84; --chart2:#e0b25a;
+    --sidebar:#0b130e; --sidebar-ink:#b7c8bd; --sidebar-active:#1d3326; --sidebar-active-ink:#eaf6ee;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="terre"]{
+    --leaf:#7a6a3a; --deep:#5c4a22; --sun:#c7892f; --line:#e6ddcb;
+    --bg:#f4efe3; --surface:#fffdf8; --surface2:#f7f1e5; --panel:#fffdf8;
+    --ink:#2a2416; --soft:#6b6150; --faint:#9a8f78;
+    --chart:#7a9a3a; --chart2:#c7892f;
+    --sidebar:#3a3016; --sidebar-ink:#e9dfc8; --sidebar-active:#fffaf0; --sidebar-active-ink:#4a3c18;
+    --shadow:0 8px 28px rgba(80,60,20,.1);
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{ font-family:"Segoe UI",system-ui,Arial,sans-serif; color:var(--ink); background:var(--bg); line-height:1.5; }
+  a{ color:inherit; text-decoration:none; }
+
+  /* ===== Mise en page : barre latérale + contenu ===== */
+  .shell{ display:grid; grid-template-columns:230px 1fr; min-height:100vh; }
+  @media(max-width:860px){ .shell{ grid-template-columns:1fr; } .side{ position:sticky; top:0; z-index:40; } .side .menu{ display:none; } }
+  @media(min-width:861px){ .side{ position:sticky; top:0; height:100vh; overflow-y:auto; } }
+  .side{ background:var(--sidebar); color:var(--sidebar-ink); padding:18px 14px; display:flex; flex-direction:column; gap:6px; }
+  .side .brand{ display:flex; align-items:center; gap:10px; font-family:var(--f-display); font-size:19px; color:#fff; font-weight:700; padding:4px 6px 14px; }
+  .side .brand .emblem{ width:34px; height:34px; flex:0 0 auto; }
+  .side .brand .emblem svg{ width:100%; height:100%; display:block; }
+  .menu a{ display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:10px; color:var(--sidebar-ink); font-weight:600; font-size:.92rem; }
+  .menu a svg{ width:18px; height:18px; opacity:.85; }
+  .menu a:hover{ background:rgba(255,255,255,.08); }
+  :root[data-theme="clair"] .menu a:hover, :root[data-theme="terre"] .menu a:hover{ background:rgba(0,0,0,.05); }
+  .menu a.active{ background:var(--sidebar-active); color:var(--sidebar-active-ink); }
+  .side .foot{ margin-top:auto; font-size:.8rem; opacity:.8; padding:10px 8px 2px; }
+
+  .main{ padding:22px 26px 48px; max-width:1400px; }
+  @media(max-width:560px){ .main{ padding:16px; } }
+  .head{ display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
+  .head h1{ font-family:var(--f-display); font-size:1.6rem; color:var(--deep); margin:0; }
+  .head .sub{ color:var(--soft); font-size:.92rem; }
+  .head .grow{ flex:1; }
+  .theme-wrap{ display:flex; align-items:center; gap:8px; }
+  .theme-wrap label{ font-size:.82rem; color:var(--soft); }
+  select.theme{ font-family:inherit; font-size:.88rem; padding:8px 12px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); cursor:pointer; }
+
+  .grid{ display:grid; gap:16px; }
+  .kpis{ grid-template-columns:repeat(4,1fr); }
+  @media(max-width:860px){ .kpis{ grid-template-columns:repeat(2,1fr); } }
+  @media(max-width:420px){ .kpis{ grid-template-columns:1fr; } }
+  .cols{ grid-template-columns:1.6fr 1fr; margin-top:16px; align-items:start; }
+  @media(max-width:860px){ .cols{ grid-template-columns:1fr; } }
+
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:18px; box-shadow:var(--shadow); }
+  .tile{ background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:16px 16px 14px; box-shadow:var(--shadow); }
+  .tile .ic{ width:40px; height:40px; border-radius:11px; background:var(--surface2); display:flex; align-items:center; justify-content:center; color:var(--leaf); margin-bottom:10px; }
+  .tile .ic svg{ width:22px; height:22px; }
+  .tile .lab{ font-size:.8rem; color:var(--soft); font-weight:600; }
+  .tile .val{ font-family:var(--f-display); font-size:1.9rem; color:var(--ink); line-height:1.1; margin-top:2px; }
+  .tile .meta{ font-size:.78rem; color:var(--faint); margin-top:3px; }
+
+  h2.ct{ font-family:var(--f-display); color:var(--deep); font-size:1.12rem; margin:0 0 4px; }
+  .muted{ color:var(--soft); font-size:.85rem; }
+  .wx-now{ display:flex; align-items:center; gap:14px; margin:10px 0 14px; }
+  .wx-now .t{ font-family:var(--f-display); font-size:2.2rem; color:var(--ink); }
+  .wx-ic{ width:48px; height:48px; color:var(--sun); } .wx-ic svg{ width:100%; height:100%; }
+  .wx-days{ display:flex; gap:8px; }
+  .wx-day{ flex:1; text-align:center; background:var(--surface2); border:1px solid var(--line); border-radius:11px; padding:9px 4px; }
+  .wx-day .d{ font-size:.72rem; color:var(--soft); text-transform:capitalize; }
+  .wx-day .dic{ width:22px; height:22px; margin:3px auto; color:var(--sun); } .wx-day .dic svg{ width:100%; height:100%; }
+  .wx-day .tmax{ font-weight:700; font-size:.85rem; } .wx-day .tmin{ color:var(--faint); font-size:.75rem; }
+
+  .chartwrap{ position:relative; }
+  svg .grid-line{ stroke:var(--line); stroke-width:1; }
+  svg .axis-txt{ fill:var(--faint); font-size:10px; font-family:inherit; }
+  .tip{ position:absolute; pointer-events:none; background:var(--ink); color:var(--surface); font-size:.76rem; padding:5px 8px; border-radius:7px; transform:translate(-50%,-120%); white-space:nowrap; opacity:0; transition:opacity .1s; }
+
+  .keybox{ display:flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--line); border-radius:10px; padding:9px 11px; margin:8px 0; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.82rem; word-break:break-all; }
+  .btn{ font-family:inherit; font-weight:600; border-radius:9px; padding:9px 14px; cursor:pointer; font-size:.88rem; border:1px solid var(--line); background:var(--surface2); color:var(--ink); display:inline-flex; align-items:center; gap:7px; }
+  .btn:hover{ filter:brightness(.97); }
+  .btn.primary{ background:var(--leaf); color:#fff; border-color:var(--leaf); }
+  .btn svg{ width:15px; height:15px; }
+  .list a{ display:flex; align-items:center; gap:10px; padding:9px 11px; border:1px solid var(--line); border-radius:10px; margin-top:8px; background:var(--surface2); font-size:.9rem; }
+  .list a:hover{ filter:brightness(.98); }
+  .list .arr{ margin-left:auto; color:var(--faint); } .list .arr svg{ width:16px; height:16px; }
+  .tipbar{ background:linear-gradient(120deg,var(--surface2),var(--surface)); border:1px solid var(--line); border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:12px; margin-top:16px; }
+  .tipbar .ti{ color:var(--leaf); } .tipbar .ti svg{ width:24px; height:24px; }
+  .section-gap{ margin-top:16px; }
+  #map{ height:340px; border-radius:12px; margin-top:12px; border:1px solid var(--line); z-index:1; }
+  .leaflet-container{ background:var(--surface2); font:inherit; }
+  .maprow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .maprow select.sel{ font-family:inherit; font-size:.88rem; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); cursor:pointer; }
+  .wide{ width:100%; }
+  /* Colonne de droite qui accompagne le défilement : plus de grand vide à côté de la parcelle */
+  @media(min-width:861px){ #rightCol{ position:sticky; top:16px; } }
+
+  #soilOut:empty{ display:none; }
+  .soilgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px; }
+  .chemgrid{ display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:6px; }
+  @media(max-width:700px){ .soilgrid, .chemgrid{ grid-template-columns:repeat(2,1fr); } }
+  .soiltext{ max-width:920px; }
+  #logCard input, #logCard select{ font:inherit; font-size:.92rem; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); box-sizing:border-box; height:42px; }
+  #soilOut input, #soilOut select{ font:inherit; font-size:.95rem; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); }
+  #manualRow input, #manualRow select{ font:inherit; font-size:.9rem; padding:8px 10px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); box-sizing:border-box; height:40px; }
+  .alertshare{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; } .alertshare .btn{ padding:5px 10px; font-size:.8rem; }
+  .pairtab td.up, .pairtab td.down{ font-weight:700; } .impact h4 .ico{ color:var(--leaf); margin-right:4px; }
+  .kindlabel{ font-size:.8rem; margin-bottom:6px; }
+  .kindpick{ display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
+  @media(max-width:1250px){ .kindpick{ grid-template-columns:repeat(4,minmax(0,1fr)); } }
+  .kind{ display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; column-gap:10px; align-items:center; text-align:left; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--ink); font:inherit; cursor:pointer; transition:border-color .15s, background .15s, box-shadow .15s; }
+  .kind .ico{ grid-row:1 / span 2; width:22px; height:22px; color:var(--soft); margin:0; }
+  .kind .kt{ font-weight:600; font-size:.9rem; line-height:1.2; }
+  .kind .kh{ font-size:.74rem; color:var(--soft); line-height:1.2; }
+  .kind:hover{ border-color:var(--leaf); }
+  .kind:focus-visible{ outline:2px solid var(--leaf); outline-offset:2px; }
+  .kind[aria-checked="true"]{ border-color:var(--leaf); background:color-mix(in srgb, var(--leaf) 9%, var(--surface)); box-shadow:inset 0 0 0 1px var(--leaf); }
+  .kind[aria-checked="true"] .ico{ color:var(--leaf); }
+  @media(max-width:900px){ .kindpick{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media(max-width:700px){ #logBody .maprow label{ flex:1 1 140px; width:auto !important; min-width:0 !important; } }
+  .logrow .k .ico{ color:var(--leaf); margin-right:4px; }
+  .logrow button .ico{ margin:0; width:16px; height:16px; }
+  .btn.wa{ background:#1f8f4e; border-color:#1f8f4e; color:#fff; }
+  .btn.wa:hover{ filter:brightness(1.05); }
+  .ferthead .ico, .sharebox .ico{ color:var(--leaf); }
+  .nat{ display:inline-block; font-size:.68rem; font-weight:700; letter-spacing:.02em; border-radius:999px; padding:1px 7px; margin-left:4px; vertical-align:1px; border:1px solid; white-space:nowrap; }
+  .nat.mesure{ color:#1f7a45; border-color:#9fd3b2; background:#eaf7ef; } .nat.declare{ color:#1e5f99; border-color:#a9cbea; background:#eef5fc; }
+  .nat.satellite{ color:#6a3fa0; border-color:#cdb7ea; background:#f5effc; } .nat.modele{ color:#9a5b00; border-color:#ecc98a; background:#fdf4e4; }
+  .nat.hypothese{ color:#5d6670; border-color:#c9ced4; background:#f2f4f6; }
+  .nat.repere{ color:#0b6b74; border-color:#9fd0d5; background:#e9f6f7; }
+  /* Guide « Valoriser mes résidus » et test de germination */
+  .resgrid{ display:grid; grid-template-columns:minmax(220px,300px) 1fr; gap:14px; margin-top:12px; align-items:start; }
+  @media(max-width:800px){ .resgrid{ grid-template-columns:1fr; } }
+  .respanel{ border:1px solid var(--line); border-radius:14px; padding:12px 14px; background:var(--surface2); }
+  #resPick{ font-family:inherit; font-size:.95rem; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); cursor:pointer; }
+  .resroutes{ display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 8px; }
+  .resroute{ border:1px solid var(--line); border-radius:999px; padding:6px 13px; background:var(--surface); color:var(--ink); font:inherit; font-size:.86rem; font-weight:600; cursor:pointer; }
+  .resroute:hover{ border-color:var(--leaf); } .resroute:focus-visible{ outline:2px solid var(--leaf); outline-offset:2px; }
+  .resroute[aria-pressed="true"]{ border-color:var(--leaf); background:color-mix(in srgb, var(--leaf) 10%, var(--surface)); box-shadow:inset 0 0 0 1px var(--leaf); }
+  .resroute .best{ font-weight:400; color:var(--soft); font-size:.74rem; margin-left:5px; }
+  .rescare{ margin:4px 0 0 18px; padding:0; font-size:.86rem; line-height:1.5; }
+  #resCard details{ margin-top:12px; } #resCard summary{ cursor:pointer; font-weight:700; color:var(--leaf); }
+  #resCard a{ color:var(--leaf); }
+  .germgrid{ display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; }
+  .germgrid fieldset{ border:1px solid var(--line); border-radius:10px; padding:4px 10px 9px; margin:0; display:flex; gap:10px; }
+  .germgrid legend{ font-size:.78rem; font-weight:700; color:var(--deep); padding:0 4px; }
+  .germgrid label{ font-size:.8rem; color:var(--soft); display:block; }
+  .germgrid input{ display:block; width:92px; margin-top:4px; }
+  :root[data-theme="sombre"] .nat{ background:transparent; }
+  .impact{ margin-top:12px; border:1px solid var(--line); border-radius:14px; padding:12px 14px; background:var(--surface2); }
+  .impact table{ width:100%; border-collapse:collapse; font-size:.86rem; margin-top:6px; }
+  .impact td,.impact th{ border-bottom:1px solid var(--line); padding:6px; text-align:left; vertical-align:top; }
+  .impact th{ font-size:.74rem; color:var(--soft); font-weight:600; }
+  .impact .up{ color:#1f7a45; font-weight:700; } .impact .down{ color:#c0392b; font-weight:700; }
+  .impact h4{ margin:12px 0 4px; font-family:var(--f-display); color:var(--deep); font-size:.98rem; }
+  @media(max-width:700px){ .impact table{ font-size:.8rem; } }
+  .loglist{ margin-top:10px; display:flex; flex-direction:column; gap:6px; }
+  .logrow{ display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-radius:10px; padding:7px 10px; background:var(--surface2); font-size:.86rem; }
+  .logrow .d{ color:var(--soft); width:92px; flex:none; } .logrow .k{ font-weight:700; width:170px; flex:none; } .logrow .q{ width:110px; flex:none; } .logrow .n{ flex:1; color:var(--soft); }
+  .logrow button{ border:none; background:none; color:#c0392b; cursor:pointer; font-size:.95rem; }
+  @media(max-width:700px){ .logrow{ flex-wrap:wrap; position:relative; padding-right:36px; row-gap:2px; } .logrow .d,.logrow .k,.logrow .q{ width:auto; } .logrow .n{ flex-basis:100%; } .logrow .n:empty,.logrow .q:empty{ display:none; } .logrow button{ position:absolute; right:6px; top:50%; transform:translateY(-50%); } }
+  .fertbox .vchip{ background:var(--surface); }
+  .fertbox{ margin-top:16px; border:1px solid var(--line); border-radius:14px; padding:12px 14px; background:var(--surface2); }
+  .ferthead{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; flex-wrap:wrap; font-weight:700; font-size:.92rem; }
+  .fertlist{ margin:10px 0 0 18px; padding:0; font-size:.86rem; line-height:1.5; }
+  .nutgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; }
+  .nut{ border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:.82rem; line-height:1.45; background:var(--surface); }
+  .nut.low{ border-color:#d9a441; }
+  @media(max-width:700px){ .nutgrid{ grid-template-columns:1fr; } }
+  .sharebox{ margin-top:12px; border:1px dashed var(--line); border-radius:14px; padding:10px 14px; }
+  .sharepre{ white-space:pre-wrap; font-family:inherit; font-size:.82rem; background:var(--surface2); border-radius:10px; padding:8px 10px; margin:6px 0 0; }
+  .vchips{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; margin-top:12px; }
+  .vchip{ background:var(--surface2); border:1px solid var(--line); border-radius:11px; padding:10px 12px; min-width:92px; }
+  .vchip .l{ font-size:.72rem; color:var(--soft); } .vchip .v{ font-family:var(--f-display); font-size:1.25rem; color:var(--ink); }
+  .valert{ border-radius:11px; padding:11px 13px; margin-top:12px; font-size:.9rem; border:1px solid var(--line); }
+  .valert.ok{ background:color-mix(in srgb,var(--good) 12%,transparent); border-color:color-mix(in srgb,var(--good) 35%,transparent); }
+  .valert.warn{ background:color-mix(in srgb,var(--sun) 14%,transparent); border-color:color-mix(in srgb,var(--sun) 40%,transparent); }
+  .valert.bad{ background:color-mix(in srgb,var(--bad) 12%,transparent); border-color:color-mix(in srgb,var(--bad) 35%,transparent); }
+  .vverdict{ background:var(--surface2); border:1px solid var(--line); border-left:5px solid var(--line); border-radius:10px; padding:11px 13px; margin-top:8px; }
+  .vverdict.fav{ border-left-color:var(--good); } .vverdict.prec{ border-left-color:var(--sun); } .vverdict.dec{ border-left-color:var(--bad); }
+  .vverdict .tete{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .vverdict .nom{ font-weight:700; text-transform:capitalize; }
+  .vbadge{ font-size:.72rem; font-weight:700; padding:3px 9px; border-radius:20px; color:#fff; }
+  .vbadge.fav{ background:var(--good); } .vbadge.prec{ background:var(--sun); color:#2a1d04; } .vbadge.dec{ background:var(--bad); }
+  .vverdict ul{ margin:7px 0 0 18px; font-size:.84rem; color:var(--soft); } .vverdict .note{ font-size:.8rem; color:var(--faint); font-style:italic; margin-top:5px; }
+  /* Indice de durabilité */
+  .durq{ display:grid; grid-template-columns:1fr 190px; gap:8px 12px; align-items:center; margin:7px 0; }
+  .durq label{ font-size:.86rem; color:var(--ink); }
+  .durgrp{ font-weight:700; color:var(--leaf); font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; margin:14px 0 2px; }
+  .durhero{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; border:1px solid var(--line); border-radius:12px; padding:14px 16px; background:var(--surface2); }
+  .durhero .big{ font-size:2.6rem; font-weight:800; line-height:1; color:var(--leaf); }
+  .durhero .big small{ font-size:1rem; font-weight:600; color:var(--faint); }
+  .durmeter{ margin:9px 0; }
+  .durmeter .top{ display:flex; justify-content:space-between; align-items:baseline; font-size:.86rem; margin-bottom:4px; }
+  .durmeter .top b{ color:var(--ink); } .durmeter .top .sc{ font-weight:800; }
+  .durbar{ height:12px; border-radius:999px; background:var(--surface2); border:1px solid var(--line); overflow:hidden; }
+  .durbar>span{ display:block; height:100%; border-radius:999px; transition:width .5s ease; }
+  .durtag{ font-size:.72rem; font-weight:700; padding:2px 9px; border-radius:20px; color:#fff; }
+/* v8.3 — facilité d'usage : mode simple, écran « Aujourd'hui », mesures du terrain */
+html.simple .adv{display:none!important}
+.today{border-left:5px solid var(--leaf);margin-bottom:16px}
+.todayhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}
+.todayhead .sel{width:auto;min-width:160px}
+.todayday{margin-top:6px;font-size:.95rem}
+.todaysec{margin-top:10px}
+.todayt{font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--leaf)}
+.todaylist{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.todaylist li{padding:10px 12px;border-radius:10px;background:rgba(46,125,79,.08);display:flex;flex-direction:column;gap:2px}
+.todaylist li b{font-size:1.02rem}
+.todaylist li span{font-size:.88rem}
+.todaylist li em{font-style:normal;font-size:.76rem;opacity:.7}
+.todaystep{margin-top:10px;line-height:1.55}
+.todaystep .btn{margin:6px 0 0 6px}
+.todayhead select.sel{font:inherit;font-size:.92rem;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink)}
+.todaystage summary{cursor:pointer;font-size:.86rem;margin-top:8px}
+.todayacts{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.btn.big{min-height:52px;font-size:1.02rem;padding:0 20px}
+.qtyrow{display:flex;gap:6px;margin-top:4px}
+.qtyrow select{width:auto;flex:1}
+.qtysize{display:block;margin-top:4px;font-size:.78rem}
+.qtyconv{display:block;margin-top:2px;font-weight:700;color:var(--leaf)}
+.logpend{opacity:.8}
+.logpend .tag{font-size:.72rem;border:1px dashed currentColor;border-radius:999px;padding:1px 8px;margin-left:6px}
+@media (max-width:720px){
+  .btn,.sel,select.sel,input.sel{min-height:46px;font-size:16px}
+  .todayacts .btn{flex:1}
+  #logBody .maprow.logform{flex-direction:column;align-items:stretch!important;gap:12px}
+  #logBody .maprow.logform>label,#logBody .maprow.logform>button{width:100%!important;min-width:0!important;flex:none!important;font-size:.9rem!important}
+  .logform .sel{box-sizing:border-box;max-width:100%}
+  .qtyrow{width:100%}
+  .qtyrow>.sel{min-width:0}
+  .qtyrow input.sel{flex:1;width:auto!important}
+  .qtyrow select.sel{flex:1.4}
+  .qtysize input.sel{width:90px!important;min-height:40px}
+}
+</style>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2E7D46">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<script src="/pwa.js" defer></script>
+<link rel="icon" type="image/png" href="/favicon-32.png">
+<link rel="stylesheet" href="/mobile.css">
+<script>try{ if(localStorage.getItem("trv-mode")==="simple") document.documentElement.classList.add("simple"); }catch(e){}</script>
+<link rel="stylesheet" href="/anims.css">
+<script src="/mobile.js" defer></script>
+<script src="/anims.js" defer></script>
+<script src="/icons.js"></script>
+<script src="/residus.js"></script>
+<script src="/voice.js"></script>
+</head>
+<body>
+<div class="shell">
+  <!-- ===== Barre latérale ===== -->
+  <aside class="side">
+    <a class="brand" href="/"><span class="emblem" aria-hidden="true"><img src="/logo.png" alt="Terravive" style="display:block;width:100%;height:100%;object-fit:contain"></span> Terravive</a>
+    <nav class="menu">
+      <a href="/tableau" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg> Tableau de bord</a>
+      <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V6a2 2 0 0 1 2-2h11l3 3v12.5"/><path d="M8 8h7M8 12h9M8 16h5"/></svg> Plan de culture</a>
+      <a href="/planteur"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5v-8.6"/><path d="M12 12.6c0-3.3-2.2-5.3-6.2-5.3 0 3.7 2.3 5.3 6.2 5.3z"/><path d="M12 10.4c0-2.9 2-4.8 5.8-4.8 0 3.3-2.1 4.8-5.8 4.8z"/><path d="M7.5 20.5h9"/></svg> Vue planteur</a>
+      <a href="/arduino"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="9" rx="2"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/><path d="M2 12h2M20 12h2"/></svg> Automatisation</a>
+      <a href="/conseiller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.6 8.6 0 0 1-3.9-.9L3 20l1.4-4.1A8.4 8.4 0 0 1 3.5 11.5 8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg> Conseiller</a>
+      <a href="/diagnostic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2 2 0 0 1 5 6.5h1.5l1-1.6h5l1 1.6H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12.5" cy="12.5" r="3.2"/></svg> Diagnostic photo</a>
+      <a href="/cooperative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M15 19a4.5 4.5 0 0 1 6 0"/></svg> Coopérative</a>
+      <a href="/comprendre"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 5.5V20.5"/><path d="M8 7h8M8 11h6"/></svg> Comprendre</a>
+    </nav>
+    <div class="foot" id="sideFoot">
+      <div id="acctFoot" style="margin-bottom:8px;"></div>
+      <button type="button" id="logoutBtn" onclick="this.disabled=true;this.textContent='Déconnexion…';fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'}).catch(function(){}).finally(function(){location.href='/';});" style="width:100%;justify-content:center;border:1px solid rgba(255,255,255,.3);background:transparent;color:var(--sidebar-ink);border-radius:9px;padding:9px 12px;cursor:pointer;font:inherit;font-weight:600;display:inline-flex;align-items:center;gap:8px;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 12H4M9 7l-5 5 5 5"/><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/></svg>Se déconnecter</button>
+    </div>
+  </aside>
+
+  <!-- ===== Contenu ===== -->
+  <main class="main">
+    <div class="head">
+      <div>
+        <h1 id="hello">Bonjour</h1>
+        <div class="sub" id="subline"></div>
+      </div>
+      <span class="grow"></span>
+      <button class="btn" type="button" id="modeBtn" style="display:none;" title="Mode simple : l'essentiel pour le producteur. Mode complet : toutes les fonctions (animateur).">Mode complet</button>
+      <div class="theme-wrap">
+        <label for="themeSel">Thème</label>
+        <select class="theme" id="themeSel">
+          <option value="nature">Nature (vert)</option>
+          <option value="clair">Clair</option>
+          <option value="sombre">Sombre</option>
+          <option value="terre">Terre</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="authNote" style="display:none;" class="card">Connectez-vous pour voir votre tableau de bord. <a href="/app" style="color:var(--leaf);font-weight:600;">Ouvrir la page de connexion</a></div>
+
+    <div id="board" style="display:none;">
+      <div class="card today" id="todayCard" style="display:none;">
+        <div class="todayhead">
+          <h2 class="ct" style="margin:0;"><span data-ico="check"></span>Aujourd'hui</h2>
+          <select class="sel" id="todayParcel" aria-label="Parcelle"></select>
+        </div>
+        <div id="todayDay" class="todayday"></div>
+        <div id="todayAlert"></div>
+        <div id="todayTasks"></div>
+        <div class="todayacts">
+          <button class="btn primary big" type="button" id="todayNote"><span data-ico="pencil"></span>Noter ce que j'ai fait</button>
+          <button class="btn big" type="button" id="todaySpeak" style="display:none;"><span data-ico="speaker"></span>Écouter</button>
+        </div>
+        <div id="todayQueue" class="muted" style="font-size:.84rem;margin-top:6px;"></div>
+      </div>
+      <!-- Tuiles KPI -->
+      <div class="grid kpis">
+        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2c3.6 4.6 6 7.7 6 10.8a6 6 0 0 1-12 0c0-3.1 2.4-6.2 6-10.8z"/></svg></div><div class="lab">Humidité du sol</div><div class="val" id="kSoil">—</div><div class="meta" id="kSoilMeta">en attente du capteur</div></div>
+        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13.5V5a2 2 0 0 1 4 0v8.5a4 4 0 1 1-4 0z"/></svg></div><div class="lab">Température</div><div class="val" id="kTemp">—</div><div class="meta" id="kTempMeta">capteur ou météo</div></div>
+        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V6a2 2 0 0 1 2-2h11l3 3v12.5"/><path d="M8 9h7M8 13h9"/></svg></div><div class="lab">Itinéraires créés</div><div class="val" id="kPlans">0</div><div class="meta">plans de culture</div></div>
+        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="9" rx="2"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/></svg></div><div class="lab">Projets Arduino</div><div class="val" id="kDev">0</div><div class="meta">montages générés</div></div>
+      </div>
+
+      <div class="grid cols">
+        <!-- Colonne principale -->
+        <div>
+          <div class="card" id="adminQCard" style="display:none;border-color:var(--sun);">
+            <h2 class="ct">Espace formateur — questions des cultivateurs</h2>
+            <div class="muted">Ce que les cultivateurs demandent au conseiller, pour repérer les incompréhensions fréquentes et y répondre (formation, itinéraires, FAQ).</div>
+            <div id="adminQThemes" class="section-gap"></div>
+            <div id="adminQRecent" class="section-gap"></div>
+          </div>
+
+          <div class="card" id="adminACard" style="display:none;border-color:var(--sun);">
+            <h2 class="ct">Propriétaire — animateurs désignés</h2>
+            <div class="muted">Vous seul accordez le statut d'<b>animateur</b> (droit de créer et d'animer une coopérative). La personne doit déjà avoir un compte Terravive.</div>
+            <div class="row" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <input class="sel" id="animEmail" aria-label="Adresse e-mail du compte à désigner" style="flex:1;min-width:200px;" placeholder="adresse e-mail du compte" autocomplete="off">
+              <button class="btn primary" id="animGrant" type="button">Désigner animateur</button>
+              <button class="btn" id="animRevoke" type="button">Retirer le statut</button>
+            </div>
+            <div id="animMsg" class="muted" style="margin-top:7px;"></div>
+            <div id="animReqList" class="section-gap"></div>
+            <div id="animList" class="section-gap"></div>
+            <div id="certReqList" class="section-gap"></div>
+          </div>
+
+          <div class="card" id="certCard" style="display:none;border-color:var(--leaf);">
+            <h2 class="ct">Devenir cultivateur certifié</h2>
+            <div class="muted">Si vous maîtrisez Terravive, demandez votre certification. Une fois <b>approuvé par l'administrateur</b>, vous gérez votre propre stock en autonomie, sans passer par un animateur.</div>
+            <div id="certStatus" class="section-gap muted">—</div>
+            <button class="btn primary" id="certAsk" type="button" style="margin-top:8px;display:none;">Demander la certification</button>
+          </div>
+
+
+          <div class="card">
+            <h2 class="ct">Ma parcelle — surveillance satellite</h2>
+            <div class="muted" id="mapSub">Repérez votre champ (recherche ou GPS), puis dessinez votre parcelle (outil rectangle ou polygone, en haut à gauche de la carte) et lancez une analyse satellite via Vertea.</div>
+            <div class="maprow" style="margin-top:10px;">
+              <input id="placeSearch" aria-label="Rechercher un lieu" class="sel" style="flex:1;min-width:150px;" placeholder="Rechercher un lieu (village, ville…)">
+              <button class="btn" id="btnSearch" type="button">Aller</button>
+              <button class="btn" id="btnLocate" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> Me localiser</button>
+            </div>
+            <div id="map"></div>
+            <div class="maprow" id="verteaControls" style="display:none;">
+              <input class="sel" id="vCulture" list="vCultureList" value="Tomate" autocomplete="off" placeholder="Culture (ex. tomate, maïs, riz…)" title="Tapez n'importe quelle culture (pour le besoin en eau). Les suggestions aident, mais toute culture est acceptée.">
+              <datalist id="vCultureList">
+                <option value="Tomate"></option><option value="Concombre"></option><option value="Piment"></option><option value="Poivron"></option><option value="Laitue"></option><option value="Chou"></option><option value="Carotte"></option><option value="Oignon"></option><option value="Aubergine"></option><option value="Gombo"></option><option value="Épinard"></option><option value="Courgette"></option><option value="Pastèque"></option><option value="Melon"></option><option value="Haricot vert"></option><option value="Arachide"></option><option value="Niébé"></option><option value="Soja"></option><option value="Sésame"></option><option value="Maïs"></option><option value="Maïs doux"></option><option value="Riz"></option><option value="Sorgho"></option><option value="Mil"></option><option value="Manioc"></option><option value="Igname"></option><option value="Patate douce"></option><option value="Pomme de terre"></option><option value="Taro"></option><option value="Gingembre"></option><option value="Coton"></option><option value="Canne à sucre"></option><option value="Banane plantain"></option><option value="Ananas"></option><option value="Cacao"></option><option value="Café"></option><option value="Palmier à huile"></option><option value="Hévéa"></option><option value="Anacarde"></option><option value="Mangue"></option><option value="Papaye"></option><option value="Agrumes"></option>
+              </datalist>
+              <button class="btn primary" id="btnNdvi" type="button">Santé (NDVI)</button>
+              <button class="btn" id="btnEau" type="button">Besoin en eau</button>
+              <button class="btn" id="btnPlant" type="button">Quoi planter&nbsp;?</button>
+            </div>
+            <div class="maprow" id="parcelSaveRow" style="display:none;align-items:center;">
+              <input class="sel" id="parcelName" aria-label="Nom de la parcelle" style="flex:1;min-width:150px;" placeholder="Nom de cette parcelle (ex. Champ derrière la maison)" maxlength="80" autocomplete="off">
+              <button class="btn" id="btnSaveParcel" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M5 3h12l2 2v16l-7-4-7 4z"/></svg> Enregistrer la parcelle</button>
+            </div>
+            <div id="parcelList" class="section-gap"></div>
+            <div class="muted section-gap" id="vStatus" style="min-height:1em;"></div>
+            <div id="vOut"></div>
+          </div>
+
+
+
+          <div class="tipbar">
+            <span class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 1 4 10.5c-.7.7-1 1.2-1 2.5H9c0-1.3-.3-1.8-1-2.5A6 6 0 0 1 12 3z"/></svg></span>
+            <div><b id="tipTitle">Petit à petit, le sol vit mieux.</b><div class="muted" id="tipText">Arrosez tôt le matin ou en soirée pour limiter l'évaporation.</div></div>
+          </div>
+        </div>
+
+        <!-- Colonne latérale -->
+        <div id="rightCol">
+          <div class="card">
+            <div class="maprow" style="justify-content:space-between;margin-top:0;">
+              <h2 class="ct" style="margin:0;">Météo</h2>
+              <button class="btn" id="gpsWx" type="button" style="padding:7px 11px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> Ma position</button>
+            </div>
+            <div class="muted" id="wxPlace">—</div>
+            <div class="wx-now"><span class="wx-ic" id="wxIc"></span><span class="t" id="wxTemp">—</span><span class="muted" id="wxHum"></span></div>
+            <div class="wx-days" id="wxDays"></div>
+          </div>
+
+          <div class="card section-gap">
+            <h2 class="ct">Ma station connectée</h2>
+            <div class="muted">La clé secrète que votre carte (ESP32) utilise pour envoyer ses mesures. Ne la partagez pas.</div>
+            <div class="keybox"><span id="keyText">••••••••••••</span></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn" id="revealBtn" type="button">Afficher</button>
+              <button class="btn" id="copyKeyBtn" type="button">Copier</button>
+              <button class="btn primary" id="sketchBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10M8 11l4 3 4-3"/><path d="M5 19h14"/></svg> Programme ESP32</button>
+            </div>
+            <div class="muted section-gap">Téléchargez le programme déjà pré-rempli avec votre clé, mettez votre Wi-Fi, et téléversez-le sur une carte ESP32.</div>
+          </div>
+
+          <div class="card section-gap">
+            <h2 class="ct">Dernières mesures de la parcelle</h2>
+            <div class="grid kpis" style="margin-top:12px;grid-template-columns:repeat(4,1fr);gap:10px;" id="liveRow">
+              <div class="tile" style="box-shadow:none;"><div class="lab">Sol</div><div class="val" id="lSoil" style="font-size:1.4rem;">—</div></div>
+              <div class="tile" style="box-shadow:none;"><div class="lab">Air (temp.)</div><div class="val" id="lTemp" style="font-size:1.4rem;">—</div></div>
+              <div class="tile" style="box-shadow:none;"><div class="lab">Air (humid.)</div><div class="val" id="lHum" style="font-size:1.4rem;">—</div></div>
+              <div class="tile" style="box-shadow:none;"><div class="lab">Cuve</div><div class="val" id="lLevel" style="font-size:1.4rem;">—</div></div>
+            </div>
+            <div id="liveAlert"></div>
+            <details id="manualBox" style="margin-top:10px;"><summary style="cursor:pointer;font-weight:700;color:var(--leaf);"><span data-ico="pencil"></span> Saisir une mesure à la main (sans capteur)</summary>
+              <div class="muted" style="font-size:.82rem;margin:6px 0;">Pas encore de station ? Notez vos observations : les alertes et la courbe fonctionnent de la même façon. Une mesure « au toucher » est approximative et signalée comme telle.</div>
+              <div class="maprow" style="align-items:flex-end;" id="manualRow">
+                <label class="muted" style="width:130px;font-size:.8rem;">Humidité du sol (%)<input class="sel" id="mSoil" inputmode="decimal" placeholder="appareil" style="width:100%;margin-top:4px;"></label>
+                <label class="muted" style="width:210px;font-size:.8rem;">…ou au toucher<select class="sel" id="mTouch" style="width:100%;margin-top:4px;"><option value="">—</option><option value="sec">Sec : la terre s'effrite (≈ 15 %)</option><option value="frais">Frais : boule friable (≈ 40 %)</option><option value="humide">Humide : la boule tient (≈ 65 %)</option><option value="detrempe">Détrempé : l'eau suinte (≈ 90 %)</option></select></label>
+                <label class="muted" style="width:100px;font-size:.8rem;">Temp. air (°C)<input class="sel" id="mTemp" inputmode="decimal" style="width:100%;margin-top:4px;"></label>
+                <label class="muted" style="width:100px;font-size:.8rem;">Humid. air (%)<input class="sel" id="mHum" inputmode="decimal" style="width:100%;margin-top:4px;"></label>
+                <label class="muted" style="width:100px;font-size:.8rem;">Cuve (%)<input class="sel" id="mLevel" inputmode="decimal" style="width:100%;margin-top:4px;"></label>
+                <label class="muted" style="flex:1;min-width:160px;font-size:.8rem;">Observation<input class="sel" id="mNote" maxlength="200" placeholder="ex. feuilles flétries à midi" style="width:100%;margin-top:4px;"></label>
+                <button class="btn primary" type="button" id="mSave">Enregistrer</button>
+              </div><div class="muted" id="mMsg" style="font-size:.84rem;margin-top:4px;"></div>
+            </details>
+            <div class="maprow" style="justify-content:space-between;">
+              <span class="muted" id="liveWhen"></span>
+              <button class="btn" id="clearMeas" type="button" style="display:none;">Effacer mes mesures</button>
+            </div>
+          </div>
+          <div class="card section-gap">
+            <h2 class="ct">Humidité du sol — tendance</h2>
+            <div class="muted" id="chartSub">En attente des premières mesures de votre capteur.</div>
+            <div class="chartwrap section-gap" id="chartWrap"><div class="muted" style="padding:30px 0;text-align:center;" id="chartEmpty">Aucune mesure pour l'instant. Branchez votre station (voir « Ma station » à droite).</div></div>
+          </div>
+          <div class="card section-gap">
+            <h2 class="ct">Accès rapide</h2>
+            <div class="list">
+              <a href="/app"><span>Nouveau plan de culture</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
+              <a href="/arduino" class="adv"><span>Nouveau projet d'automatisation</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
+              <a href="/conseiller"><span>Poser une question au conseiller</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
+              <a href="/diagnostic"><span>Diagnostiquer une plante malade (photo)</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
+              <a href="/cooperative"><span>Ma coopérative</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
+            </div>
+            <div id="recentPlans" class="list section-gap"></div>
+          </div>
+        </div>
+      </div>
+        <div id="soilOut" class="wide section-gap"></div>
+          <div class="card wide section-gap" id="resCard">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;"><h2 class="ct" style="margin:0;"><span data-ico="recycle"></span>Valoriser mes résidus</h2><span class="muted" style="font-size:.82rem;">Tiges, pailles, fumier, cabosses : ce sont des ressources. Choisissez ce que vous avez, Terravive vous indique quoi en faire.</span></div>
+            <div class="resgrid">
+              <label class="muted" style="font-size:.8rem;">J'ai…<select class="sel" id="resPick" style="width:100%;margin-top:4px;"></select></label>
+              <div class="respanel" id="resPanel" aria-live="polite"></div>
+            </div>
+            <details id="resRules"><summary>Les règles d'un bon tas de compost</summary><ul class="rescare" id="resRulesList" style="margin-top:8px;"></ul></details>
+            <details id="resGerm"><summary>Mon compost est-il mûr ? Le test de germination</summary><div id="resGermBody"></div></details>
+            <div class="muted" id="resSource" style="font-size:.74rem;margin-top:12px;"></div>
+          </div>
+          <div class="card wide section-gap" id="logCard">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;"><h2 class="ct" style="margin:0;"><span data-ico="notebook"></span>Carnet de champ</h2><span class="muted" style="font-size:.82rem;">Notez ce que vous faites et ce que vous récoltez : c'est ce qui prouve les résultats.</span></div>
+            <div id="logEmpty" class="muted section-gap" style="display:none;">Enregistrez d'abord une parcelle sur la carte pour tenir son carnet.</div>
+            <div id="logBody" style="display:none;">
+              <div class="kindlabel muted section-gap" id="kindLabel">Intervention</div>
+              <div class="kindpick" id="kindPick" role="radiogroup" aria-labelledby="kindLabel"></div>
+              <select id="logKind" hidden aria-hidden="true" tabindex="-1"><option value="arrosage">Arrosage</option><option value="pluie">Pluie</option><option value="compost">Compost / fumier</option><option value="engrais">Engrais chimique</option><option value="traitement">Traitement</option><option value="semis">Semis / plantation</option><option value="recolte">Récolte</option><option value="perte">Récolte invendable</option><option value="residu">Résidus valorisés</option><option value="germination">Test de germination</option><option value="incident">Incident</option><option value="observation">Observation</option></select>
+              <div class="maprow logform" style="align-items:flex-end;margin-top:12px;">
+                <label class="muted" style="min-width:160px;flex:1;font-size:.8rem;">Parcelle<select class="sel" id="logParcel" style="width:100%;margin-top:4px;"></select></label>
+                <label class="muted" style="width:150px;font-size:.8rem;">Date<input class="sel" type="date" id="logDate" style="width:100%;margin-top:4px;"></label>
+                <label class="muted" id="logQtyWrap" style="min-width:230px;flex:1;font-size:.8rem;">Quantité <span id="logUnit">(L)</span><span class="qtyrow"><input class="sel" id="logQty" inputmode="decimal" placeholder="ex. 12" style="width:90px;"><select class="sel" id="logMeasure" aria-label="Mesure"></select></span><span class="qtysize" id="logSizeWrap" style="display:none;">1 <span id="logSizeName">arrosoir</span> = <input class="sel" id="logSize" inputmode="decimal" style="width:70px;"> <span id="logSizeUnit">L</span> <span class="muted">(réglez une fois)</span></span><span class="qtyconv" id="logConv"></span></label>
+                <label class="muted" id="logProdWrap" style="width:170px;font-size:.8rem;display:none;">Produit / type<input class="sel" id="logProd" maxlength="60" list="logProdList" placeholder="ex. NPK 15-15-15" style="width:100%;margin-top:4px;"><datalist id="logProdList"></datalist></label>
+                <label class="muted" id="logResWrap" style="min-width:190px;flex:1;font-size:.8rem;display:none;">Résidu<select class="sel" id="logResidue" style="width:100%;margin-top:4px;"></select></label>
+                <label class="muted" id="logRouteWrap" style="min-width:170px;flex:1;font-size:.8rem;display:none;">Ce que j'en ai fait<select class="sel" id="logRoute" style="width:100%;margin-top:4px;"></select></label>
+                <div id="logGermWrap" style="display:none;flex:1 1 100%;">
+                  <div class="germgrid">
+                    <fieldset><legend>Sur le compost</legend><label>Graines semées<input class="sel" id="gSown" inputmode="numeric" placeholder="ex. 20"></label><label>Graines levées<input class="sel" id="gUp" inputmode="numeric" placeholder="ex. 18"></label></fieldset>
+                    <fieldset><legend>Sur le témoin</legend><label>Graines semées<input class="sel" id="gRefSown" inputmode="numeric" placeholder="ex. 20"></label><label>Graines levées<input class="sel" id="gRefUp" inputmode="numeric" placeholder="ex. 19"></label></fieldset>
+                    <label>Jours avant le comptage<input class="sel" id="gDays" inputmode="numeric" value="7"></label>
+                  </div>
+                  <div class="valert" id="logGermOut" style="display:none;" aria-live="polite"></div>
+                  <div class="muted" style="font-size:.8rem;margin-top:6px;"><a href="#resGerm" id="germHow" style="color:var(--leaf);font-weight:600;">Comment faire le test ?</a></div>
+                </div>
+                <label class="muted adv" style="width:190px;font-size:.8rem;">Saison / campagne<input class="sel" id="logSeason" maxlength="60" list="logSeasonList" style="width:100%;margin-top:4px;"><datalist id="logSeasonList"></datalist></label>
+                <label class="muted" style="flex:2;min-width:180px;font-size:.8rem;">Note (facultatif)<input class="sel" id="logNote" maxlength="300" placeholder="ex. tomates, 2ᵉ cueillette" style="width:100%;margin-top:4px;"></label>
+                <button class="btn primary" type="button" id="logAdd">Enregistrer</button>
+              </div>
+              <div id="logResHint" style="display:none;margin-top:8px;font-size:.86rem;line-height:1.5;padding:8px 12px;border-left:3px solid var(--leaf);background:color-mix(in srgb,var(--leaf) 6%,transparent);border-radius:6px;" aria-live="polite"></div>
+              <div class="muted" id="logMsg" style="margin-top:4px;font-size:.84rem;"></div>
+              <div class="maprow" style="margin-top:10px;align-items:center;"><span class="muted" style="font-size:.82rem;">Totaux :</span><select class="sel" id="logSeasonFilter" aria-label="Saison des totaux" style="width:auto;"></select></div>
+              <div id="logTotals" class="vchips"></div>
+              <div id="logPending" class="loglist"></div>
+              <div id="logList" class="loglist"></div>
+              <div class="maprow" style="margin-top:8px;"><button class="btn primary" type="button" id="impactBtn"><span data-ico="chart"></span>Bilan d'impact</button><button class="btn adv" type="button" id="logCsv"><span data-ico="download"></span>Télécharger le carnet (CSV)</button><button class="btn" type="button" id="collectBtn"><span data-ico="printer"></span>Fiche de collecte à imprimer</button></div>
+              <div id="impactBox" style="display:none;"></div>
+            </div>
+          </div>
+          <div class="card wide section-gap adv" id="durCard">
+            <h2 class="ct">Indice de durabilité de mon exploitation</h2>
+            <div class="muted">Auto-évaluation inspirée du cadre des agrosystèmes durables — trois piliers : environnemental, économique, social. Répondez en quelques clics ; si vous avez lancé la Santé (NDVI), elle est prise en compte automatiquement. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></div>
+            <div id="durForm" class="section-gap"></div>
+            <div class="maprow" style="align-items:center;">
+              <label class="muted" for="durArea">Surface (ha, pour le bilan carbone) :</label>
+              <input id="durArea" class="sel" style="width:110px;" placeholder="ex. 1" inputmode="decimal" autocomplete="off">
+              <button class="btn primary" id="durCalc" type="button">Calculer mon indice</button>
+            </div>
+            <div id="durOut" class="section-gap"></div>
+          </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  const $=(id)=>document.getElementById(id);
+  function esc(s){ const d=document.createElement("div"); d.textContent=(s==null?"":s); return d.innerHTML; }
+  // Contexte partagé (parcelle) : lu par le Conseiller pour des questions suggérées dynamiques.
+  function saveCtx(obj){ try{ var cur={}; try{ cur=JSON.parse(localStorage.getItem("trv-ctx")||"{}"); }catch(e){} Object.keys(obj).forEach(function(k){ if(obj[k]!==undefined && obj[k]!==null && obj[k]!=="") cur[k]=obj[k]; }); cur.at=Date.now(); localStorage.setItem("trv-ctx", JSON.stringify(cur)); }catch(e){} }
+  let me=null, station=null, DASH=null;
+
+  // ===== Thème (mémorisé) =====
+  function applyTheme(t){ document.documentElement.setAttribute("data-theme", t); try{ localStorage.setItem("trv-theme", t); }catch(e){} }
+  (function initTheme(){ let t="nature"; try{ t=localStorage.getItem("trv-theme")||"nature"; }catch(e){} document.documentElement.setAttribute("data-theme", t); })();
+
+  // ===== Icônes météo (selon le code Open-Meteo) =====
+  function wxSvg(code){
+    const c=Number(code);
+    if(c===0) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>';
+    if(c>=1&&c<=3) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="3.2"/><path d="M6 17h11a3.5 3.5 0 0 0 0-7 4.5 4.5 0 0 0-8.6-1"/></svg>';
+    if(c>=45&&c<=48) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h12M6 13h14M4 17h11"/></svg>';
+    if(c>=51&&c<=67||c>=80&&c<=82) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14h9a3.5 3.5 0 0 0 0-7 4.5 4.5 0 0 0-8.6-1A3.5 3.5 0 0 0 7 14z"/><path d="M9 18l-1 2M13 18l-1 2M17 18l-1 2"/></svg>';
+    if(c>=95) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14h9a3.5 3.5 0 0 0 0-7 4.5 4.5 0 0 0-8.6-1A3.5 3.5 0 0 0 7 14z"/><path d="M12 13l-2 4h3l-2 4"/></svg>';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 17h11a3.5 3.5 0 0 0 0-7 4.5 4.5 0 0 0-8.6-1"/></svg>';
+  }
+  const DAYS=["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
+
+  // ===== Météo : tout est récupéré CÔTÉ NAVIGATEUR (le serveur Render n'a pas accès
+  // au service météo ; le navigateur, lui, l'atteint sans problème). =====
+  let usingGps=false, lastGpsWeather=null, regionWeather=null;
+  try{ usingGps = localStorage.getItem("trv-gps-weather")==="1"; }catch(e){}
+  function renderWeather(w){
+    if(w&&w.current){ $("wxPlace").textContent=(usingGps?"Ma position · ":"")+(w.place||""); $("wxIc").innerHTML=wxSvg(w.current.code); $("wxTemp").textContent=w.current.temp+"°C"; $("wxHum").textContent="Humidité "+w.current.hum+"%"; }
+    else { $("wxPlace").textContent="Météo indisponible pour le moment."; $("wxIc").innerHTML=""; $("wxTemp").textContent="—"; $("wxHum").textContent=""; }
+    if(w&&w.daily){ $("wxDays").innerHTML=w.daily.map(dd=>{ const dt=new Date(dd.date); return '<div class="wx-day"><div class="d">'+DAYS[dt.getDay()]+'</div><div class="dic">'+wxSvg(dd.code)+'</div><div class="tmax">'+dd.tmax+'°</div><div class="tmin">'+dd.tmin+'°</div></div>'; }).join(""); }
+    else { $("wxDays").innerHTML=""; }
+  }
+  function renderCurrentWeather(){ renderWeather(usingGps && lastGpsWeather ? lastGpsWeather : regionWeather); }
+  async function omForecast(lat, lon){
+    try{
+      const f=await fetch("https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lon+"&current=temperature_2m,relative_humidity_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=4&timezone=auto").then(r=>r.json());
+      if(!f||!f.current) return null;
+      return { current:{temp:Math.round(f.current.temperature_2m), hum:f.current.relative_humidity_2m, code:f.current.weather_code}, daily: f.daily? f.daily.time.map((t,i)=>({date:t,code:f.daily.weather_code[i],tmax:Math.round(f.daily.temperature_2m_max[i]),tmin:Math.round(f.daily.temperature_2m_min[i])})):[] };
+    }catch(e){ return null; }
+  }
+  async function geocodeCIClient(region){
+    const q=encodeURIComponent((region&&String(region).trim())||"Yamoussoukro");
+    const pick=(a)=>{ if(a&&a[0]){ const parts=String(a[0].display_name||"").split(",").map(s=>s.trim()); return {lat:+a[0].lat, lon:+a[0].lon, place:parts.slice(0,2).join(", ")}; } return null; };
+    try{
+      let a=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ci&q="+q,{headers:{"Accept-Language":"fr"}}).then(x=>x.json());
+      let g=pick(a); if(g) return g;
+      a=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q="+q,{headers:{"Accept-Language":"fr"}}).then(x=>x.json());
+      return pick(a);
+    }catch(e){ return null; }
+  }
+  async function initWeather(region){
+    if(usingGps){ gpsWeather(true); return; }
+    const g=await geocodeCIClient(region);
+    if(g){ const fc=await omForecast(g.lat,g.lon); regionWeather = fc? Object.assign({place:g.place},fc):null; } else regionWeather=null;
+    renderCurrentWeather();
+  }
+  function gpsWeather(silent){
+    if(!navigator.geolocation){ if(!silent) $("wxPlace").textContent="GPS non disponible sur cet appareil."; return; }
+    if(!silent) $("wxPlace").textContent="Localisation en cours… (autorisez l'accès à votre position)";
+    navigator.geolocation.getCurrentPosition(async (p)=>{
+      const fc=await omForecast(p.coords.latitude, p.coords.longitude);
+      if(!fc){ if(!silent) $("wxPlace").textContent="Météo de votre position indisponible."; return; }
+      let place="Ma position";
+      try{ const r=await fetch("https://nominatim.openstreetmap.org/reverse?format=json&zoom=12&lat="+p.coords.latitude+"&lon="+p.coords.longitude,{headers:{"Accept-Language":"fr"}}).then(x=>x.json()); if(r&&r.display_name) place=String(r.display_name).split(",").slice(0,2).map(s=>s.trim()).join(", "); }catch(e){}
+      usingGps=true; lastGpsWeather=Object.assign({place},fc); try{ localStorage.setItem("trv-gps-weather","1"); }catch(e){} renderWeather(lastGpsWeather);
+    }, ()=>{ if(!silent){ $("wxPlace").textContent="Position refusée — météo de la région affichée."; } usingGps=false; try{ localStorage.removeItem("trv-gps-weather"); }catch(e){} renderCurrentWeather(); }, { enableHighAccuracy:true, timeout:10000, maximumAge:600000 });
+  }
+
+  // ===== Graphique de tendance (SVG, une seule série) =====
+  function drawChart(readings){
+    const wrap=$("chartWrap");
+    const pts=readings.filter(r=>r.soil!=null).map(r=>({x:new Date(r.created_at).getTime(), y:r.soil, when:r.created_at}));
+    if(pts.length<2){ wrap.innerHTML='<div class="muted" style="padding:30px 0;text-align:center;">Il faut au moins deux mesures pour tracer la courbe. Branchez votre station.</div>'; return; }
+    const W=640,H=220,PL=34,PR=16,PT=14,PB=26, iw=W-PL-PR, ih=H-PT-PB;
+    const xs=pts.map(p=>p.x), minX=Math.min(...xs), maxX=Math.max(...xs);
+    const X=(x)=> PL + (maxX===minX?0.5:(x-minX)/(maxX-minX))*iw;
+    const Y=(y)=> PT + (1-(y/100))*ih;
+    let grid="", yl="";
+    [0,25,50,75,100].forEach(v=>{ const y=Y(v); grid+='<line class="grid-line" x1="'+PL+'" y1="'+y.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+y.toFixed(1)+'"/>'; yl+='<text class="axis-txt" x="'+(PL-6)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end">'+v+'</text>'; });
+    let line="", area="";
+    pts.forEach((p,i)=>{ const cx=X(p.x).toFixed(1), cy=Y(p.y).toFixed(1); line+=(i?"L":"M")+cx+" "+cy+" "; });
+    area="M"+X(pts[0].x).toFixed(1)+" "+Y(0).toFixed(1)+" "+pts.map(p=>"L"+X(p.x).toFixed(1)+" "+Y(p.y).toFixed(1)).join(" ")+" L"+X(pts[pts.length-1].x).toFixed(1)+" "+Y(0).toFixed(1)+" Z";
+    const last=pts[pts.length-1];
+    const lastLabel='<circle cx="'+X(last.x).toFixed(1)+'" cy="'+Y(last.y).toFixed(1)+'" r="4" fill="var(--chart)"/><text x="'+(X(last.x)-6).toFixed(1)+'" y="'+(Y(last.y)-9).toFixed(1)+'" text-anchor="end" style="fill:var(--ink);font-size:12px;font-weight:700;">'+last.y+'%</text>';
+    // repères de temps (premier et dernier)
+    const fmt=(t)=>{ const d=new Date(t); return d.toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"})+" "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}); };
+    const xlabels='<text class="axis-txt" x="'+PL+'" y="'+(H-8)+'" text-anchor="start">'+fmt(minX)+'</text><text class="axis-txt" x="'+(W-PR)+'" y="'+(H-8)+'" text-anchor="end">'+fmt(maxX)+'</text>';
+    wrap.innerHTML=
+      '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;overflow:visible;">'
+      +'<defs><linearGradient id="soilg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--chart)" stop-opacity=".22"/><stop offset="100%" stop-color="var(--chart)" stop-opacity="0"/></linearGradient></defs>'
+      +grid+yl
+      +'<path d="'+area+'" fill="url(#soilg)"/>'
+      +'<path d="'+line+'" fill="none" stroke="var(--chart)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+      +lastLabel+xlabels
+      +'<rect id="hit" x="'+PL+'" y="'+PT+'" width="'+iw+'" height="'+ih+'" fill="transparent"/>'
+      +'</svg><div class="tip" id="tip"></div>';
+    // survol : point le plus proche
+    const svg=wrap.querySelector("svg"), tip=$("tip");
+    svg.addEventListener("mousemove",(e)=>{
+      const r=svg.getBoundingClientRect(); const mx=(e.clientX-r.left)/r.width*W;
+      let best=pts[0],bd=1e9; pts.forEach(p=>{ const d=Math.abs(X(p.x)-mx); if(d<bd){bd=d;best=p;} });
+      const px=X(best.x)/W*r.width, py=Y(best.y)/H*r.height;
+      tip.style.left=px+"px"; tip.style.top=py+"px"; tip.style.opacity="1";
+      tip.textContent=best.y+"% · "+fmt(best.when);
+    });
+    svg.addEventListener("mouseleave",()=>{ tip.style.opacity="0"; });
+  }
+
+  function fillDashboard(d){
+    DASH=d;
+    $("board").style.display="block"; $("authNote").style.display="none";
+    const now=new Date();
+    $("hello").textContent="Bonjour"+(d.user&&d.user.name?" "+d.user.name:"");
+    $("subline").textContent=now.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})+(d.user&&d.user.region?" · "+d.user.region:"");
+    $("sideFoot").textContent=(d.user&&d.user.name?d.user.name:"") ;
+    // KPI
+    $("kPlans").textContent=d.counts.plans;
+    $("kDev").textContent=d.counts.devices;
+    const L=d.latest;
+    if(L&&L.soil!=null){ $("kSoil").textContent=L.soil+"%"; $("kSoilMeta").textContent="dernière mesure du capteur"; }
+    // Température : capteur sinon météo
+    if(L&&L.temp!=null){ $("kTemp").textContent=L.temp+"°C"; $("kTempMeta").textContent="capteur de la parcelle"; }
+    else if(d.weather&&d.weather.current){ $("kTemp").textContent=d.weather.current.temp+"°C"; $("kTempMeta").textContent="météo "+(d.weather.place||""); }
+    // Mesures en direct
+    $("lSoil").textContent = L&&L.soil!=null ? L.soil+"%" : "—";
+    $("lTemp").textContent = L&&L.temp!=null ? L.temp+"°C" : "—";
+    $("lHum").textContent  = L&&L.hum!=null ? L.hum+"%" : "—";
+    $("lLevel").textContent= L&&L.level!=null ? L.level+"%" : "—";
+    $("liveWhen").innerHTML = L ? "Dernière mesure : "+esc(new Date(L.created_at).toLocaleString("fr-FR"))+(L.source==="manuel"?' <span class="nat declare">saisie à la main</span>':L.source==="toucher"?' <span class="nat hypothese" title="test au toucher, valeur approximative">au toucher (approx.)</span>':(L.source?'':' <span class="nat mesure">capteur</span>'))+(L.soil!=null&&L.soil_at&&L.soil_at!==L.created_at?' · sol mesuré le '+esc(new Date(L.soil_at).toLocaleString("fr-FR"))+(L.soil_source==="toucher"?' (au toucher)':''):'')+(L.note?' · '+esc(L.note):'') : "Aucune mesure reçue pour l'instant.";
+    $("clearMeas").style.display = (d.readings && d.readings.length) ? "inline-flex" : "none";
+    renderLiveAlert(L, d.soilAdvice);
+    // graphique
+    if(d.readings&&d.readings.length){ $("chartSub").textContent="Chaque point est une mesure (capteur ou saisie à la main), humidité du sol en %."; drawChart(d.readings); }
+    // météo : on ré-affiche ce qui est déjà en mémoire (le calcul se fait côté navigateur, voir initWeather)
+    renderCurrentWeather();
+    // plans récents
+    const rp=(d.recentPlans||[]);
+    $("recentPlans").innerHTML = rp.length ? rp.map(p=>'<a href="/app"><span>'+esc(p.title||p.crop)+'</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>').join("") : "";
+    // carte de la parcelle
+    initParcelMap(d);
+  }
+
+  // ===== Carte de la parcelle (vue satellite) + appels à Vertea =====
+  const VERTEA_BASE = "https://agriscan-z7dc.onrender.com";
+  let MAP=null, drawGroup=null, zoneActive=null, ndviLayer=null;
+  function savedParcelle(){ try{ const s=localStorage.getItem("trv-parcelle"); const o=s?JSON.parse(s):null; return (o&&(o.bbox||o.polygon))?o:null; }catch(e){ return null; } }
+  function ymd(dt){ return dt.toISOString().slice(0,10); }
+  function daysAgo(n){ const dt=new Date(); dt.setDate(dt.getDate()-n); return dt; }
+
+  function showControls(){ $("verteaControls").style.display="flex"; var r=$("parcelSaveRow"); if(r) r.style.display="flex"; $("mapSub").textContent="Parcelle prête. Enregistrez-la pour la revoir plus tard, et lancez une analyse satellite (15–40 s)."; }
+
+  // ===== Parcelles enregistrées (limites sauvegardées sur le compte) =====
+  // ---------- Carnet de champ ----------
+  const LOG_LABEL={arrosage:"Arrosage",pluie:"Pluie",compost:"Compost / fumier",engrais:"Engrais chimique",traitement:"Traitement",semis:"Semis / plantation",recolte:"Récolte",perte:"Récolte invendable",residu:"Résidus valorisés",germination:"Test de germination",incident:"Incident",observation:"Observation"};
+  const LOG_ICON={arrosage:"water",pluie:"rain",compost:"compost",engrais:"fertilizer",traitement:"treatment",semis:"sowing",recolte:"harvest",perte:"loss",residu:"recycle",germination:"sprout",incident:"incident",observation:"observation"};
+  const LOG_HINT={arrosage:"litres",pluie:"mm au pluviomètre",compost:"kg",engrais:"kg + produit",traitement:"litres + produit",semis:"date, variété",recolte:"kg",perte:"kg abîmés, invendus",residu:"kg mis au compost, en paillis…",germination:"compost mûr ou non",incident:"maladie, ravageur…",observation:"note libre"};
+  function ico(n){ return window.trvIcon?trvIcon(n):""; }
+  function buildKindPick(){
+    const box=$("kindPick"); if(!box) return;
+    box.innerHTML=Object.keys(LOG_LABEL).map(k=>'<button type="button" role="radio" class="kind" data-kind="'+k+'" aria-checked="false" tabindex="-1">'+ico(LOG_ICON[k])+'<span class="kt">'+esc(LOG_LABEL[k])+'</span><span class="kh">'+esc(LOG_HINT[k])+'</span></button>').join("");
+    const btns=[...box.querySelectorAll(".kind")];
+    function pick(k, focus){ btns.forEach(b=>{ const on=b.dataset.kind===k; b.setAttribute("aria-checked",on?"true":"false"); b.tabIndex=on?0:-1; if(on&&focus) b.focus(); }); $("logKind").value=k; $("logKind").dispatchEvent(new Event("change")); }
+    btns.forEach((b,i)=>{ b.addEventListener("click",()=>pick(b.dataset.kind)); b.addEventListener("keydown",e=>{ const d={ArrowRight:1,ArrowDown:1,ArrowLeft:-1,ArrowUp:-1}[e.key]; if(!d) return; e.preventDefault(); const j=(i+d+btns.length)%btns.length; pick(btns[j].dataset.kind,true); }); });
+    pick($("logKind").value||"arrosage");
+  }
+  const LOG_UNIT={arrosage:"L",pluie:"mm",compost:"kg",engrais:"kg",traitement:"L",semis:"",recolte:"kg",perte:"kg",residu:"kg",germination:"%",incident:"",observation:""};
+  const NAT={mesure:["Mesuré","noté dans le carnet de champ"],declare:["Déclaré","référence saisie à la main"],satellite:["Estimé satellite","images ou cartes satellitaires"],modele:["Estimé (calcul)","calcul à partir d'autres chiffres et d'hypothèses écrites"],hypothese:["Hypothèse","valeur supposée, à confirmer"],repere:["Repère général","valeur publiée, source citée"]};
+  function natTag(n){ const x=NAT[n]; return x?'<span class="nat '+n+'" title="'+esc(x[1])+'">'+esc(x[0])+'</span>':''; }
+  function defaultSeason(date){ const d=new Date(String(date||"")+"T12:00:00Z"); if(isNaN(d)) return "Sans saison"; const m=d.getUTCMonth()+1, y=d.getUTCFullYear(); if(m>=3&&m<=7) return y+" · grande saison"; if(m>=8&&m<=11) return y+" · petite saison"; return (m===12?y:y-1)+"-"+(m===12?y+1:y)+" · saison sèche"; }
+  function seasonOf(e){ return (e.season&&String(e.season).trim())||defaultSeason(e.date); }
+  let logEntries=[], logParcelName="";
+  function nf(x){ return Number(x).toLocaleString("fr-FR",{maximumFractionDigits:2}); }
+  function renderLogParcels(){
+    if(!$("logCard")) return;
+    if(!myParcels.length){ $("logEmpty").style.display=""; $("logBody").style.display="none"; return; }
+    $("logEmpty").style.display="none"; $("logBody").style.display="";
+    const sel=$("logParcel"), cur=sel.value||(function(){ try{ return localStorage.getItem("trv-log-parcel")||""; }catch(e){ return ""; } })();
+    sel.innerHTML=myParcels.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join("");
+    if(cur&&myParcels.some(p=>p.id===cur)) sel.value=cur;
+    loadLog();
+  }
+  async function loadLog(){
+    const id=$("logParcel").value; if(!id) return;
+    try{ localStorage.setItem("trv-log-parcel",id); }catch(e){}
+    $("logList").innerHTML='<div class="muted">Chargement…</div>';
+    try{
+      const r=await fetch("/api/fieldlog?parcel="+encodeURIComponent(id)); const d=await r.json();
+      if(!r.ok){ $("logList").innerHTML='<div class="valert warn">'+esc(d.error||"Carnet indisponible.")+'</div>'; $("logTotals").innerHTML=""; return; }
+      logEntries=d.entries||[]; logParcelName=d.parcel&&d.parcel.name||""; renderLog(d); showQueue();
+    }catch(e){ $("logList").innerHTML='<div class="muted">Serveur injoignable.</div>'; }
+  }
+  let logArea=null;
+  function seasonTotalsClient(list){ const t={}; list.forEach(function(e){ const k=e.kind; t[k]=t[k]||{n:0,qty:0,unit:e.unit||LOG_UNIT[k]||""}; t[k].n++; if(e.qty!=null&&isFinite(Number(e.qty))) t[k].qty=Math.round((t[k].qty+Number(e.qty))*100)/100; }); return t; }
+  function fillSeasons(){
+    const seasons=[]; logEntries.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(function(e){ const s=seasonOf(e); if(seasons.indexOf(s)<0) seasons.push(s); });
+    const f=$("logSeasonFilter"), cur=f.value;
+    f.innerHTML=seasons.slice().reverse().map(x=>'<option>'+esc(x)+'</option>').join("")+'<option value="">Toutes les saisons</option>';
+    if(f.dataset.picked==="1" && Array.from(f.options).some(o=>o.value===cur)) f.value=cur; else if(seasons.length) f.value=seasons[seasons.length-1];
+    $("logSeasonList").innerHTML=seasons.map(x=>'<option value="'+esc(x)+'">').join("");
+    const prods={}; logEntries.forEach(e=>{ if(e.product) prods[e.product]=1; }); $("logProdList").innerHTML=Object.keys(prods).map(x=>'<option value="'+esc(x)+'">').join("");
+    if(!$("logSeason").value) $("logSeason").value=(function(){ try{ return localStorage.getItem("trv-log-season-"+$("logParcel").value)||""; }catch(e){ return ""; } })()||defaultSeason($("logDate").value||new Date().toISOString().slice(0,10));
+  }
+  function renderLog(d){
+    logArea=d.parcel&&d.parcel.area_m2; fillSeasons();
+    const fs=$("logSeasonFilter").value;
+    const shown=fs?logEntries.filter(e=>seasonOf(e)===fs):logEntries;
+    const T=seasonTotalsClient(shown), area=logArea;
+    let t="";
+    const rec=T.recolte; if(rec&&rec.qty) t+=chip("Récolté", nf(rec.qty)+" kg", rec.n+" récolte"+(rec.n>1?"s":"")+(area?" · "+nf(Math.round(rec.qty/area*10000/100)/10)+" t/ha":""));
+    const ar=T.arrosage; if(ar) t+=chip("Arrosages", String(ar.n), ar.qty?nf(ar.qty)+" L"+(area?" · "+nf(Math.round(ar.qty/area*10)/10)+" L/m²":""):"");
+    const co=T.compost; if(co) t+=chip("Compost apporté", co.qty?nf(co.qty)+" kg":String(co.n), co.qty&&area?nf(Math.round(co.qty/area*100)/100)+" kg/m²":"");
+    const en=T.engrais; if(en) t+=chip("Engrais chimique", en.qty?nf(en.qty)+" kg":String(en.n), en.qty&&area?nf(Math.round(en.qty/area*10000))+" kg/ha":"");
+    const tr=T.traitement; if(tr) t+=chip("Traitements", String(tr.n), tr.qty?nf(tr.qty)+" L":"");
+    const pl=T.pluie; if(pl) t+=chip("Pluie", nf(pl.qty)+" mm", pl.n+" relevé"+(pl.n>1?"s":"")+" · "+nf(pl.qty)+" L/m²");
+    const pe=T.perte; if(pe&&pe.qty) t+=chip("Invendable", nf(pe.qty)+" kg", rec&&rec.qty?"vendable : "+nf(Math.max(0,Math.round((rec.qty-pe.qty)*100)/100))+" kg":"");
+    const rs=T.residu; if(rs&&rs.qty){ const by={}; shown.forEach(e=>{ if(e.kind==="residu"&&e.qty!=null){ const k=e.product||"voie non précisée"; by[k]=Math.round(((by[k]||0)+Number(e.qty))*100)/100; } }); t+=chip("Résidus valorisés", nf(rs.qty)+" kg", Object.keys(by).map(k=>k.toLowerCase()+" "+nf(by[k])+" kg").join(" · ")); }
+    const gt=shown.filter(e=>e.kind==="germination").sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]; if(gt) t+=chip("Test de germination", gt.qty!=null?nf(gt.qty)+" %":"à refaire", "le "+new Date(gt.date+"T12:00:00").toLocaleDateString("fr-FR")+(gt.qty!=null&&!/sans témoin/.test(gt.note||"")?" · de la levée du témoin":""));
+    const inc=T.incident; if(inc) t+=chip("Incidents", String(inc.n), "notés");
+    $("logTotals").innerHTML=t||'<div class="muted" style="font-size:.84rem;">Rien de noté pour cette saison.</div>';
+    if(!logEntries.length){ $("logList").innerHTML='<div class="muted">Aucune entrée pour cette parcelle. Commencez par noter votre prochain arrosage ou apport de compost.</div>'; return; }
+    $("logList").innerHTML=logEntries.slice(0,40).map(e=>'<div class="logrow"><span class="d">'+esc(new Date(e.date+"T12:00:00").toLocaleDateString("fr-FR"))+'</span><span class="k">'+ico(LOG_ICON[e.kind]||"observation")+' '+esc(LOG_LABEL[e.kind]||e.kind)+'</span><span class="q">'+(e.qty!=null?esc(nf(e.qty)+" "+(e.unit||"")):"")+'</span><span class="n">'+esc([e.product,e.note].filter(Boolean).join(" · "))+'</span><button type="button" title="Supprimer" aria-label="Supprimer" data-logdel="'+esc(e.id)+'">'+ico("close")+'</button></div>').join("")
+      +(logEntries.length>40?'<div class="muted" style="font-size:.8rem;">… et '+(logEntries.length-40)+' entrées plus anciennes (dans le fichier CSV).</div>':'');
+    $("logList").querySelectorAll("[data-logdel]").forEach(b=>b.addEventListener("click", async function(){
+      if(b.dataset.armed!=="1"){ b.dataset.armed="1"; b.textContent="Supprimer ?"; setTimeout(function(){ b.dataset.armed=""; b.innerHTML=ico("close"); },3500); return; }
+      try{ const r=await fetch("/api/fieldlog?id="+encodeURIComponent(b.getAttribute("data-logdel")),{method:"DELETE"}); if(r.ok) loadLog(); }catch(e){}
+    }));
+  }
+  // ---- Mesures du terrain (arrosoirs, sacs…), converties en L ou en kg ----
+  // Tailles par défaut indicatives : chaque producteur règle les siennes une fois (gardées sur le téléphone).
+  const MEASURES={
+    arrosage:[["L","litres",1],["arrosoir","arrosoirs",10],["seau","seaux",15],["bidon","bidons",20],["fut","fûts",200]],
+    traitement:[["L","litres",1],["pulve","pulvérisateurs",16],["bidon","bidons",20]],
+    compost:[["kg","kg",1],["brouette","brouettes",50],["sac","sacs",50],["seau","seaux",10]],
+    engrais:[["kg","kg",1],["sac","sacs",50]],
+    recolte:[["kg","kg",1],["sac","sacs",50],["cageot","cageots",20],["panier","paniers",15],["seau","seaux",10]],
+    perte:[["kg","kg",1],["sac","sacs",50],["cageot","cageots",20],["panier","paniers",15],["seau","seaux",10]],
+    // Résidus : pas de poids par défaut. Une brouette de paille et une brouette de fumier ne pèsent pas pareil :
+    // le producteur pèse une fois, et la taille est gardée pour chaque résidu.
+    residu:[["kg","kg",1],["brouette","brouettes",0],["sac","sacs",0],["seau","seaux",0],["botte","bottes",0]]
+  };
+  const MEAS_ONE={arrosoir:"arrosoir",seau:"seau",bidon:"bidon",fut:"fût",pulve:"pulvérisateur",brouette:"brouette",sac:"sac",cageot:"cageot",panier:"panier",botte:"botte"};
+  // Clé de rangement des tailles : par type de saisie, et pour les résidus par type de résidu.
+  function sizeKind(){ const k=$("logKind").value; return k==="residu"?"residu-"+($("logResidue").value||"autre"):k; }
+  function mSizes(){ try{ const o=JSON.parse(localStorage.getItem("trv-units")||"{}"); return o&&typeof o==="object"?o:{}; }catch(e){ return {}; } }
+  function mSize(kind,code){ const own=Number(mSizes()[kind+":"+code]); if(own>0) return own; const m=(MEASURES[kind.split("-")[0]]||[]).find(x=>x[0]===code); return m?m[2]:1; }
+  function numIn(v){ const x=parseFloat(String(v==null?"":v).replace(/\s/g,"").replace(",",".")); return isFinite(x)?x:null; }
+  function fillMeasure(){
+    const k=$("logKind").value, list=MEASURES[k], sel=$("logMeasure");
+    if(!list){ sel.style.display="none"; sel.innerHTML=""; $("logSizeWrap").style.display="none"; $("logConv").textContent=""; return; }
+    sel.style.display=""; let want=""; try{ want=localStorage.getItem("trv-measure-"+k)||""; }catch(e){}
+    sel.innerHTML=list.map(m=>'<option value="'+m[0]+'">'+esc(m[1])+'</option>').join("");
+    if(list.some(m=>m[0]===want)) sel.value=want; measureChanged();
+  }
+  function measureChanged(){
+    const k=$("logKind").value, code=$("logMeasure").value, base=LOG_UNIT[k];
+    try{ if(code) localStorage.setItem("trv-measure-"+k,code); }catch(e){}
+    const isBase=!code||code===base; $("logSizeWrap").style.display=isBase?"none":"";
+    if(!isBase){ const sz=mSize(sizeKind(),code); $("logSizeName").textContent=MEAS_ONE[code]||code; $("logSize").value=sz>0?String(sz).replace(".",","):""; $("logSize").placeholder=sz>0?"":"à peser"; $("logSizeUnit").textContent=base; }
+    convPreview();
+  }
+  // Quantité à enregistrer (toujours en L ou kg) et trace lisible de la mesure du terrain.
+  function measured(){
+    const k=$("logKind").value, base=LOG_UNIT[k], code=$("logMeasure").value, n=numIn($("logQty").value);
+    if(n==null) return { qty:$("logQty").value.trim(), label:"" };
+    if(!MEASURES[k]||!code||code===base) return { qty:String(n), label:"" };
+    const size=numIn($("logSize").value)||mSize(sizeKind(),code);
+    if(!(size>0)) return { qty:"", label:"", needSize:MEAS_ONE[code]||code };
+    const total=Math.round(n*size*100)/100;
+    const plural=(MEASURES[k].find(m=>m[0]===code)||[])[1]||code;
+    return { qty:String(total), label:nf(n)+" "+(n>1?plural:(MEAS_ONE[code]||plural))+" de "+nf(size)+" "+base };
+  }
+  function convPreview(){ const k=$("logKind").value, m=measured(); $("logConv").textContent=m.needSize?"Pesez une fois un(e) "+m.needSize+" de ce résidu et indiquez son poids.":m.label&&numIn(m.qty)!=null?"= "+nf(numIn(m.qty))+" "+LOG_UNIT[k]:""; }
+
+  // ---------- Résidus valorisés et test de germination (contenus : /residus.js) ----------
+  const RES=window.TRV_RESIDUS||null;
+  function fillLogRoutes(){
+    if(!RES) return; const sel=$("logRoute"), r=RES.residueById($("logResidue").value), adv=r?r.routes:[], want=sel.dataset.want||"";
+    sel.innerHTML=adv.concat(Object.keys(RES.ROUTES).filter(k=>adv.indexOf(k)<0)).map(k=>'<option value="'+k+'">'+esc(RES.ROUTES[k].label)+(adv.indexOf(k)===0?" (conseillé)":"")+'</option>').join("");
+    if(want&&RES.ROUTES[want]) sel.value=want; sel.dataset.want=""; logResHint();
+  }
+  function logResHint(){
+    const box=$("logResHint"); if(!box) return;
+    const r=RES&&$("logKind").value==="residu"?RES.residueById($("logResidue").value):null; if(!r){ box.style.display="none"; return; }
+    const k=$("logRoute").value, how=r.how[k];
+    box.innerHTML='<b>'+esc(r.nature)+'</b> '+(how?esc(how):(k!=="autre"&&r.routes.indexOf(k)<0?"Ce n'est pas la voie la plus adaptée à ce résidu : regardez le guide « Valoriser mes résidus » ci-dessus.":""));
+    box.style.display="";
+  }
+  function germInput(){ return { sown:$("gSown").value, up:$("gUp").value, ref_sown:$("gRefSown").value, ref_up:$("gRefUp").value, days:$("gDays").value }; }
+  function germPreview(){
+    const box=$("logGermOut"), g=germInput(); if(!RES||!String(g.sown).trim()||!String(g.up).trim()){ box.style.display="none"; return; }
+    const x=RES.germinationResult(g); box.style.display="";
+    if(x.error){ box.className="valert warn"; box.textContent=x.error; return; }
+    box.className="valert "+({ok:"ok",moyen:"warn",faible:"bad"}[x.level]||"");
+    box.innerHTML='<b>'+esc(x.verdict)+'</b>'+x.warnings.map(w=>'<div style="font-size:.82rem;margin-top:3px;">'+esc(w)+'</div>').join("")
+      +(x.kind==="relatif"&&x.pct!=null?'<div class="muted" style="font-size:.76rem;margin-top:4px;">Repère de lecture : '+RES.GERMINATION.ok_pct+' % et plus, satisfaisant ; moins de '+RES.GERMINATION.low_pct+' %, poursuivre le compostage.'+natTag("repere")+'</div>':'');
+  }
+  // Depuis le guide : prépare la saisie dans le carnet (type, résidu, voie) et y conduit.
+  function toLog(kind, residue, route){
+    const b=document.querySelector('#kindPick .kind[data-kind="'+kind+'"]'); if(b) b.click();
+    if(kind==="residu"&&RES){ $("logResidue").value=residue; $("logRoute").dataset.want=route||""; fillLogRoutes(); measureChanged(); }
+    const c=$("logCard"); if(c) c.scrollIntoView({ behavior:"smooth", block:"start" });
+    const f=kind==="germination"?$("gSown"):$("logQty");
+    if(f&&$("logBody").style.display!=="none") setTimeout(function(){ try{ f.focus({ preventScroll:true }); }catch(e){} },450);
+  }
+  function bindResidus(){
+    if(!RES||!$("resCard")) return;
+    const pick=$("resPick"); pick.innerHTML=RES.RESIDUES.map(r=>'<option value="'+r.id+'">'+esc(r.label)+'</option>').join("");
+    try{ const w=localStorage.getItem("trv-residu"); if(w&&RES.residueById(w)) pick.value=w; }catch(e){}
+    let route="";
+    function show(){
+      const r=RES.residueById(pick.value); if(!r) return; if(r.routes.indexOf(route)<0) route=r.routes[0];
+      try{ localStorage.setItem("trv-residu",r.id); }catch(e){}
+      $("resPanel").innerHTML=(r.family?'<div class="muted" style="font-size:.76rem;">'+esc(RES.FAMILIES[r.family])+'</div>':'')
+        +'<div style="font-weight:700;margin-top:2px;">'+esc(r.nature)+'</div>'
+        +'<div class="resroutes" role="group" aria-label="Que faire de ce résidu">'+r.routes.map((k,i)=>'<button type="button" class="resroute" data-route="'+k+'" aria-pressed="'+(k===route?"true":"false")+'">'+esc(RES.ROUTES[k].label)+(i===0?'<span class="best">conseillé en premier</span>':'')+'</button>').join("")+'</div>'
+        +'<div style="font-size:.92rem;line-height:1.55;">'+esc(r.how[route]||"")+'</div>'
+        +(r.care.length?'<div style="font-weight:700;font-size:.84rem;margin-top:10px;">Précautions</div><ul class="rescare">'+r.care.map(c=>'<li>'+esc(c)+'</li>').join("")+'</ul>':'')
+        +'<div class="maprow"><button type="button" class="btn primary" id="resLog">'+ico("notebook")+'Noter dans le carnet</button><span class="muted" style="font-size:.8rem;flex:1;min-width:180px;">Notez la quantité à chaque fois : c\'est elle qui apparaît dans le bilan d\'impact.</span></div>';
+      $("resPanel").querySelectorAll(".resroute").forEach(b=>b.addEventListener("click", function(){ route=b.dataset.route; show(); const n=$("resPanel").querySelector('.resroute[data-route="'+route+'"]'); if(n) n.focus(); }));
+      $("resLog").addEventListener("click", function(){ toLog("residu", r.id, route); });
+    }
+    pick.addEventListener("change", function(){ route=""; show(); }); show();
+    $("resRulesList").innerHTML=RES.RULES.map(x=>'<li>'+esc(x)+'</li>').join("");
+    const G=RES.GERMINATION;
+    $("resGermBody").innerHTML='<div class="muted" style="font-size:.86rem;margin:8px 0;">'+esc(G.why)+'</div>'
+      +'<ol style="margin:0 0 0 20px;padding:0;font-size:.9rem;line-height:1.6;">'+G.steps.map(s=>'<li>'+esc(s)+'</li>').join("")+'</ol>'
+      +'<div style="font-size:.88rem;margin-top:8px;"><b>Lire le résultat.</b> À partir de '+G.ok_pct+' % de la levée du témoin, le compost est jugé satisfaisant ; en dessous de '+G.low_pct+' %, il faut poursuivre le compostage.'+natTag("repere")+'</div>'
+      +'<div class="muted" style="font-size:.76rem;margin-top:4px;">'+esc(G.note)+' Sources : '+G.sources.map(s=>'<a href="'+esc(s.url)+'" target="_blank" rel="noopener">'+esc(s.name)+'</a>').join(" ; ")+'.</div>'
+      +'<div class="maprow"><button type="button" class="btn primary" id="resGermLog">'+ico("notebook")+'Noter le résultat dans le carnet</button></div>';
+    $("resGermLog").addEventListener("click", function(){ toLog("germination"); });
+    $("resSource").textContent=RES.SOURCE;
+  }
+
+  // ---- Carnet hors ligne : les saisies sans réseau attendent sur le téléphone ----
+  const QKEY="trv-log-queue"; let qBusy=false;
+  function newClientId(){ try{ const a=new Uint8Array(12); crypto.getRandomValues(a); return Array.from(a).map(x=>x.toString(16).padStart(2,"0")).join(""); }catch(e){ return ""; } }
+  // Envoi avec délai maximal : sur un réseau très lent, on n'attend pas indéfiniment (la saisie passe en attente).
+  function postLog(p, ms){
+    const c=("AbortController" in window)?new AbortController():null, t=c?setTimeout(function(){ c.abort(); }, ms):null;
+    return fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(p),signal:c?c.signal:undefined}).finally(function(){ if(t) clearTimeout(t); });
+  }
+  function qGet(){ try{ const a=JSON.parse(localStorage.getItem(QKEY)||"[]"); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+  function qSet(a){ try{ localStorage.setItem(QKEY,JSON.stringify(a)); }catch(e){} showQueue(); }
+  function qAdd(p){ const a=qGet(); a.push({ p:p, t:Date.now() }); qSet(a); }
+  function showQueue(){
+    const a=qGet(), n=a.length;
+    const txt=n?(n+" saisie"+(n>1?"s":"")+" en attente de réseau : "+(n>1?"elles seront envoyées":"elle sera envoyée")+" automatiquement."):"";
+    if($("todayQueue")) $("todayQueue").textContent=txt;
+    const box=$("logPending"); if(!box) return;
+    const cur=$("logParcel")&&$("logParcel").value, mine=a.filter(x=>x.p&&x.p.parcel_id===cur);
+    box.innerHTML=mine.map(x=>'<div class="logrow logpend"><span class="d">'+esc(new Date(x.p.date+"T12:00:00").toLocaleDateString("fr-FR"))+'</span><span class="k">'+ico(LOG_ICON[x.p.kind]||"observation")+' '+esc(LOG_LABEL[x.p.kind]||x.p.kind)+'<span class="tag">en attente</span></span><span class="q">'+(x.p.qty!==""&&x.p.qty!=null?esc(nf(x.p.qty)+" "+(LOG_UNIT[x.p.kind]||"")):"")+'</span><span class="n">'+esc(x.p.note||"")+'</span></div>').join("");
+  }
+  async function flushQueue(){
+    if(qBusy) return; const a=qGet(); if(!a.length||navigator.onLine===false) return;
+    qBusy=true; const keep=[]; let sent=0, refused=0;
+    for(const it of a){
+      try{ const r=await postLog(it.p, 20000); if(r.ok) sent++; else if(r.status===400||r.status===404) refused++; else keep.push(it); }
+      catch(e){ keep.push(it); }
+    }
+    qBusy=false; qSet(keep.concat(qGet().slice(a.length)));
+    if(sent||refused){ if($("logMsg")) $("logMsg").textContent=(sent?sent+" saisie"+(sent>1?"s":"")+" en attente envoyée"+(sent>1?"s":"")+" ✓":"")+(refused?(sent?" — ":"")+refused+" refusée"+(refused>1?"s":"")+" par le serveur (parcelle supprimée ?).":""); loadLog(); loadToday(); }
+  }
+
+  // ---- Écran « Aujourd'hui » ----
+  let TODAY=null, todayAlerts=[];
+  function renderTodayParcels(){
+    const c=$("todayCard"); if(!c) return;
+    if(!myParcels.length){ c.style.display="none"; return; }
+    c.style.display="";
+    const sel=$("todayParcel"), cur=sel.value||(function(){ try{ return localStorage.getItem("trv-today-parcel")||localStorage.getItem("trv-log-parcel")||""; }catch(e){ return ""; } })();
+    sel.innerHTML=myParcels.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join("");
+    if(cur&&myParcels.some(p=>p.id===cur)) sel.value=cur;
+    sel.style.display=myParcels.length>1?"":"none";
+    loadToday();
+  }
+  async function loadToday(){
+    const sel=$("todayParcel"); if(!sel||!sel.value) return;
+    try{ localStorage.setItem("trv-today-parcel",sel.value); }catch(e){}
+    try{ const r=await fetch("/api/today?parcel="+encodeURIComponent(sel.value)); const d=await r.json(); if(r.ok){ TODAY=d; renderToday(); } }catch(e){}
+    showQueue();
+  }
+  function fdate(iso){ try{ return new Date(String(iso).slice(0,10)+"T12:00:00").toLocaleDateString("fr-FR"); }catch(e){ return iso; } }
+  function taskList(title, arr){
+    if(!arr||!arr.length) return "";
+    return '<div class="todaysec">'+(title?'<div class="todayt">'+esc(title)+'</div>':'')+'<ul class="todaylist">'+arr.map(x=>'<li><b>'+esc(x.faire)+'</b>'+(x.detail?'<span>'+esc(x.detail)+'</span>':'')+(x.quand?'<em>'+esc(x.quand)+'</em>':'')+'</li>').join("")+'</ul></div>';
+  }
+  function renderToday(){
+    const d=TODAY; if(!d) return;
+    const pid=d.parcel.id, t=d.tasks;
+    const planUrl=d.plan?'/app?plan='+encodeURIComponent(d.plan.id):'/app?'+(d.crop?'culture='+encodeURIComponent(d.crop)+'&':'')+'parcelle='+encodeURIComponent(pid);
+    let day="", h="";
+    if(!d.crop){
+      day="Pas encore de culture notée pour cette parcelle.";
+      h='<div class="todaystep">Sur la carte ci-dessous, ouvrez <b>« Sol &amp; racines »</b> pour cette parcelle et indiquez la culture et la date de semis : vos tâches de la semaine apparaîtront ici.</div>';
+    } else {
+      const crop=d.crop.charAt(0).toUpperCase()+d.crop.slice(1);
+      day='<b>'+esc(crop)+'</b>'+(d.sown_at?(t&&t.day!=null?(t.day>=0?' · Jour '+t.day+' depuis le semis ('+fdate(d.sown_at)+')':' · semis dans '+(-t.day)+' jour'+(t.day<-1?'s':'')+' ('+fdate(d.sown_at)+')'):' · semé le '+fdate(d.sown_at)):' · date de semis non notée');
+      if(!d.plan) h='<div class="todaystep">Pas encore de plan de culture pour '+esc(d.crop)+'. <a class="btn primary" href="'+planUrl+'">Créer le plan de culture</a></div>';
+      else if(!d.fiche) h='<div class="todaystep">Ouvrez une fois votre plan de culture pour préparer la fiche terrain : vos tâches de la semaine apparaîtront ici. <a class="btn" href="'+planUrl+'">Ouvrir le plan</a></div>';
+      else {
+        if(t.day==null) h+=taskList("Pour démarrer", t.start)+'<div class="muted" style="font-size:.84rem;margin-top:6px;">Notez la date de semis dans « Sol &amp; racines » pour voir les tâches de chaque semaine.</div>';
+        else { h+=taskList("Cette semaine", t.now)+taskList("La semaine prochaine", t.next); if(!t.now.length&&!t.next.length) h+='<div class="todaystep">Rien de prévu par la fiche cette semaine. Surveillez la culture et notez vos arrosages.</div>'; }
+        if(t.stage&&t.stage.length) h+='<details class="todaystage"><summary>Selon le stade de la plante</summary>'+taskList("", t.stage)+'</details>';
+        h+='<div style="margin-top:8px;"><a style="font-size:.84rem;color:var(--leaf);font-weight:600;" href="'+planUrl+'">Voir toute la fiche terrain</a></div>';
+      }
+    }
+    $("todayDay").innerHTML=day; $("todayTasks").innerHTML=h; renderTodayAlert();
+  }
+  function renderTodayAlert(){
+    const box=$("todayAlert"); if(!box) return;
+    box.innerHTML=todayAlerts.map(m=>'<div class="valert warn" style="margin-top:8px;">'+esc(m)+'</div>').join("");
+    const sp=$("todaySpeak"); if(sp) sp.style.display=(window.trvCanSpeak&&trvCanSpeak()&&((TODAY&&TODAY.speech)||todayAlerts.length))?"":"none";
+  }
+  function bindToday(){
+    if(!$("todayCard")) return;
+    $("todayParcel").addEventListener("change", loadToday);
+    $("todayNote").addEventListener("click", function(){
+      const id=$("todayParcel").value;
+      if(id&&$("logParcel").value!==id&&myParcels.some(p=>p.id===id)){ $("logParcel").value=id; $("logParcel").dispatchEvent(new Event("change")); }
+      $("logDate").value=new Date().toISOString().slice(0,10);
+      try{ $("logCard").scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){}
+      setTimeout(function(){ const b=document.querySelector('#kindPick [aria-checked="true"]'); if(b) b.focus(); },600);
+    });
+    const sp=$("todaySpeak"), idle=sp.innerHTML; let on=false;
+    sp.addEventListener("click", function(){
+      if(on){ if(window.trvStop) trvStop(); on=false; sp.innerHTML=idle; return; }
+      const txt=[(TODAY&&TODAY.speech)||"", todayAlerts.join(" ")].filter(Boolean).join(" "); if(!txt) return;
+      on=true; sp.innerHTML=ico("stop")+"Arrêter"; trvSpeak(txt, function(){ on=false; sp.innerHTML=idle; });
+    });
+    window.addEventListener("online", flushQueue); setInterval(flushQueue, 60000); flushQueue(); showQueue();
+  }
+
+  // ---- Mode simple (producteur) / complet (animateur) ----
+  function applyMode(m){
+    document.documentElement.classList.toggle("simple", m==="simple");
+    const b=$("modeBtn"); if(b){ b.style.display=""; b.textContent=m==="simple"?"Passer en mode complet":"Passer en mode simple"; b.setAttribute("aria-pressed", m==="simple"?"true":"false"); }
+  }
+  function initMode(){
+    let m=null; try{ m=localStorage.getItem("trv-mode"); }catch(e){}
+    if(m!=="simple"&&m!=="complet") m=(me&&(me.isAdmin||me.animator))?"complet":"simple";
+    applyMode(m);
+    const b=$("modeBtn"); if(b) b.onclick=function(){ m=(m==="simple")?"complet":"simple"; try{ localStorage.setItem("trv-mode",m); }catch(e){} applyMode(m); };
+  }
+
+  function bindLog(){
+    if(!$("logCard")) return;
+    $("logDate").value=new Date().toISOString().slice(0,10);
+    $("logParcel").addEventListener("change", loadLog);
+    function unit(){ const k=$("logKind").value, u=LOG_UNIT[k]; $("logUnit").textContent=u?"("+u+")":""; $("logQty").disabled=!u; if(!u) $("logQty").value=""; $("logProdWrap").style.display=(k==="engrais"||k==="traitement"||k==="compost")?"":"none";
+      const isRes=k==="residu", isGerm=k==="germination";
+      $("logResWrap").style.display=$("logRouteWrap").style.display=isRes?"":"none";
+      $("logGermWrap").style.display=isGerm?"":"none"; $("logQtyWrap").style.display=isGerm?"none":"";
+      fillMeasure(); logResHint(); }
+    if(RES){
+      $("logResidue").innerHTML=RES.RESIDUES.map(r=>'<option value="'+r.id+'">'+esc(r.label)+'</option>').join(""); fillLogRoutes();
+      $("logResidue").addEventListener("change", function(){ fillLogRoutes(); measureChanged(); });
+      $("logRoute").addEventListener("change", logResHint);
+      ["gSown","gUp","gRefSown","gRefUp","gDays"].forEach(i=>$(i).addEventListener("input", germPreview));
+      $("germHow").addEventListener("click", function(e){ e.preventDefault(); const d=$("resGerm"); if(d){ d.open=true; d.scrollIntoView({ behavior:"smooth", block:"center" }); } });
+    }
+    $("logSeasonFilter").addEventListener("change", function(){ this.dataset.picked="1"; renderLog({ parcel:{ area_m2:logArea } }); });
+    $("logParcel").addEventListener("change", function(){ $("logSeason").value=""; $("logSeasonFilter").dataset.picked=""; $("impactBox").style.display="none"; });
+    $("impactBtn").addEventListener("click", function(){ const b=$("impactBox"); if(b.style.display==="none"){ b.style.display=""; loadImpact(); } else b.style.display="none"; });
+    $("collectBtn").addEventListener("click", printCollect);
+    $("logMeasure").addEventListener("change", measureChanged);
+    $("logQty").addEventListener("input", convPreview);
+    $("logSize").addEventListener("change", function(){ const k=sizeKind(), code=$("logMeasure").value, v=numIn(this.value); if(v>0){ const a=mSizes(); a[k+":"+code]=v; try{ localStorage.setItem("trv-units",JSON.stringify(a)); }catch(e){} } convPreview(); });
+    $("logSize").addEventListener("input", function(){ convPreview(); $("logMsg").textContent=""; });
+    $("logKind").addEventListener("change", unit); unit();
+    $("logAdd").addEventListener("click", async function(){
+      const b=this, k=$("logKind").value, m=measured();
+      if(m.needSize&&k!=="germination"){ $("logMsg").textContent="Indiquez d'abord le poids d'un(e) "+m.needSize+" de ce résidu (pesez-en une fois), ou saisissez directement des kg."; $("logSize").focus(); return; }
+      const note=[m.label, $("logNote").value.trim()].filter(Boolean).join(" · ").slice(0,300);
+      const payload={ client_id:newClientId(), parcel_id:$("logParcel").value, date:$("logDate").value, kind:k, qty:m.qty, product:$("logProd").value.trim(), season:$("logSeason").value.trim(), note:note };
+      if(k==="residu"){
+        if(!(numIn(m.qty)>0)){ $("logMsg").textContent="Indiquez la quantité de résidus valorisés."; $("logQty").focus(); return; }
+        payload.residue=$("logResidue").value; payload.route=$("logRoute").value; payload.product="";
+      }
+      if(k==="germination"){
+        const g=germInput(), x=RES?RES.germinationResult(g):{ error:"Test indisponible : rechargez la page." };
+        if(x.error){ $("logMsg").textContent=x.error; return; }
+        payload.germ=g; payload.qty=""; payload.note=$("logNote").value.trim().slice(0,200);
+      }
+      try{ localStorage.setItem("trv-log-season-"+payload.parcel_id,payload.season); }catch(e){}
+      const done=function(msg){ $("logMsg").textContent=msg; $("logQty").value=""; $("logNote").value=""; $("logProd").value=""; if(k==="germination"){ ["gSown","gUp","gRefSown","gRefUp"].forEach(i=>{ $(i).value=""; }); germPreview(); } convPreview(); };
+      const keepOffline=function(){ qAdd(payload); done("Pas de réseau : saisie gardée sur ce téléphone. Elle sera envoyée automatiquement dès que le réseau revient."); };
+      if(navigator.onLine===false){ keepOffline(); return; }
+      b.disabled=true; $("logMsg").textContent="Enregistrement…";
+      try{
+        const r=await postLog(payload, 15000);
+        let d={}; try{ d=await r.json(); }catch(e){}
+        if(r.status===502||r.status===503||r.status===504) keepOffline();
+        else if(!r.ok){ $("logMsg").textContent="Erreur : "+(d.error||"enregistrement impossible."); }
+        else { done("Enregistré ✓"+(d.warning?" — "+d.warning:"")); loadLog(); loadToday(); if($("impactBox").style.display!=="none") loadImpact(); if(!d.warning) setTimeout(function(){ $("logMsg").textContent=""; },2500); }
+      }catch(e){ keepOffline(); }
+      b.disabled=false;
+    });
+    $("logCsv").addEventListener("click", function(){
+      const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+      const rows=[["date","saison","intervention","produit","quantite","unite","note"]].concat(logEntries.map(e=>[e.date,seasonOf(e),(LOG_LABEL[e.kind]||e.kind),e.product||"",e.qty!=null?String(e.qty).replace(".",","):"",e.unit||"",e.note||""]));
+      const csv="﻿"+rows.map(r=>r.map(q).join(";")).join("\r\n");
+      const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); a.download="carnet-"+(logParcelName||"parcelle").replace(/[^\w\-]+/g,"_")+".csv"; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+    });
+  }
+  // ---------- Bilan d'impact (A1) + provenance des chiffres (A2) ----------
+  let lastImpact=null;
+  const CMP_LABEL={water_l_m2:"Eau d'arrosage",chem_kg_ha:"Engrais chimique",compost_kg_m2:"Compost",yield_t_ha:"Rendement",water_prod_kg_m3:"Récolte par m³ d'eau"};
+  function fd(d){ return d?new Date(d+"T12:00:00").toLocaleDateString("fr-FR"):""; }
+  function fv(o){ if(!o) return "—"; const v=Array.isArray(o.v)?nf(o.v[0])+" à "+nf(o.v[1]):nf(o.v); return v+" "+o.unit; }
+  async function loadImpact(){
+    const id=$("logParcel").value; if(!id) return;
+    $("impactBox").innerHTML='<div class="impact muted">Calcul du bilan…</div>';
+    try{
+      const r=await fetch("/api/impact?parcel="+encodeURIComponent(id)); const d=await r.json();
+      if(!r.ok){ $("impactBox").innerHTML='<div class="impact"><div class="valert warn">'+esc(d.error||"Bilan indisponible.")+'</div></div>'; return; }
+      lastImpact=d; renderImpact(d);
+    }catch(e){ $("impactBox").innerHTML='<div class="impact muted">Serveur injoignable.</div>'; }
+  }
+  // ---------- Test côte à côte : parcelle Terravive face à sa parcelle témoin ----------
+  const VERDICT={terravive:["Terravive mieux","up"],temoin:["Témoin mieux","down"],egal:["Égalité",""]};
+  function pairHtml(R, forPrint){
+    if(R.control_of) return '<div class="valert" style="margin-top:8px;">Cette parcelle est le <b>témoin</b> de « '+esc(R.control_of.name)+' ». La comparaison côte à côte s\'affiche dans le bilan de « '+esc(R.control_of.name)+' ».</div>';
+    const P=R.pair; if(!P) return '';
+    let h='<h4>'+ico("scale")+' Test côte à côte : Terravive et témoin</h4>';
+    h+='<div class="muted" style="font-size:.8rem;">« '+esc(P.terravive.name||"")+' » (conduite avec Terravive) face à « '+esc(P.temoin.name||"")+' » (pratique habituelle), saison en cours de chacune. Écart = (Terravive − témoin) ÷ témoin.</div>';
+    if(P.rows.length){
+      h+='<table class="pairtab"><thead><tr><th>Indicateur</th><th>Terravive</th><th>Témoin</th><th>Écart</th><th>Le mieux</th><th>Verdict</th></tr></thead><tbody>'
+        +P.rows.map(x=>{ const v=VERDICT[x.verdict]; return '<tr><td>'+esc(x.label)+'</td><td>'+(x.terravive?fv(x.terravive):'—')+'</td><td>'+(x.temoin?fv(x.temoin):'—')+'</td><td>'+(x.pct!=null?(x.pct>0?"+":"")+nf(x.pct)+" %":"—")+'</td><td class="muted">'+(x.better==="lower"?"plus bas":x.better==="higher"?"plus haut":"indicatif")+'</td><td class="'+(v?v[1]:"")+'">'+(v?esc(v[0]):"—")+'</td></tr>'; }).join("")+'</tbody></table>';
+      h+='<div style="font-size:.84rem;margin-top:6px;">Bilan : Terravive fait mieux sur <b>'+P.score.terravive+'</b> indicateur'+(P.score.terravive>1?"s":"")+', le témoin sur <b>'+P.score.temoin+'</b>. '+natTag("mesure")+'</div>';
+    }
+    if(P.warnings&&P.warnings.length) h+='<ul style="margin:6px 0 0 18px;font-size:.8rem;" class="muted">'+P.warnings.map(w=>'<li>'+esc(w)+'</li>').join("")+'</ul>';
+    return h;
+  }
+  function pairPicker(d){
+    const R=d.report, cur=R.pair&&R.pair.control_id||"", me=$("logParcel").value;
+    if(R.control_of) return '';
+    const opts=myParcels.filter(p=>p.id!==me).map(p=>'<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>').join("");
+    return '<details style="margin-top:10px;"><summary style="cursor:pointer;font-weight:700;color:var(--leaf);">Test côte à côte avec une parcelle témoin <span class="muted" style="font-weight:400;">(facultatif)</span></summary>'
+      +'<div class="muted" style="font-size:.82rem;margin:6px 0;">Pour un test terrain, dessinez deux parcelles voisines : celle-ci, conduite avec Terravive, et une parcelle témoin cultivée comme d\'habitude. Tenez le carnet des deux avec le même nom de saison.</div>'
+      +(opts?'<div class="maprow" style="align-items:flex-end;"><label class="muted" style="flex:1;min-width:200px;font-size:.8rem;">Parcelle témoin<select class="sel" id="pairSel" style="width:100%;margin-top:4px;"><option value="">— aucune —</option>'+opts+'</select></label><button class="btn" type="button" id="pairSave">Enregistrer</button></div><div class="muted" id="pairMsg" style="font-size:.82rem;margin-top:4px;"></div>'
+        :'<div class="muted" style="font-size:.84rem;">Dessinez d\'abord une seconde parcelle sur la carte pour en faire le témoin.</div>')
+      +'</details>';
+  }
+  function bindPair(){
+    const b=$("pairSave"); if(!b) return;
+    b.addEventListener("click", async function(){
+      b.disabled=true; $("pairMsg").textContent="Enregistrement…";
+      try{
+        const r=await fetch("/api/impact/pair",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ parcel_id:$("logParcel").value, control_id:$("pairSel").value })});
+        const x=await r.json(); if(!r.ok){ $("pairMsg").textContent="Erreur : "+(x.error||""); b.disabled=false; return; }
+        loadImpact();
+      }catch(e){ $("pairMsg").textContent="Serveur injoignable."; b.disabled=false; }
+    });
+  }
+  function impactHtml(d, forPrint){
+    const R=d.report, C=R.current, B=R.baseline;
+    let h='';
+    h+='<div style="font-size:.84rem;">Parcelle : <b>'+esc(R.parcel.name||"")+'</b>'+(R.parcel.area_m2?' · '+fv(R.parcel.area_m2)+natTag(R.parcel.area_m2.nature):'')+(C?' · saison en cours : <b>'+esc(C.season)+'</b> ('+C.n+' entrées)':'')+'</div>';
+    h+=pairHtml(R, forPrint);
+    if(R.comparisons.length){
+      h+='<h4>Avant / maintenant</h4><div class="muted" style="font-size:.8rem;">Comparaison avec '+(B.nature==="declare"?'votre référence « '+esc(B.label||"")+' »':'la saison précédente « '+esc(B.season||"")+' »')+'.</div>';
+      h+='<table><thead><tr><th>Indicateur</th><th>Avant</th><th>Maintenant</th><th>Écart</th></tr></thead><tbody>'
+        +R.comparisons.map(c=>'<tr><td>'+esc(CMP_LABEL[c.key]||c.key)+'</td><td>'+fv(c.baseline)+natTag(c.baseline.nature)+'</td><td>'+fv(c.current)+natTag(c.current.nature)+'</td><td class="'+(c.better===true?'up':c.better===false?'down':'')+'">'+(c.pct!=null?(c.pct>0?"+":"")+c.pct+" %":(c.delta>0?"+":"")+nf(c.delta))+(c.better===true?' '+ico("check"):'')+'</td></tr>').join("")+'</tbody></table>';
+      const S=R.savings, sv=[];
+      if(S.water_l) sv.push((S.water_l.v>=0?'Eau économisée : ':'Eau en plus : ')+'<b>'+nf(Math.abs(S.water_l.v))+' L</b>'+natTag(S.water_l.nature));
+      if(S.chem_kg) sv.push((S.chem_kg.v>=0?'Engrais chimique évité : ':'Engrais chimique en plus : ')+'<b>'+nf(Math.abs(S.chem_kg.v))+' kg</b>'+natTag(S.chem_kg.nature));
+      if(sv.length) h+='<div class="valert ok" style="margin-top:8px;">'+sv.join(" · ")+'<div style="font-size:.76rem;margin-top:2px;">Calcul : écart par m² (ou par ha) entre les deux saisons × surface de la parcelle. La pluie n\'est pas comptée.</div></div>';
+    }
+    if(R.seasons.length){
+      h+='<h4>Saison par saison '+natTag("mesure")+'</h4><table><thead><tr><th>Saison</th><th>Eau</th><th>Pluie</th><th>Compost</th><th>Engrais chim.</th><th>Récolte</th><th>Rendement</th><th>Incidents</th></tr></thead><tbody>'
+        +R.seasons.slice().reverse().map(x=>'<tr><td><b>'+esc(x.season)+'</b><div class="muted" style="font-size:.74rem;">'+esc(fd(x.from))+' → '+esc(fd(x.to))+'</div></td><td>'+(x.water_l?nf(x.water_l)+' L'+(x.water_l_m2!=null?'<div class="muted" style="font-size:.74rem;">'+nf(x.water_l_m2)+' L/m²</div>':''):'—')+'</td><td>'+(x.rain_n?nf(x.rain_mm)+' mm':'—')+'</td><td>'+(x.compost_kg?nf(x.compost_kg)+' kg':'—')+'</td><td>'+(x.chem_n?nf(x.chem_kg)+' kg'+(x.chem_kg_ha!=null?'<div class="muted" style="font-size:.74rem;">'+nf(x.chem_kg_ha)+' kg/ha</div>':''):'—')+'</td><td>'+(x.harvest_kg?nf(x.harvest_kg)+' kg'+(x.loss_kg?'<div class="muted" style="font-size:.74rem;">vendable '+nf(x.sellable_kg)+' kg</div>':''):'—')+'</td><td>'+(x.yield_t_ha!=null?nf(x.yield_t_ha)+' t/ha':'—')+'</td><td>'+(x.incidents.length||'—')+'</td></tr>').join("")+'</tbody></table>';
+      if(C&&C.incidents.length) h+='<div class="muted" style="font-size:.8rem;margin-top:4px;">Incidents de la saison : '+C.incidents.map(i=>esc(fd(i.date)+" "+i.note)).join(" ; ")+'</div>';
+      if(C&&Object.keys(C.products).length) h+='<div class="muted" style="font-size:.8rem;margin-top:4px;">Intrants par type : '+Object.keys(C.products).map(k=>esc(k)+' ('+nf(C.products[k])+')').join(", ")+'</div>';
+    }
+    if(R.carbon){
+      const K=R.carbon;
+      h+='<h4>Carbone apporté au sol par le compost noté</h4><div style="font-size:.86rem;">'+fv(K.carbon_kg)+natTag(K.carbon_kg.nature)+' soit '+fv(K.co2e_kg)+natTag(K.co2e_kg.nature)+', dont '+fv(K.retained_co2e_kg)+natTag(K.retained_co2e_kg.nature)+' resteraient durablement dans le sol.</div><div class="muted" style="font-size:.76rem;">Hypothèses : '+K.hypotheses.map(esc).join(" ; ")+'.</div>';
+    }
+    if(R.residues){
+      const Z=R.residues;
+      h+='<h4>'+(forPrint?'':ico("recycle"))+'Résidus valorisés</h4><div style="font-size:.86rem;"><b>'+fv(Z.total)+'</b>'+natTag(Z.total.nature)+' de résidus valorisés cette saison'+(Z.routes.length?' : '+Z.routes.map(x=>esc(x.label.toLowerCase())+' '+nf(x.kg)+' kg').join(", "):'')+'.</div>';
+      if(Z.need) h+='<div style="font-size:.84rem;margin-top:4px;">Pour faire le compost conseillé par la fiche sol, il faut réunir '+fv(Z.need)+natTag(Z.need.nature)+' de matières. Déjà mis au compost : <b>'+(Z.composted?fv(Z.composted):'0 kg')+'</b>'+natTag("mesure")+', soit '+(Z.need_pct[0]===Z.need_pct[1]?Z.need_pct[0]:Z.need_pct[0]+' à '+Z.need_pct[1])+' % de ce besoin.</div>';
+      const older=R.seasons.filter(x=>C&&x.season!==C.season&&x.residue_n);
+      if(older.length) h+='<div class="muted" style="font-size:.8rem;margin-top:4px;">Saisons précédentes : '+older.map(x=>esc(x.season)+' : '+nf(x.residue_kg)+' kg').join(" ; ")+'.</div>';
+    }
+    if(R.germination){
+      const G=R.germination, vd={ok:"Le compost ne freine pas la levée.",moyen:"Compost à laisser mûrir encore, puis refaire le test.",faible:"Compost pas mûr : poursuivre le compostage avant de l'utiliser.",indetermine:"Test non concluant : à refaire avec un témoin."}[G.level]||"";
+      h+='<h4>'+(forPrint?'':ico("sprout"))+'Maturité du compost (test de germination)</h4><div style="font-size:.86rem;">Dernier test le '+esc(fd(G.date))+' : '+(G.pct?'<b>'+fv(G.pct)+'</b>'+natTag(G.pct.nature)+'. ':'')+esc(vd)+'</div>'
+        +'<div class="muted" style="font-size:.76rem;margin-top:2px;">'+esc(G.detail||"")+'. '+esc(G.reading)+natTag("repere")+' Sources : '+esc(G.threshold.source)+'.</div>';
+    }
+    if(R.missing.length) h+='<h4>À compléter</h4><ul style="margin:2px 0 0 18px;font-size:.84rem;">'+R.missing.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>';
+    if(!forPrint&&R.tips&&R.tips.length) h+='<div class="muted" style="font-size:.84rem;margin-top:10px;padding:8px 12px;border-left:3px solid var(--leaf);background:rgba(46,125,79,.06);border-radius:6px;"><b>Facultatif.</b> Votre bilan est complet. '+R.tips.map(esc).join(" ")+'</div>';
+    if(forPrint) h+='<h4>Légende</h4><div style="font-size:.8rem;">'+Object.keys(NAT).map(k=>natTag(k)+' '+esc(NAT[k][1])).join(" &nbsp; ")+'</div>';
+    return h;
+  }
+  function renderImpact(d){
+    const ref=d.ref||{};
+    let h='<div class="impact">'+impactHtml(d,false)+pairPicker(d);
+    h+='<details style="margin-top:10px;"><summary style="cursor:pointer;font-weight:700;color:var(--leaf);">Référence « avant », saison sans Terravive <span class="muted" style="font-weight:400;">(facultatif)</span></summary>'
+      +'<div class="muted" style="font-size:.82rem;margin:6px 0;">Totaux d\'une saison complète sur cette parcelle, de mémoire ou d\'après un cahier. Ils seront marqués <span class="nat declare">Déclaré</span>. Laissez tout vide puis enregistrez pour effacer.</div>'
+      +'<div class="maprow" style="align-items:flex-end;">'
+      +'<label class="muted" style="flex:2;min-width:170px;font-size:.8rem;">Nom<input class="sel" id="refLabel" maxlength="80" value="'+esc(ref.label||"")+'" placeholder="ex. Saison 2025, avant Terravive" style="width:100%;margin-top:4px;"></label>'
+      +'<label class="muted" style="width:120px;font-size:.8rem;">Eau (L)<input class="sel" id="refWater" inputmode="decimal" value="'+(ref.water_l!=null?ref.water_l:"")+'" style="width:100%;margin-top:4px;"></label>'
+      +'<label class="muted" style="width:120px;font-size:.8rem;">Compost (kg)<input class="sel" id="refCompost" inputmode="decimal" value="'+(ref.compost_kg!=null?ref.compost_kg:"")+'" style="width:100%;margin-top:4px;"></label>'
+      +'<label class="muted" style="width:130px;font-size:.8rem;">Engrais chim. (kg)<input class="sel" id="refChem" inputmode="decimal" value="'+(ref.chem_kg!=null?ref.chem_kg:"")+'" style="width:100%;margin-top:4px;"></label>'
+      +'<label class="muted" style="width:120px;font-size:.8rem;">Récolte (kg)<input class="sel" id="refYield" inputmode="decimal" value="'+(ref.yield_kg!=null?ref.yield_kg:"")+'" style="width:100%;margin-top:4px;"></label>'
+      +'<button class="btn" type="button" id="refSave">Enregistrer</button></div><div class="muted" id="refMsg" style="font-size:.82rem;margin-top:4px;"></div></details>';
+    h+='<div class="maprow" style="margin-top:10px;"><button class="btn sun" type="button" id="impPrint">'+ico("printer")+'Imprimer le bilan / PDF</button><a class="btn adv" href="/api/impact/csv?parcel='+encodeURIComponent($("logParcel").value)+'">'+ico("download")+'Bilan en tableur (CSV)</a><a class="btn wa" id="impWa" target="_blank" rel="noopener">'+ico("send")+'Envoyer sur WhatsApp</a><button class="btn" type="button" id="impProof">'+ico("proof")+'Fiche de preuve</button></div>';
+    h+='<div class="muted" style="font-size:.74rem;margin-top:6px;">Chaque chiffre porte son origine : '+Object.keys(NAT).map(k=>natTag(k)).join(" ")+'. Survolez une étiquette pour l\'explication.</div></div>';
+    $("impactBox").innerHTML=h;
+    $("impWa").href="https://wa.me/?text="+encodeURIComponent(impactText(d));
+    $("impPrint").addEventListener("click", function(){ printDoc("Bilan d'impact — "+(d.report.parcel.name||""), impactHtml(d,true), "Bilan établi à partir du carnet de champ Terravive. Les valeurs « Mesuré » viennent de vos saisies ; les autres sont signalées."); });
+    $("impProof").addEventListener("click", function(){ printProof(d); });
+    bindPair();
+    $("refSave").addEventListener("click", async function(){
+      const b=this; b.disabled=true; $("refMsg").textContent="Enregistrement…";
+      try{
+        const r=await fetch("/api/impact/ref",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ parcel_id:$("logParcel").value, label:$("refLabel").value, water_l:$("refWater").value, compost_kg:$("refCompost").value, chem_kg:$("refChem").value, yield_kg:$("refYield").value })});
+        const x=await r.json(); if(!r.ok){ $("refMsg").textContent="Erreur : "+(x.error||""); b.disabled=false; return; }
+        loadImpact();
+      }catch(e){ $("refMsg").textContent="Serveur injoignable."; b.disabled=false; }
+    });
+  }
+  function impactText(d){
+    const R=d.report, C=R.current, L=["Bilan Terravive — "+(R.parcel.name||"ma parcelle")];
+    if(C){ L.push("Saison : "+C.season); if(C.water_l) L.push("Eau : "+nf(C.water_l)+" L"+(C.water_l_m2!=null?" ("+nf(C.water_l_m2)+" L/m²)":"")); if(C.compost_kg) L.push("Compost : "+nf(C.compost_kg)+" kg"); if(C.chem_n) L.push("Engrais chimique : "+nf(C.chem_kg)+" kg"); if(C.harvest_kg) L.push("Récolte : "+nf(C.harvest_kg)+" kg"+(C.yield_t_ha!=null?" ("+nf(C.yield_t_ha)+" t/ha)":"")); }
+    if(R.residues) L.push("Résidus valorisés : "+nf(R.residues.total.v)+" kg"+(R.residues.routes.length?" ("+R.residues.routes.map(x=>x.label.toLowerCase()+" "+nf(x.kg)+" kg").join(", ")+")":""));
+    if(R.germination&&R.germination.pct&&R.germination.level!=="indetermine") L.push("Test de germination du compost : "+nf(R.germination.pct.v)+" % de la levée du témoin");
+    R.comparisons.forEach(c=>{ if(c.pct!=null) L.push((CMP_LABEL[c.key]||c.key)+" : "+(c.pct>0?"+":"")+c.pct+" % par rapport à avant"+(c.better?" ✓":"")); });
+    if(R.pair&&R.pair.rows.length){ L.push(""); L.push("Test côte à côte (Terravive / témoin) :"); R.pair.rows.forEach(x=>{ if(x.terravive&&x.temoin) L.push(x.label+" : "+nf(x.terravive.v)+" / "+nf(x.temoin.v)+" "+x.unit+(x.verdict==="terravive"?" (Terravive mieux)":x.verdict==="temoin"?" (témoin mieux)":"")); }); }
+    L.push("Chiffres notés dans le carnet de champ."); return L.join("\n");
+  }
+  function printDoc(title, body, foot){
+    const html='<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>@page{size:A4;margin:12mm}body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12.5px;line-height:1.4;margin:0}'
+      +'.h{border-bottom:3px solid #1B5E34;padding-bottom:6px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-end}.h b{font-size:19px;color:#1B5E34}.h span{font-size:11px;color:#555}'
+      +'h4{font-size:13.5px;color:#1B5E34;margin:12px 0 4px;border-bottom:1px solid #bbb;padding-bottom:2px}table{width:100%;border-collapse:collapse;margin-top:4px}td,th{border:1px solid #bbb;padding:4px 6px;text-align:left;vertical-align:top}th{background:#eef5ef;font-size:11px}'
+      +'.nat{display:inline-block;font-size:9.5px;font-weight:bold;border:1px solid #888;border-radius:8px;padding:0 5px;margin-left:3px}.up{color:#1f7a45;font-weight:bold}.down{color:#c0392b;font-weight:bold}.muted{color:#555}.valert{border:1px solid #9fd3b2;border-radius:6px;padding:5px 8px;margin-top:6px}'
+      +'.sign{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px}.sign div{border:1px solid #999;border-radius:6px;height:58px;padding:4px 6px;font-size:11px;color:#555}.box{display:inline-block;width:13px;height:13px;border:1.5px solid #333;vertical-align:middle;margin-right:4px}.f{margin-top:10px;font-size:10px;color:#666}</style></head><body>'
+      +'<div class="h"><b>'+esc(title)+'</b><span>Terravive · '+new Date().toLocaleDateString("fr-FR")+'</span></div>'+body+'<div class="f">'+esc(foot||"")+'</div>'
+      +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.focus();window.print();},300);};</scr'+'ipt></body></html>';
+    const w=window.open("","_blank"); if(!w){ alert("Autorisez les fenêtres pop-up de ce site pour imprimer."); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+  }
+  // Fiche de preuve : chaque chiffre, sa source, son niveau, les hypothèses et les données manquantes, à faire valider.
+  async function printProof(d){
+    const R=d.report, rows=[];
+    if(R.parcel.area_m2) rows.push(["Surface de la parcelle",fv(R.parcel.area_m2),R.parcel.area_m2.nature,R.parcel.area_m2.source]);
+    R.comparisons.forEach(c=>{ rows.push([(CMP_LABEL[c.key]||c.key)+" — avant",fv(c.baseline),c.baseline.nature,c.baseline.source]); rows.push([(CMP_LABEL[c.key]||c.key)+" — maintenant",fv(c.current),c.current.nature,c.current.source]); });
+    if(R.pair) R.pair.rows.forEach(x=>{ if(x.terravive) rows.push([x.label+" — Terravive",fv(x.terravive),"mesure","carnet de champ « "+(R.pair.terravive.name||"")+" »"]); if(x.temoin) rows.push([x.label+" — témoin",fv(x.temoin),"mesure","carnet de champ « "+(R.pair.temoin.name||"")+" »"]); });
+    Object.keys(R.savings).forEach(k=>{ const v=R.savings[k]; rows.push([k==="water_l"?"Eau économisée":"Engrais chimique évité",fv(v),v.nature,v.source]); });
+    if(R.carbon){ ["carbon_kg","co2e_kg","retained_co2e_kg"].forEach(k=>{ const v=R.carbon[k]; rows.push([k==="carbon_kg"?"Carbone apporté":k==="co2e_kg"?"Équivalent CO₂ apporté":"Part restant dans le sol",fv(v),v.nature,v.source]); }); }
+    if(R.residues){ const Z=R.residues; rows.push(["Résidus valorisés (saison en cours)",fv(Z.total),Z.total.nature,Z.total.source+(Z.routes.length?" — "+Z.routes.map(x=>x.label.toLowerCase()+" "+nf(x.kg)+" kg").join(", "):"")]); if(Z.need) rows.push(["Matières à réunir pour le compost conseillé",fv(Z.need),Z.need.nature,Z.need.source]); }
+    if(R.germination&&R.germination.pct){ const G=R.germination; rows.push(["Test de germination du compost ("+fd(G.date)+")",fv(G.pct),G.pct.nature,G.detail||G.pct.source]); rows.push(["Repère de lecture du test",fv(G.threshold),G.threshold.nature,G.threshold.source]); }
+    // Chiffres de la fiche sol de la parcelle (si elle existe)
+    try{
+      const r=await fetch("/api/parcels/soil?id="+encodeURIComponent($("logParcel").value)); const x=await r.json(); const f=x.fiche;
+      if(f&&f.advice){ const a=f.advice, sat=f.estimate&&f.estimate.source?f.estimate.source:"carte de sol";
+        if(a.texture) rows.push(["Texture du sol",a.texture.label,a.soil&&a.soil.textureFrom==="terrain"?"mesure":"satellite",a.soil&&a.soil.textureFrom==="terrain"?"test de terrain":sat]);
+        if(a.soil&&a.soil.depthCm!=null) rows.push(["Profondeur du sol",Math.round(a.soil.depthCm)+" cm",a.soil.depthFrom==="terrain"?"mesure":"satellite",a.soil.depthFrom==="terrain"?"observation":sat]);
+        (f.chem||[]).forEach(c=>rows.push([c.k,String(c.v),"satellite",sat]));
+        if(a.irrigation&&a.irrigation.dose_l_m2) rows.push(["Dose d'arrosage",a.irrigation.dose_l_m2+" L/m²","modele","FAO-56 : réserve utile × profondeur racinaire"+(a.irrigation.interval_days?" ; ET0 Open-Meteo":"")]);
+        if(a.sensor&&a.sensor.threshold_pct) rows.push(["Seuil d'arrosage du capteur",a.sensor.threshold_pct+" %","modele","(1 − p) FAO-56 ; à ajuster en observant"]);
+        if(f.fert&&f.fert.organic&&f.fert.organic.dose_t_ha) rows.push(["Dose de compost conseillée",f.fert.organic.dose_t_ha.join(" à ")+" t/ha","modele","repères de vulgarisation × carbone estimé"]);
+        if(f.fert&&f.fert.ph&&f.fert.ph.lime_t_ha) rows.push(["Chaux conseillée",f.fert.ph.lime_t_ha.join(" à ")+" t/ha","hypothese","à confirmer par analyse de laboratoire"]);
+      }
+    }catch(e){}
+    let body='<div style="font-size:12px;">Parcelle : <b>'+esc(R.parcel.name||"")+'</b>. Cette fiche liste chaque chiffre utilisé, son origine et son niveau de confiance, pour qu\'un agronome puisse le vérifier.</div>';
+    body+='<h4>Chiffres et provenance</h4><table><thead><tr><th>Chiffre</th><th>Valeur</th><th>Niveau</th><th>Source / méthode</th><th>Vérifié</th></tr></thead><tbody>'
+      +rows.map(x=>'<tr><td>'+esc(x[0])+'</td><td><b>'+esc(String(x[1]).replace(/(\d)\.(\d)/g,"$1,$2"))+'</b></td><td>'+esc((NAT[x[2]]||[x[2]])[0])+'</td><td>'+esc(x[3]||"")+'</td><td><span class="box"></span></td></tr>').join("")+'</tbody></table>';
+    const hyp=(R.carbon?R.carbon.hypotheses:[]).concat(["Les volumes d'eau notés ne comptent pas la pluie","Les rendements dépendent de la surface dessinée sur la carte"]);
+    body+='<h4>Hypothèses utilisées</h4><ul>'+hyp.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>';
+    if(R.missing.length) body+='<h4>À compléter</h4><ul>'+R.missing.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>';
+    body+='<h4>Validation</h4><div><span class="box"></span> Chiffres vérifiés et cohérents &nbsp; <span class="box"></span> À corriger (voir remarques)</div><div class="sign"><div>Nom de l\'agronome</div><div>Date</div><div>Signature</div></div><div class="sign" style="grid-template-columns:1fr;"><div style="height:70px;">Remarques</div></div>';
+    printDoc("Fiche de preuve — "+(R.parcel.name||""), body, "Niveaux : Mesuré = noté dans le carnet ; Déclaré = référence saisie à la main ; Estimé satellite = images ou cartes ; Estimé (calcul) = modèle et hypothèses écrites ; Hypothèse = à confirmer.");
+  }
+  // Fiche de collecte terrain (A4) : à remplir au champ puis à reporter dans le carnet.
+  function printCollect(){
+    const P=myParcels.find(p=>p.id===$("logParcel").value)||{}, season=$("logSeason").value||defaultSeason(new Date().toISOString().slice(0,10));
+    const line='<tr>'+'<td style="height:30px"></td>'.repeat(7)+'</tr>';
+    let body='<div style="font-size:12px;">Parcelle : <b>'+esc(P.name||"……………………")+'</b> · Saison : <b>'+esc(season)+'</b> · Cultivateur : ………………………………… · Culture : ……………………</div>';
+    body+='<h4>Interventions et récoltes</h4><div class="muted" style="font-size:11px;">Type : A = arrosage (litres), C = compost (kg), E = engrais chimique (kg + nom), T = traitement (litres + produit), S = semis, R = récolte (kg), V = résidus valorisés (kg + ce que vous en avez fait : compost, paillis…), I = incident.</div>';
+    body+='<table><thead><tr><th style="width:12%">Date</th><th style="width:8%">Type</th><th style="width:12%">Quantité</th><th style="width:16%">Produit</th><th>Observation</th><th style="width:12%">Humidité sol (%) ou au toucher</th><th style="width:8%">Saisi ✓</th></tr></thead><tbody>'+line.repeat(16)+'</tbody></table>';
+    body+='<h4>Retour du cultivateur</h4><table><tbody>'
+      +['Les conseils (arrosage, compost) étaient-ils clairs ?','Ce qui a bien marché','Ce qui a été difficile','Différence observée par rapport à avant (eau, rendement, sol)'].map(q=>'<tr><td style="width:40%">'+esc(q)+'</td><td style="height:38px"></td></tr>').join("")+'</tbody></table>';
+    body+='<div style="margin-top:6px;font-size:11px;"><span class="box"></span> Très utile &nbsp; <span class="box"></span> Utile &nbsp; <span class="box"></span> Peu utile &nbsp;&nbsp; Note sur 10 : ……</div>';
+    printDoc("Fiche de collecte terrain", body, "Reportez chaque ligne dans le carnet de champ Terravive (tableau de bord), puis cochez « Saisi ». Les chiffres reportés apparaissent comme « Mesuré » dans le bilan d'impact.");
+  }
+  let myParcels=[];
+  async function loadParcels(){
+    try{ const r=await fetch("/api/parcels"); const d=await r.json(); if(r.ok){ myParcels=d.parcels||[]; renderParcels(); renderLogParcels(); renderTodayParcels(); } }catch(e){}
+  }
+  function renderParcels(){
+    const box=$("parcelList"); if(!box) return;
+    if(!myParcels.length){ box.innerHTML='<div class="muted" style="font-size:.84rem;">Aucune parcelle enregistrée. Dessinez votre champ puis « Enregistrer la parcelle » pour le retrouver ici.</div>'; return; }
+    box.innerHTML='<div style="font-weight:700;color:var(--leaf);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Mes parcelles enregistrées</div>'
+      + '<div style="display:flex;flex-direction:column;gap:6px;">'
+      + myParcels.map(function(p){ const when=p.created_at?(" · "+new Date(p.created_at).toLocaleDateString("fr-FR")):""; const kind=p.zone&&p.zone.polygon?"polygone":"rectangle"; return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--surface2);"><span style="flex:1;font-weight:600;min-width:120px;">'+esc(p.name)+'<span class="muted" style="font-weight:400;font-size:.8rem;"> · '+kind+when+'</span></span><button class="btn" type="button" data-view="'+esc(p.id)+'">Voir sur la carte</button><button class="btn" type="button" data-soil="'+esc(p.id)+'" title="Nature du sol, profondeur des racines, arrosage et capteur">Sol &amp; racines'+(p.soil&&p.soil.analyzed?' ✓':'')+'</button><button class="btn" type="button" data-del="'+esc(p.id)+'" title="Supprimer" style="border-color:#c0392b;color:#c0392b;">Supprimer</button></div>'; }).join("")
+      + '</div>';
+    box.querySelectorAll("[data-view]").forEach(function(b){ b.addEventListener("click", function(){ const p=myParcels.find(function(x){return x.id===b.getAttribute("data-view");}); if(p&&p.zone) viewParcel(p.zone); }); });
+    box.querySelectorAll("[data-del]").forEach(function(b){ b.addEventListener("click", function(){ delParcel(b.getAttribute("data-del"), b); }); });
+    box.querySelectorAll("[data-soil]").forEach(function(b){ b.addEventListener("click", function(){ openSoil(b.getAttribute("data-soil")); }); });
+  }
+  function viewParcel(zone){
+    if(!MAP){ return; }
+    if(drawGroup) drawGroup.clearLayers();
+    if(ndviLayer){ MAP.removeLayer(ndviLayer); ndviLayer=null; }
+    restoreZone(zone);
+    try{ localStorage.setItem("trv-parcelle", JSON.stringify(zone)); }catch(e){}
+    $("vStatus").textContent="Parcelle rechargée. Vous pouvez relancer une analyse satellite.";
+  }
+  async function saveParcelNow(){
+    if(!zoneActive){ $("vStatus").textContent="Dessinez d'abord une parcelle."; return; }
+    const name=($("parcelName").value||"").trim();
+    const btn=$("btnSaveParcel"); btn.disabled=true;
+    try{
+      const r=await fetch("/api/parcels",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ name:name, zone:zoneActive })});
+      const d=await r.json();
+      if(!r.ok){ $("vStatus").textContent="Erreur : "+(d.error||"enregistrement impossible."); }
+      else { $("parcelName").value=""; $("vStatus").textContent="Parcelle « "+((d.parcel&&d.parcel.name)||"")+" » enregistrée."; await loadParcels(); }
+    }catch(e){ $("vStatus").textContent="Serveur injoignable."; }
+    btn.disabled=false;
+  }
+  async function delParcel(id, btn){
+    if(btn && btn.dataset.armed!=="1"){ btn.dataset.armed="1"; const t=btn.textContent; btn.textContent="Confirmer ?"; setTimeout(function(){ btn.dataset.armed=""; btn.textContent=t; },3500); return; }
+    try{ await fetch("/api/parcels/delete",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ id:id })}); }catch(e){}
+    await loadParcels();
+  }
+  function setZoneFromLayer(layer){
+    if(layer instanceof L.Rectangle){ const b=layer.getBounds(); zoneActive={ bbox:[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()] }; }
+    else if(layer.getLatLngs){ zoneActive={ polygon: layer.getLatLngs()[0].map(p=>[p.lng,p.lat]) }; }
+    try{ localStorage.setItem("trv-parcelle", JSON.stringify(zoneActive)); }catch(e){}
+    try{ MAP.fitBounds(layer.getBounds()); }catch(e){}
+    showControls();
+  }
+  function restoreZone(sv){
+    let layer=null;
+    if(sv.bbox){ layer=L.rectangle([[sv.bbox[1],sv.bbox[0]],[sv.bbox[3],sv.bbox[2]]], {color:'#C58A2A',weight:2,fill:false}); }
+    else if(sv.polygon){ layer=L.polygon(sv.polygon.map(p=>[p[1],p[0]]), {color:'#C58A2A',weight:2,fill:false}); }
+    if(layer){ drawGroup.addLayer(layer); zoneActive=sv; try{MAP.fitBounds(layer.getBounds());}catch(e){} showControls(); }
+  }
+  function initParcelMap(d){
+    if(MAP || !window.L){ return; }
+    const sv=savedParcelle();
+    const center = (d.weather && d.weather.lat!=null) ? [d.weather.lat, d.weather.lon] : [6.82,-5.28];
+    MAP = L.map('map', { zoomControl:true }).setView(center, 13);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, maxNativeZoom:18, attribution:'Imagerie © Esri, Maxar, Earthstar Geographics' }).addTo(MAP);
+    drawGroup = new L.FeatureGroup(); MAP.addLayer(drawGroup);
+    if(L.Control && L.Control.Draw){
+      const dc = new L.Control.Draw({
+        draw:{ rectangle:{shapeOptions:{color:'#C58A2A',weight:2,fill:false}}, polygon:{shapeOptions:{color:'#C58A2A',weight:2,fill:false},allowIntersection:false,showArea:true}, polyline:false, circle:false, marker:false, circlemarker:false },
+        edit:{ featureGroup:drawGroup, remove:true }
+      });
+      MAP.addControl(dc);
+      MAP.on(L.Draw.Event.CREATED, (e)=>{ drawGroup.clearLayers(); if(ndviLayer){MAP.removeLayer(ndviLayer);ndviLayer=null;} drawGroup.addLayer(e.layer); setZoneFromLayer(e.layer); });
+      MAP.on(L.Draw.Event.DELETED, ()=>{ zoneActive=null; try{localStorage.removeItem("trv-parcelle");}catch(e){} $("verteaControls").style.display="none"; var r=$("parcelSaveRow"); if(r) r.style.display="none"; $("vOut").innerHTML=""; $("mapSub").textContent="Dessinez votre parcelle sur la carte, puis lancez une analyse satellite."; });
+    }
+    if(sv){ restoreZone(sv); }
+    setTimeout(()=>{ try{ MAP.invalidateSize(); }catch(e){} }, 300);
+  }
+
+  // ===== Sol, racines et arrosage (estimation satellite iSDAsoil/SoilGrids + correction terrain) =====
+  const TEXTURE_OPTIONS=[["","— choisir —"],["sand","Sableux (grains qui crissent, ne colle pas)"],["loamy_sand","Sablo-limoneux léger"],["sandy_loam","Sablo-limoneux"],["loam","Terre franche (équilibrée)"],["silt_loam","Limoneux (doux, farineux)"],["silt","Limoneux fin"],["sandy_clay_loam","Sablo-argileux"],["clay_loam","Argilo-limoneux équilibré"],["silty_clay_loam","Limono-argileux"],["sandy_clay","Argilo-sableux"],["silty_clay","Argilo-limoneux"],["clay","Argileux (colle, se façonne)"]];
+  let soilParcelId=null;
+  function fmtDate(iso){ try{ return new Date(iso).toLocaleDateString("fr-FR"); }catch(e){ return ""; } }
+  async function openSoil(id){
+    soilParcelId=id;
+    const p=myParcels.find(x=>x.id===id);
+    $("soilOut").innerHTML='<div class="card muted">Chargement de la fiche sol…</div>';
+    try{
+      const r=await fetch("/api/parcels/soil?id="+encodeURIComponent(id)); const d=await r.json();
+      if(!r.ok){ $("soilOut").innerHTML='<div class="card"><div class="valert warn">'+esc(d.error||"Erreur.")+'</div></div>'; return; }
+      if(d.fiche) renderSoil(d.fiche); else renderSoilStart(p);
+    }catch(e){ $("soilOut").innerHTML='<div class="card"><div class="valert warn">Serveur injoignable.</div></div>'; }
+    try{ $("soilOut").scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){}
+  }
+  function soilForm(crop, sown){
+    const cur=crop||(($("vCulture")&&$("vCulture").value)||"");
+    return '<div class="maprow" style="align-items:flex-end;">'
+      +'<label style="flex:1;min-width:140px;font-size:.82rem;" class="muted">Culture en place ou prévue<input class="sel" id="soilCrop" list="vCultureList" value="'+esc(cur)+'" style="width:100%;margin-top:4px;" autocomplete="off"></label>'
+      +'<label style="min-width:150px;font-size:.82rem;" class="muted">Date de semis / plantation<input class="sel" id="soilSown" type="date" value="'+esc(sown||"")+'" style="width:100%;margin-top:4px;"></label>'
+      +'<button class="btn primary" id="soilCalc" type="button">Calculer</button></div>';
+  }
+  function renderSoilStart(p){
+    $("soilOut").innerHTML='<div class="card">'
+      +'<h2 class="ct" style="margin:0 0 4px;">Sol &amp; racines — '+esc(p?p.name:"parcelle")+'</h2>'
+      +'<div class="muted" style="font-size:.86rem;">Terravive estime la nature du sol de cette parcelle à partir de cartes satellitaires (iSDAsoil 30 m, ou SoilGrids), calcule la profondeur utile des racines de votre culture, la dose et la fréquence d\'arrosage, et où placer votre capteur. Ce sont des estimations : vous pourrez les corriger avec un test de terrain.</div>'
+      +soilForm("", "")+'<div class="muted" id="soilMsg" style="margin-top:6px;"></div></div>';
+    bindSoilCalc(false);
+  }
+  function bindSoilCalc(hasFiche){
+    const go=async function(refresh){
+      const crop=($("soilCrop").value||"").trim(), sown=$("soilSown").value||"";
+      $("soilMsg").textContent=refresh||!hasFiche?"Lecture des cartes de sol et calcul… (jusqu'à 30 s)":"Calcul…";
+      ["soilCalc","soilRefresh"].forEach(i=>{ const b=$(i); if(b) b.disabled=true; });
+      try{
+        const r=await fetch("/api/parcels/soil",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ id:soilParcelId, crop:crop, sown_at:sown, refresh:!!refresh })});
+        const d=await r.json();
+        if(!r.ok){ $("soilMsg").textContent="Erreur : "+(d.error||"calcul impossible."); ["soilCalc","soilRefresh"].forEach(i=>{ const b=$(i); if(b) b.disabled=false; }); return; }
+        renderSoil(d.fiche); loadParcels();
+      }catch(e){ $("soilMsg").textContent="Serveur injoignable."; ["soilCalc","soilRefresh"].forEach(i=>{ const b=$(i); if(b) b.disabled=false; }); }
+    };
+    $("soilCalc").addEventListener("click", function(){ go(false); });
+    const rb=$("soilRefresh"); if(rb) rb.addEventListener("click", function(){ go(true); });
+  }
+  function chip(l,v,sub){ return '<div class="vchip"><div class="l">'+esc(l)+'</div><div class="v">'+v+'</div>'+(sub?'<div class="muted" style="font-size:.72rem;margin-top:2px;">'+esc(sub)+'</div>':'')+'</div>'; }
+  function rng(a,u){ if(!a) return ""; const fr=v=>Number(v).toLocaleString("fr-FR",{maximumFractionDigits:1}); const x=fr(a[0]), y=fr(a[1]); return (x===y?x:x+" à "+y)+(u?" "+u:""); }
+  function fertHtml(f){
+    const F=f.fert; if(!F) return "";
+    const g=F.organic||{};
+    let h='<div class="fertbox"><div class="ferthead"><span>'+ico("compost")+' Plan de fertilisation organique</span>'+(F.group?'<span class="muted" style="font-weight:400;font-size:.8rem;">'+esc(F.group)+(F.area_m2?' · '+(F.area_m2>=10000?String(F.area_ha).replace(".",",")+' ha':F.area_m2.toLocaleString("fr-FR")+' m²'):'')+'</span>':'')+'</div>';
+    h+='<div class="soilgrid">';
+    if(g.dose_kg_m2) h+=chip("Compost mûr", rng(g.dose_kg_m2,"kg/m²"), rng(g.dose_t_ha,"t/ha"));
+    if(g.dose_kg_plant) h+=chip("Compost mûr", rng(g.dose_kg_plant,"kg/pied"), "chaque année");
+    if(g.total_kg) h+=chip("Pour la parcelle", rng(g.total_kg,"kg"), "≈ "+rng(g.wheelbarrows,"brouettes"));
+    if(g.raw_kg) h+=chip("Matières à composter", rng(g.raw_kg,"kg"), "déchets verts et secs, fumier");
+    if(g.status) h+=chip("Matière organique", (g.mo_pct!=null?String(g.mo_pct).replace(".",",")+" %":"—"), g.status);
+    h+='</div>';
+    if(g.raw_kg&&$("resCard")) h+='<div class="muted" style="font-size:.82rem;margin-top:6px;">Quelles matières réunir, et comment ? <a href="#resCard" style="color:var(--leaf);font-weight:600;">Voir « Valoriser mes résidus »</a>. Notez-les dans le carnet : le bilan d\'impact compare ce que vous avez déjà mis au compost à ce besoin.</div>';
+    if(F.priorities&&F.priorities.length) h+='<ol class="fertlist">'+F.priorities.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ol>';
+    if(F.ph&&F.ph.action) h+='<div class="valert'+(F.ph.lime_t_ha?' warn':'')+'" style="margin-top:8px;">'+esc(F.ph.action)+(F.ph.lime_total_kg?' Pour la parcelle : '+esc(rng(F.ph.lime_total_kg,"kg"))+' de chaux.':'')+'</div>';
+    if(F.nutrients&&F.nutrients.length) h+='<div class="nutgrid">'+F.nutrients.map(n=>'<div class="nut '+(n.status==="faible"?'low':'')+'"><b>'+esc(n.k)+'</b> <span class="muted">· '+esc(n.status)+'</span><div>'+esc(n.action)+'</div></div>').join("")+'</div>';
+    else if(F.nutrients_note) h+='<div class="muted" style="font-size:.82rem;margin-top:6px;">'+esc(F.nutrients_note)+'</div>';
+    h+='<div class="muted soiltext" style="font-size:.82rem;line-height:1.55;margin-top:8px;">'+(g.when?'<b>Quand</b> : '+esc(g.when)+' ':'')+(g.start?esc(g.start)+' ':'')+'<br><b>Et l\'engrais chimique ?</b> '+esc(F.mineral)+'<br><span style="font-size:.78rem;">'+esc(F.caveat)+'</span></div>';
+    h+='</div>';
+    if(f.share_text){
+      h+='<div class="sharebox"><div style="font-weight:700;font-size:.88rem;">'+ico("phone")+' Envoyer ce conseil au producteur</div>'
+        +'<div class="maprow" style="align-items:flex-end;margin-top:6px;">'
+        +'<label class="muted" style="flex:1;min-width:190px;font-size:.8rem;">Numéro WhatsApp (facultatif)<input class="sel" id="waNum" inputmode="tel" placeholder="ex. 225 07 00 00 00 00" style="width:100%;margin-top:4px;"></label>'
+        +'<a class="btn wa" id="waBtn" href="#" target="_blank" rel="noopener">'+ico("send")+'Envoyer sur WhatsApp</a>'
+        +'<button class="btn" type="button" id="waCopy">Copier le message</button></div>'
+        +'<details style="margin-top:6px;"><summary class="muted" style="cursor:pointer;font-size:.82rem;">Voir le message</summary><pre class="sharepre" id="waText"></pre></details>'
+        +'<div class="muted" style="font-size:.76rem;margin-top:4px;">Le message s\'ouvre dans WhatsApp : vous choisissez le contact et vous l\'envoyez vous-même. Rien n\'est envoyé automatiquement.</div></div>';
+    }
+    return h;
+  }
+  function bindShare(f){
+    if(!f.share_text||!$("waBtn")) return;
+    $("waText").textContent=f.share_text;
+    try{ const saved=localStorage.getItem("trv-wa-"+f.parcel.id); if(saved) $("waNum").value=saved; }catch(e){}
+    function link(){ const d=$("waNum").value.replace(/\D/g,""); $("waBtn").href="https://wa.me/"+(d.length>=8?d:"")+"?text="+encodeURIComponent(f.share_text); }
+    link();
+    $("waNum").addEventListener("input",function(){ link(); try{ localStorage.setItem("trv-wa-"+f.parcel.id,this.value); }catch(e){} });
+    $("waCopy").addEventListener("click", async function(){ try{ await navigator.clipboard.writeText(f.share_text); this.textContent="Copié ✓"; }catch(e){ this.textContent="Copie impossible"; } const b=this; setTimeout(function(){ b.textContent="Copier le message"; },2000); });
+  }
+  function renderSoil(f){
+    const a=f.advice||{}, so=a.soil||{}, e=f.estimate, m=f.manual||{};
+    const srcLbl=function(from){ return from==="terrain"?"terrain":(from?"estimation":""); };
+    let h='<div class="card">'
+      +'<h2 class="ct" style="margin:0 0 4px;">Sol &amp; racines — '+esc(f.parcel.name)+'</h2>';
+    // Source
+    if(e) h+='<div class="muted" style="font-size:.8rem;">Estimation : '+esc(e.source||"")+(e.fetched_at?' · '+fmtDate(e.fetched_at):'')+(e.note?' · '+esc(e.note):'')+(f.center?' · point '+f.center.lat+', '+f.center.lon:'')+'</div>';
+    if(f.estimate_error) h+='<div class="valert warn" style="margin-top:6px;">Estimation satellite indisponible pour l\'instant ('+esc(f.estimate_error)+'). Vous pouvez saisir votre test de terrain ci-dessous : les calculs fonctionneront.</div>';
+    h+=soilForm(f.crop, f.sown_at);
+    h+='<div class="maprow" style="margin-top:4px;"><button class="btn" id="soilRefresh" type="button" title="Relire les cartes de sol">Ré-estimer le sol</button><span class="muted" id="soilMsg"></span></div>';
+    // Chiffres clés
+    h+='<div class="soilgrid">';
+    h+=chip("Texture", a.texture?esc(a.texture.label):"inconnue", srcLbl(so.textureFrom));
+    h+=chip("Profondeur du sol", so.depthCm==null?"inconnue":(so.depthCapped?"≥ 200 cm":Math.round(so.depthCm)+" cm"), srcLbl(so.depthFrom));
+    if(a.roots) h+=chip("Racines utiles", Math.round(a.roots.effective_m*100)+" cm", "max culture ≈ "+Math.round(a.roots.max_m*100)+" cm");
+    if(a.stage) h+=chip("Stade", esc(a.stage.name), a.stage.days!=null?("J"+a.stage.days+" · Kc "+a.stage.kc):"");
+    if(a.irrigation&&!a.irrigation.paddy){
+      h+=chip("Réserve d'eau (RU)", a.irrigation.ru_mm+" mm", "facilement utilisable : "+a.irrigation.rfu_mm+" mm");
+      h+=chip("Dose / arrosage", a.irrigation.dose_l_m2+" L/m²", "≈ "+a.irrigation.dose_l_100m2.toLocaleString("fr-FR")+" L pour 100 m²");
+      h+=chip("Fréquence (sans pluie)", a.irrigation.interval_days?("tous les "+a.irrigation.interval_days+" j"):"—", a.irrigation.etc_mm_j?("besoin ≈ "+a.irrigation.etc_mm_j+" mm/j"):"météo indisponible");
+    }
+    if(a.sensor) h+=chip("Capteur à", a.sensor.depth_cm+" cm", (a.sensor.threshold_pct!=null?("arroser sous "+a.sensor.threshold_pct+" %"):"")+(a.sensor.second_depth_cm?(" · 2ᵉ sonde "+a.sensor.second_depth_cm+" cm"):""));
+    h+='</div>';
+    if(a.summary) h+='<div class="valert ok" style="margin-top:8px;">'+esc(a.summary)+'</div>';
+    if(a.irrigation&&a.irrigation.paddy) h+='<div class="valert" style="margin-top:6px;">'+esc(a.irrigation.note)+'</div>';
+    (a.warnings||[]).forEach(w=>{ h+='<div class="valert warn" style="margin-top:6px;">'+esc(w)+'</div>'; });
+    // Chimie estimée
+    if(f.chem&&f.chem.length){
+      h+='<div style="margin-top:14px;font-weight:700;font-size:.85rem;">Fertilité estimée ('+(e&&/SoilGrids/.test(e.source||"")?"0–30 cm":"0–20 cm")+')</div><div class="chemgrid">'
+        + f.chem.map(c=>chip(c.k, esc(String(c.v)), c.t)).join("") + '</div>';
+      if(!f.fert) f.chem.filter(c=>c.note).forEach(c=>{ h+='<div class="muted" style="font-size:.82rem;margin-top:4px;">'+esc(c.note)+'</div>'; });
+      h+='<div class="muted" style="font-size:.78rem;margin-top:4px;">Valeurs issues de cartes (modèles d\'apprentissage + échantillons de sol) : utiles pour s\'orienter, elles ne remplacent pas une analyse de laboratoire avant une fertilisation coûteuse.</div>';
+    }
+    h+=fertHtml(f);
+    // Explication
+    h+='<div style="margin-top:10px;font-size:.84rem;line-height:1.55;" class="muted soiltext"><b>Comment c\'est calculé (méthode FAO-56)</b> : la <b>texture</b> donne l\'eau que le sol garde par mètre ; les <b>racines</b> de la culture descendent avec le temps, mais s\'arrêtent sur la roche ou une cuirasse ; réserve = eau par mètre × profondeur utile. On arrose quand la plante a consommé la part facilement utilisable, avec une dose qui la remplit, sans gaspiller l\'eau qui descendrait sous les racines. Le capteur se place au cœur de la zone des racines actives. Vérifiez toujours l\'état réel du sol et la pluie récente.</div>';
+    // Correction terrain
+    h+='<details style="margin-top:10px;"'+((!a.texture||f.estimate_error)?' open':'')+'><summary style="cursor:pointer;font-weight:700;color:var(--leaf);">Corriger avec un test de terrain (recommandé)</summary>'
+      +'<div class="muted soiltext" style="font-size:.84rem;line-height:1.55;margin-top:6px;"><b>Test du bocal</b> : remplissez un bocal transparent au tiers de terre prise à 10–20 cm, complétez d\'eau (+ une pincée de sel), secouez 2 minutes, laissez reposer 24 h. Le <b>sable</b> tombe en premier (en bas, en 1 minute), puis le <b>limon</b> (en 2 heures), l\'<b>argile</b> en dernier (en haut). Comparez les épaisseurs. <b>Test du boudin</b> : une terre humide qui fait un boudin fin et souple est argileuse ; qui s\'effrite, sableuse. <b>Profondeur</b> : creusez un trou ou enfoncez une barre à mine jusqu\'à rencontrer la roche ou la cuirasse (carapace dure, souvent rouge).</div>'
+      +'<div class="maprow" style="align-items:flex-end;">'
+      +'<label class="muted" style="flex:1;min-width:170px;font-size:.82rem;">Texture observée<select class="sel" id="manTex" style="width:100%;margin-top:4px;">'+TEXTURE_OPTIONS.map(o=>'<option value="'+o[0]+'"'+((m.texture||"")===o[0]?' selected':'')+'>'+esc(o[1])+'</option>').join("")+'</select></label>'
+      +'<label class="muted" style="width:130px;font-size:.82rem;">Profondeur (cm)<input class="sel" id="manDepth" inputmode="numeric" value="'+(m.depth_cm!=null?m.depth_cm:"")+'" placeholder="ex. 60" style="width:100%;margin-top:4px;"></label>'
+      +'<label class="muted" style="width:110px;font-size:.82rem;">Cailloux (%)<input class="sel" id="manStones" inputmode="numeric" value="'+(m.stones!=null?m.stones:"")+'" placeholder="ex. 10" style="width:100%;margin-top:4px;"></label>'
+      +'<button class="btn" id="manSave" type="button">Enregistrer</button></div><div class="muted" id="manMsg" style="margin-top:4px;"></div></details>';
+    // Suites
+    h+='<div class="maprow" style="margin-top:10px;">'
+      +'<a class="btn adv" href="/api/station/sketch?parcel='+encodeURIComponent(f.parcel.id)+'" download="terravive_station_esp32.ino">Programme ESP32 réglé pour cette parcelle</a>'
+      +'<a class="btn primary" href="/app?'+(f.crop?'culture='+encodeURIComponent(f.crop)+'&':'')+'parcelle='+encodeURIComponent(f.parcel.id)+'">Plan de culture adapté à ce sol →</a>'
+      +'</div></div>';
+    $("soilOut").innerHTML=h;
+    bindSoilCalc(true);
+    bindShare(f);
+    $("manSave").addEventListener("click", async function(){
+      const b=this; b.disabled=true; $("manMsg").textContent="Enregistrement…";
+      try{
+        const r=await fetch("/api/parcels/soil/manual",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ id:f.parcel.id, texture:$("manTex").value, depth_cm:$("manDepth").value.trim(), stones:$("manStones").value.trim() })});
+        const d=await r.json();
+        if(!r.ok){ $("manMsg").textContent="Erreur : "+(d.error||"enregistrement impossible."); b.disabled=false; return; }
+        renderSoil(d.fiche); loadParcels();
+      }catch(e){ $("manMsg").textContent="Serveur injoignable."; b.disabled=false; }
+    });
+  }
+  function renderLiveAlert(L, adv){
+    const box=$("liveAlert"); if(!box) return;
+    let h="";
+    if(L&&L.soil!=null&&adv&&adv.threshold_pct!=null){
+      if(L.soil<adv.threshold_pct) h+='<div class="valert warn" style="margin-top:8px;">Sol plus sec que le seuil conseillé ('+adv.threshold_pct+' %) pour « '+esc(adv.parcel_name)+' »'+(adv.crop?' ('+esc(adv.crop)+')':'')+' : arrosage conseillé'+(adv.dose_l_m2?', environ '+adv.dose_l_m2+' L/m²':'')+'. Vérifiez d\'abord qu\'il n\'a pas plu.</div>';
+      else h+='<div class="valert ok" style="margin-top:8px;">Humidité au-dessus du seuil conseillé ('+adv.threshold_pct+' % pour « '+esc(adv.parcel_name)+' ») : pas besoin d\'arroser pour l\'instant.</div>';
+    } else if(L&&L.soil!=null){
+      h+='<div class="muted" style="margin-top:8px;font-size:.84rem;">Pour savoir quand arroser, ouvrez « Sol &amp; racines » sur votre parcelle : Terravive calculera le seuil adapté à votre sol et à votre culture.</div>';
+    }
+    if(L&&L.level!=null&&L.level<15) h+='<div class="valert warn" style="margin-top:6px;">Cuve presque vide ('+L.level+' %) : remplissez-la avant le prochain arrosage pour ne pas faire tourner la pompe à vide.</div>';
+    // A3 — message à relayer (WhatsApp ou lecture à voix haute par l'animateur)
+    const msgs=[];
+    if(L&&L.soil!=null&&adv&&adv.threshold_pct!=null&&L.soil<adv.threshold_pct) msgs.push("Arroser « "+adv.parcel_name+" »"+(adv.crop?" ("+adv.crop+")":"")+" : le sol est à "+L.soil+" %, sous le seuil de "+adv.threshold_pct+" %."+(adv.dose_l_m2?" Dose : environ "+String(adv.dose_l_m2).replace(".",",")+" litres par mètre carré.":"")+" Vérifiez d'abord qu'il n'a pas plu. Arrosez tôt le matin ou en fin de journée.");
+    if(L&&L.level!=null&&L.level<15) msgs.push("La cuve est presque vide ("+L.level+" %). Remplissez-la avant le prochain arrosage.");
+    todayAlerts=msgs.slice(); renderTodayAlert();
+    if(msgs.length){
+      const txt="Terravive — alerte\n"+msgs.join("\n")+(L.soil_source==="toucher"?"\n(Mesure au toucher, approximative.)":"");
+      h+='<div class="alertshare"><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(txt)+'">'+ico("send")+'Envoyer l\'alerte sur WhatsApp</a>'+(window.trvCanSpeak&&window.trvCanSpeak()?'<button class="btn" type="button" id="alertSpeak">'+ico("speaker")+'Lire à voix haute</button>':'')+'</div>';
+      box.innerHTML=h;
+      const sp=$("alertSpeak"); if(sp) sp.addEventListener("click", function(){ if(window.trvSpeaking&&trvSpeaking()){ trvStop(); sp.innerHTML=ico("speaker")+"Lire à voix haute"; return; } sp.innerHTML=ico("stop")+"Arrêter"; trvSpeak(msgs.join(" ").replace(/[\u{1F300}-\u{1FAFF}]/gu,""), function(){ sp.innerHTML=ico("speaker")+"Lire à voix haute"; }); });
+      return;
+    }
+    box.innerHTML=h;
+  }
+  async function saveManual(){
+    const b=$("mSave"); b.disabled=true; $("mMsg").textContent="Enregistrement…";
+    try{
+      const r=await fetch("/api/station/manual",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ soil:$("mSoil").value.trim(), soil_touch:$("mSoil").value.trim()?"":$("mTouch").value, temp:$("mTemp").value.trim(), hum:$("mHum").value.trim(), level:$("mLevel").value.trim(), note:$("mNote").value.trim() })});
+      const d=await r.json();
+      if(!r.ok){ $("mMsg").textContent="Erreur : "+(d.error||"enregistrement impossible."); }
+      else { $("mMsg").textContent="Mesure enregistrée ✓"+(d.warning?" — "+d.warning:""); ["mSoil","mTemp","mHum","mLevel","mNote"].forEach(id=>$(id).value=""); $("mTouch").value=""; refresh(); }
+    }catch(e){ $("mMsg").textContent="Serveur injoignable."; }
+    b.disabled=false;
+  }
+
+  // --- Appels au moteur satellite Vertea ---
+  function vSetBusy(on, msg){ $("vStatus").textContent=msg||""; ["btnNdvi","btnEau","btnPlant"].forEach(id=>{ const b=$(id); if(b) b.disabled=!!on; }); }
+  async function vFetch(path, body){
+    const r = await fetch(VERTEA_BASE+path, { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(body) });
+    return r.json();
+  }
+  function alertClass(f, m){ if((f||0)>=25) return "bad"; if((f||0)+(m||0)>=50) return "warn"; return "ok"; }
+  async function runNdvi(){
+    if(!zoneActive){ $("vStatus").textContent="Dessinez d'abord votre parcelle."; return; }
+    vSetBusy(true, "Analyse de la santé des cultures (NDVI)… cela peut prendre 15–40 s.");
+    try{
+      const d = await vFetch("/ndvi", Object.assign({}, zoneActive, { date_debut: ymd(daysAgo(180)), date_fin: ymd(new Date()) }));
+      if(d.erreur){ vSetBusy(false, "Erreur : "+d.erreur); return; }
+      // Mémorise pour l'indice de durabilité (pilier environnemental) et le bilan carbone.
+      if(typeof d.ndvi_moyen==="number"){ window.lastNdvi = d.ndvi_moyen; }
+      if(typeof d.surface_ha==="number"){ window.lastSurfaceHa = d.surface_ha; var _da=document.getElementById("durArea"); if(_da && !_da.value) _da.value = d.surface_ha; }
+      saveCtx({ ndvi:d.ndvi_moyen, pctFaible:d.pct_faible, surface:d.surface_ha, culture:($("vCulture").value||"").trim() });
+      if(ndviLayer) MAP.removeLayer(ndviLayer);
+      if(d.tile_url){ ndviLayer=L.tileLayer(d.tile_url,{opacity:0.85, maxZoom:19, maxNativeZoom:18}); ndviLayer.addTo(MAP); }
+      const ac=alertClass(d.pct_faible,d.pct_moyen);
+      // Qualité d'observation — champs déjà renvoyés par Vertea ; s'ils manquent (ancienne réponse), ils sont simplement ignorés.
+      const nImg = (typeof d.images_utilisees==="number") ? d.images_utilisees : null;
+      const petite = (typeof d.surface_ha==="number" && d.surface_ha>0 && d.surface_ha<0.1);
+      let qual = "Analyse Sentinel-2 (~10 m)";
+      if(nImg!=null){ qual += " — "+nImg+" image"+(nImg>1?"s":"")+" nette"+(nImg>1?"s":""); }
+      if(d.periode_depuis){ qual += " depuis le "+esc(d.periode_depuis); }
+      qual += ".";
+      const faibleObs = (nImg!=null && nImg<3) || petite;
+      if(faibleObs){
+        const raisons=[ (nImg!=null && nImg<3)?"peu d'images nettes (nuages ?)":null, petite?"parcelle proche de la taille d'un pixel":null ].filter(Boolean).join(" ; ");
+        qual += " Fiabilité réduite ("+raisons+") — à confirmer sur le terrain.";
+      }
+      // Interprétation prudente : un NDVI faible n'est JAMAIS présenté comme « parcelle malade ».
+      let txt, hyp="";
+      if(ac==="bad" || ac==="warn"){
+        txt = (ac==="bad"
+              ? ("Végétation moins développée que prévu sur "+(d.pct_faible??"?")+"% de la parcelle.")
+              : "Une partie de la parcelle n'est pas en pleine vigueur.")
+            + " Plusieurs causes sont possibles — un NDVI faible ne veut pas dire « parcelle malade ».";
+        hyp = '<ul style="margin:8px 0 0;padding-left:18px;font-size:.86rem;line-height:1.5">'
+            + '<li>Manque d\'eau possible (déficit hydrique)</li>'
+            + '<li>Excès d\'eau possible (sol engorgé)</li>'
+            + '<li>Problème de nutrition possible (carence)</li>'
+            + '<li>Dégâts phytosanitaires possibles (ravageur ou maladie)</li>'
+            + '<li>Variation normale selon le stade (culture jeune, après récolte…)</li>'
+            + '</ul>'
+            + '<div style="margin-top:8px;font-size:.84rem;color:var(--soft,#5b6b5f)">À vérifier sur le terrain avant toute intervention : l\'humidité du sol, l\'état des feuilles, et la <b>répartition des symptômes</b> (repérez les zones rouges sur la carte). En cas de doute, le <a href="/diagnostic" style="color:var(--leaf);font-weight:600">diagnostic par photo</a> peut aider.</div>';
+      } else {
+        txt = "Végétation majoritairement vigoureuse sur la période observée. Poursuivez la surveillance régulière.";
+      }
+      $("vOut").innerHTML =
+        '<div class="vchips">'
+        +'<div class="vchip"><div class="l">NDVI moyen</div><div class="v">'+(d.ndvi_moyen??"—")+'</div></div>'
+        +'<div class="vchip"><div class="l">Surface</div><div class="v">'+(d.surface_ha??"—")+' ha</div></div>'
+        +'<div class="vchip"><div class="l">Saine</div><div class="v">'+(d.pct_sain??"—")+'%</div></div>'
+        +'<div class="vchip"><div class="l">À surveiller</div><div class="v">'+(d.pct_moyen??"—")+'%</div></div>'
+        +'<div class="vchip"><div class="l">Faible</div><div class="v">'+(d.pct_faible??"—")+'%</div></div>'
+        +'</div>'
+        +'<div style="font-size:.8rem;color:var(--soft,#5b6b5f);margin:8px 0 2px">'+qual+'</div>'
+        +'<div class="valert '+ac+'">'+txt+hyp+'</div>';
+      vSetBusy(false, "Analyse de santé terminée. La carte NDVI est affichée sur la parcelle.");
+    }catch(e){ vSetBusy(false, "Impossible de joindre Vertea. Le service se réveille peut-être (réessayez dans ~30 s)."); }
+  }
+  async function runIrrigation(){
+    if(!zoneActive){ $("vStatus").textContent="Dessinez d'abord votre parcelle."; return; }
+    const culture=($("vCulture").value||"").trim();
+    if(!culture){ $("vStatus").textContent="Indiquez une culture (ex. tomate, maïs, riz…)."; return; }
+    vSetBusy(true, "Calcul du besoin en eau (FAO-56, ERA5 + CHIRPS)… 15–40 s.");
+    try{
+      const body = Object.assign({}, zoneActive, { culture, date_semis: ymd(daysAgo(110)), date_fin: ymd(daysAgo(50)) });
+      const d = await vFetch("/irrigation", body);
+      if(d.erreur){ vSetBusy(false, "Erreur : "+d.erreur); return; }
+      saveCtx({ water:d.besoin_irrigation_mm_j, culture:culture });
+      const litres = Math.round((d.besoin_irrigation_mm_j||0)*10000);
+      const ac = (d.besoin_irrigation_mm_j<=0) ? "ok" : "warn";
+      const msg = (d.besoin_irrigation_mm_j<=0)
+        ? "Sur la période analysée, la pluie efficace couvre le besoin théorique : pas d'irrigation d'appoint estimée nécessaire."
+        : "Besoin théorique estimé : environ "+d.besoin_irrigation_mm_j+" mm/jour (~"+litres.toLocaleString("fr-FR")+" litres/ha/jour) sur la période analysée.";
+      // Un besoin THÉORIQUE n'est pas une consigne d'arrosage : on explique la chaîne de calcul et on invite à vérifier le terrain.
+      const expl = '<div style="margin-top:8px;font-size:.84rem;color:var(--soft,#5b6b5f);line-height:1.5">'
+        + 'Comment lire ces chiffres : <b>ET₀</b> = évapotranspiration de référence (climat, ERA5) ; <b>ETc</b> = ET₀ × Kc, besoin de la culture à son stade ; <b>pluie efficace</b> = part de la pluie (CHIRPS) réellement utile ; <b>besoin = ETc − pluie efficace</b>. '
+        + 'C\'est une <b>estimation théorique (FAO-56) sur une période passée</b>, pas une consigne d\'arrosage : avant d\'arroser, vérifiez l\'<b>humidité réelle du sol</b> et la <b>pluie récente</b>. Sur une petite parcelle ou près de la côte, ces moyennes climatiques sont moins précises.'
+        + '</div>';
+      const genNote = d.coefficients_generiques
+        ? '<div class="valert" style="margin-top:6px">Culture non répertoriée : estimation avec des coefficients culturaux FAO-56 génériques (valeur indicative).</div>'
+        : '';
+      $("vOut").innerHTML =
+        '<div class="vchips">'
+        +'<div class="vchip"><div class="l">Besoin théorique</div><div class="v">'+d.besoin_irrigation_mm_j+' mm/j</div></div>'
+        +'<div class="vchip"><div class="l">ET₀</div><div class="v">'+d.et0_mm_j+'</div></div>'
+        +'<div class="vchip"><div class="l">ETc</div><div class="v">'+d.etc_mm_j+'</div></div>'
+        +'<div class="vchip"><div class="l">Kc ('+esc(d.stade||"")+')</div><div class="v">'+d.kc+'</div></div>'
+        +'<div class="vchip"><div class="l">Pluie efficace</div><div class="v">'+d.pluie_efficace_mm_j+'</div></div>'
+        +'</div><div class="valert '+ac+'">'+msg+'</div>'+expl+genNote;
+      vSetBusy(false, "Besoin en eau calculé pour « "+esc(d.culture)+" ».");
+    }catch(e){ vSetBusy(false, "Impossible de joindre Vertea. Le service se réveille peut-être (réessayez dans ~30 s)."); }
+  }
+  async function runPlantation(){
+    if(!zoneActive){ $("vStatus").textContent="Dessinez d'abord votre parcelle."; return; }
+    vSetBusy(true, "Analyse des cultures adaptées (ERA5 + CHIRPS)… 15–40 s.");
+    try{
+      const d = await vFetch("/plantation", Object.assign({}, zoneActive, { date_ref: ymd(daysAgo(50)) }));
+      if(d.erreur){ vSetBusy(false, "Erreur : "+d.erreur); return; }
+      const cls=v=> v==="Favorable"?"fav":(v==="Deconseille"?"dec":"prec");
+      let html='<div class="valert ok">Mois : '+esc(d.mois||"")+' · Température ~'+(d.temperature_moy??"?")+'°C · Pluie sur ~90 j : '+(d.pluie_cycle_mm??"?")+' mm</div>';
+      html+='<div class="valert" style="margin-top:6px">Cliquez une culture pour créer son <b>plan de culture</b> complet.</div>';
+      (d.cultures||[]).forEach(c=>{ const k=cls(c.verdict); html+='<div class="vverdict '+k+'" data-crop="'+esc(c.culture)+'" role="button" tabindex="0" title="Créer l\'itinéraire technique de « '+esc(c.culture)+' »" style="cursor:pointer"><div class="tete"><span class="nom">'+esc(c.culture)+'</span><span class="vbadge '+k+'">'+esc(c.verdict)+'</span></div><ul>'+(c.raisons||[]).map(r=>'<li>'+esc(r)+'</li>').join("")+'</ul><div class="note">'+esc(c.note||"")+'</div><div style="margin-top:8px;font-weight:700;color:var(--leaf,#3b6d11);font-size:.85rem">Créer l\'itinéraire technique →</div></div>'; });
+      $("vOut").innerHTML=html;
+      $("vOut").querySelectorAll(".vverdict[data-crop]").forEach(function(el){
+        const go=function(){ const crop=el.getAttribute("data-crop")||""; if(crop) location.href="/app?culture="+encodeURIComponent(crop); };
+        el.addEventListener("click", go);
+        el.addEventListener("keydown", function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } });
+      });
+      vSetBusy(false, "Conseil de plantation calculé.");
+    }catch(e){ vSetBusy(false, "Impossible de joindre Vertea. Le service se réveille peut-être (réessayez dans ~30 s)."); }
+  }
+
+  // --- Repérage du champ : recherche de lieu + GPS ---
+  async function searchPlace(){
+    if(!MAP){ return; }
+    const q=$("placeSearch").value.trim(); if(!q){ return; }
+    $("vStatus").textContent="Recherche du lieu…";
+    try{
+      const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q="+encodeURIComponent(q),{headers:{"Accept-Language":"fr"}});
+      const a=await r.json();
+      if(!a||!a.length){ $("vStatus").textContent="Lieu introuvable. Essayez un nom plus précis."; return; }
+      const l=a[0];
+      if(l.boundingbox){ const b=l.boundingbox.map(parseFloat); MAP.fitBounds([[b[0],b[2]],[b[1],b[3]]]); }
+      else { MAP.setView([+l.lat,+l.lon],15); }
+      $("vStatus").textContent="Lieu trouvé. Zoomez puis dessinez votre parcelle.";
+    }catch(e){ $("vStatus").textContent="Recherche impossible (connexion ?)."; }
+  }
+  function locateMe(){
+    if(!MAP){ return; }
+    if(!navigator.geolocation){ $("vStatus").textContent="Le GPS n'est pas disponible sur cet appareil."; return; }
+    $("vStatus").textContent="Localisation en cours… (autorisez l'accès à votre position)";
+    navigator.geolocation.getCurrentPosition(
+      (p)=>{ const c=[p.coords.latitude,p.coords.longitude]; MAP.setView(c,17); L.circleMarker(c,{radius:7,color:"#C58A2A",weight:3,fillColor:"#C58A2A",fillOpacity:.5}).addTo(MAP); $("vStatus").textContent="Vous êtes ici. Dessinez votre parcelle autour de ce point."; },
+      ()=>{ $("vStatus").textContent="Localisation refusée ou indisponible."; },
+      { enableHighAccuracy:true, timeout:10000 }
+    );
+  }
+  // --- Effacer les mesures (ex. données de test) ---
+  async function clearMeasures(){
+    if(!confirm("Effacer toutes vos mesures enregistrées ? (utile pour repartir d'un historique vide avant d'utiliser une vraie carte)")) return;
+    try{ await fetch("/api/readings/clear",{method:"POST"}); }catch(e){}
+    refresh();
+  }
+
+  // ===== Station : clé + programme ESP32 =====
+  function maskKey(k){ return k ? (k.slice(0,7)+"••••••••••••••••••••") : "••••••••••••"; }
+  let keyShown=false;
+  function renderKey(){ $("keyText").textContent = (station&&station.device_key) ? (keyShown?station.device_key:maskKey(station.device_key)) : "••••••••••••"; }
+
+  // Le programme est généré par le serveur : clé, adresse et seuil d'arrosage de la parcelle déjà remplis.
+  async function downloadSketch(){
+    const btn=$("sketchBtn"); btn.disabled=true;
+    try{
+      const r=await fetch("/api/station/sketch");
+      if(!r.ok){ alert("Téléchargement impossible. Reconnectez-vous puis réessayez."); btn.disabled=false; return; }
+      const blob=await r.blob();
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="terravive_station_esp32.ino"; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    }catch(e){ alert("Serveur injoignable."); }
+    btn.disabled=false;
+  }
+  function copyKey(){
+    if(!station||!station.device_key) return;
+    const done=()=>{ const b=$("copyKeyBtn"); const o=b.textContent; b.textContent="Copié !"; setTimeout(()=>b.textContent=o,1400); };
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(station.device_key).then(done).catch(()=>{}); }
+  }
+
+  async function load(){
+    try{ const r=await fetch("/api/auth/me"); const d=await r.json(); me=d.user||null; }catch(e){ me=null; }
+    if(!me){ $("authNote").style.display="block"; $("board").style.display="none"; return; }
+    // Nom du compte au-dessus du bouton de déconnexion (le bouton est statique dans le HTML,
+    // il reste présent même si un script externe échoue à charger).
+    try{ var af=document.getElementById("acctFoot"); if(af&&me){ af.innerHTML='<strong style="color:#fff;font-weight:700;display:block;">'+esc(me.name||"Mon compte")+'</strong><span style="font-size:.78rem;opacity:.85;">'+esc(me.email||"")+'</span>'; } }catch(e){}
+    try{ const r=await fetch("/api/dashboard"); const d=await r.json(); if(r.ok) fillDashboard(d); }catch(e){}
+    try{ const r=await fetch("/api/station"); const d=await r.json(); if(r.ok){ station=d.station; renderKey(); } }catch(e){}
+    // Météo calculée côté navigateur (région du compte, ou position GPS si choisie).
+    initWeather(me && me.region);
+    // Actualisation automatique des mesures du capteur (toutes les 60 s) :
+    // dès qu'une vraie carte envoie des données, elles apparaissent sans recharger la page.
+    setInterval(refresh, 60000);
+    initMode(); bindLog(); bindResidus(); bindToday(); buildKindPick(); loadParcels();
+    if(me && me.isAdmin){
+      loadAdminQuestions(); initAdminAnimators();
+      // Quality Guard apparaît uniquement dans le menu des administrateurs.
+      const menu=document.querySelector('.side .menu');
+      if(menu && !document.getElementById('qualityGuardNav')){
+        const link=document.createElement('a');
+        link.id='qualityGuardNav'; link.href='/quality';
+        link.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg> Quality Guard';
+        link.style.marginTop='8px'; link.style.borderTop='1px solid rgba(255,255,255,.18)'; link.style.paddingTop='14px';
+        menu.appendChild(link);
+      }
+    }
+    // Cultivateur (ni admin, ni animateur, ni déjà certifié, ni compte client) : proposer la certification.
+    if(me && !me.isAdmin && !me.animator && !me.certified && me.profile!=="client"){ try{ initCertRequest(); }catch(e){} }
+    // Onglet Stock : administrateur, animateurs, ET cultivateurs certifiés (qui gèrent leur stock).
+    if(me && (me.isAdmin || me.animator || me.certified)){
+      const menu=document.querySelector('.side .menu');
+      if(menu && !document.getElementById('stockNav')){
+        const s=document.createElement('a');
+        s.id='stockNav'; s.href='/stock';
+        s.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg> Stock';
+        if(!document.getElementById('qualityGuardNav')){ s.style.marginTop='8px'; s.style.borderTop='1px solid rgba(255,255,255,.18)'; s.style.paddingTop='14px'; }
+        menu.appendChild(s);
+      }
+    }
+  }
+  // Propriétaire : désigner / retirer les animateurs.
+  function initAdminAnimators(){
+    const card=$("adminACard"); if(!card) return; card.style.display="block";
+    const msg=$("animMsg");
+    async function act(grant){
+      const email=($("animEmail").value||"").trim(); msg.style.color=""; msg.textContent="";
+      if(!email){ msg.style.color="var(--bad)"; msg.textContent="Entrez une adresse e-mail."; return; }
+      const r=await fetch("/api/admin/animator",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:email,grant:grant})});
+      const d=await r.json().catch(function(){return{};});
+      if(!r.ok){ msg.style.color="var(--bad)"; msg.textContent=d.error||"Action impossible."; return; }
+      msg.style.color="var(--good)"; msg.textContent=(grant?"Statut d'animateur accordé à ":"Statut retiré à ")+(d.email||email)+".";
+      $("animEmail").value=""; loadAnimList();
+    }
+    $("animGrant").addEventListener("click",function(){ act(true); });
+    $("animRevoke").addEventListener("click",function(){ act(false); });
+    loadAnimReqs();
+    loadAnimList();
+    loadCertReqs();
+  }
+  // Admin : demandes de certification des cultivateurs.
+  async function loadCertReqs(){
+    const box=$("certReqList"); if(!box) return;
+    try{
+      const r=await fetch("/api/admin/certify-requests"); const d=await r.json(); if(!r.ok) return;
+      const reqs=d.requests||[];
+      if(!reqs.length){ box.innerHTML=''; return; }
+      box.innerHTML='<div style="font-weight:700;color:var(--leaf);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin:12px 0 6px;">Demandes de certification cultivateur ('+reqs.length+')</div>'
+        + reqs.map(function(q){ const when=q.created_at?new Date(q.created_at).toLocaleDateString("fr-FR"):"";
+          return '<div style="border:1px solid var(--leaf);border-radius:10px;padding:9px 11px;margin-bottom:7px;background:color-mix(in srgb,var(--leaf) 7%,var(--surface));">'
+            +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="flex:1;min-width:150px;"><b>'+esc(q.name||q.email)+'</b> <span class="muted" style="font-size:.82rem;">'+esc(q.email)+(q.region?(" · "+esc(q.region)):"")+' · '+esc(when)+'</span></span>'
+            +'<button class="btn primary" type="button" data-creq="'+esc(q.id)+'|1" style="padding:5px 11px;">Certifier</button>'
+            +'<button class="btn" type="button" data-creq="'+esc(q.id)+'|0" style="padding:5px 11px;border-color:#c0392b;color:#c0392b;">Refuser</button></div></div>';
+        }).join("");
+      box.querySelectorAll("[data-creq]").forEach(function(b){ b.addEventListener("click", async function(){
+        const pr=b.getAttribute("data-creq").split("|"); b.disabled=true;
+        const rr=await fetch("/api/admin/certify-requests/decide",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:pr[0],approve:pr[1]==="1"})});
+        if(rr.ok){ loadCertReqs(); } else { b.disabled=false; }
+      }); });
+    }catch(e){}
+  }
+  // Cultivateur : demander la certification.
+  async function initCertRequest(){
+    const card=$("certCard"); if(!card) return; card.style.display="block";
+    const st=$("certStatus"), btn=$("certAsk");
+    try{
+      const r=await fetch("/api/certify/request"); const d=await r.json();
+      if(d.certified){ st.textContent="Vous êtes certifié : l'onglet « Stock » est accessible."; st.style.color="var(--good)"; btn.style.display="none"; return; }
+      if(d.request && d.request.status==="en_attente"){ st.textContent="Demande en attente de validation par l'administrateur."; btn.style.display="none"; return; }
+      if(d.request && d.request.status==="refusée"){ st.textContent="Votre précédente demande a été refusée. Vous pouvez en soumettre une nouvelle."; }
+      else { st.textContent="Vous n'êtes pas encore certifié."; }
+      btn.style.display="inline-block";
+      btn.onclick=async function(){ btn.disabled=true; btn.textContent="Envoi…";
+        const rr=await fetch("/api/certify/request",{method:"POST",headers:{"content-type":"application/json"},body:"{}"}); const dd=await rr.json();
+        if(rr.ok){ st.textContent="Demande envoyée. L'administrateur la confirmera."; st.style.color="var(--leaf)"; btn.style.display="none"; }
+        else { st.textContent=dd.error||"Demande impossible."; btn.disabled=false; btn.textContent="Demander la certification"; }
+      };
+    }catch(e){}
+  }
+  async function loadAnimReqs(){
+    const box=$("animReqList"); if(!box) return;
+    try{
+      const r=await fetch("/api/admin/animator-requests"); const d=await r.json(); if(!r.ok) return;
+      const reqs=d.requests||[];
+      if(!reqs.length){ box.innerHTML=''; return; }
+      box.innerHTML='<div style="font-weight:700;color:var(--sun);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin:10px 0 6px;">Demandes en attente ('+reqs.length+')</div>'
+        + reqs.map(function(q){ const when=q.created_at?new Date(q.created_at).toLocaleDateString("fr-FR"):"";
+          return '<div style="border:1px solid var(--sun);border-radius:10px;padding:9px 11px;margin-bottom:7px;background:color-mix(in srgb,var(--sun) 8%,var(--surface));">'
+            +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="flex:1;min-width:150px;"><b>'+esc(q.name||q.email)+'</b> <span class="muted" style="font-size:.82rem;">'+esc(q.email)+(q.region?(" · "+esc(q.region)):"")+' · '+esc(when)+'</span></span>'
+            +'<button class="btn primary" type="button" data-areq="'+esc(q.id)+'|1" style="padding:5px 11px;">Approuver</button>'
+            +'<button class="btn" type="button" data-areq="'+esc(q.id)+'|0" style="padding:5px 11px;border-color:#c0392b;color:#c0392b;">Refuser</button></div>'
+            +(q.message?('<div class="muted" style="font-size:.86rem;margin-top:5px;">'+esc(q.message)+'</div>'):'')
+          +'</div>';
+        }).join("");
+      box.querySelectorAll("[data-areq]").forEach(function(b){ b.addEventListener("click", async function(){
+        const pr=b.getAttribute("data-areq").split("|"); b.disabled=true;
+        const rr=await fetch("/api/admin/animator-requests/decide",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:pr[0],approve:pr[1]==="1"})});
+        if(rr.ok){ loadAnimReqs(); loadAnimList(); } else { b.disabled=false; }
+      }); });
+    }catch(e){}
+  }
+  async function loadAnimList(){
+    const box=$("animList"); if(!box) return;
+    try{
+      const r=await fetch("/api/admin/users"); const d=await r.json(); if(!r.ok) return;
+      const anims=(d.users||[]).filter(function(u){ return u.animator || u.isAdmin; });
+      if(!anims.length){ box.innerHTML='<div class="muted" style="margin-top:8px;">Aucun animateur désigné pour l\'instant.</div>'; return; }
+      box.innerHTML='<div style="font-weight:700;color:var(--leaf);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin:8px 0 6px;">Animateurs actuels</div>'
+        + anims.map(function(u){ return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:9px;padding:6px 10px;margin-bottom:5px;"><span style="flex:1;min-width:160px;"><b>'+esc(u.name||u.email)+'</b> <span class="muted" style="font-size:.82rem;">'+esc(u.email)+'</span></span>'+(u.isAdmin?'<span class="muted" style="font-size:.78rem;">propriétaire</span>':'<span style="font-size:.76rem;font-weight:700;color:var(--leaf);border:1px solid var(--leaf);border-radius:12px;padding:1px 8px;">animateur</span>')+'</div>'; }).join("");
+    }catch(e){}
+  }
+  // Formateur : ce que les cultivateurs demandent au conseiller.
+  async function loadAdminQuestions(){
+    try{
+      const r=await fetch("/api/admin/questions"); const d=await r.json(); if(!r.ok) return;
+      $("adminQCard").style.display="block";
+      const th=$("adminQThemes"); const themes=d.themes||[];
+      if(themes.length){
+        const max=Math.max.apply(null, themes.map(function(t){return t.count;}))||1;
+        th.innerHTML='<div style="font-weight:700;color:var(--leaf);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Thèmes les plus demandés ('+d.total+' questions)</div>'
+          + themes.map(function(t){ const w=Math.max(4,Math.round(100*t.count/max)); return '<div class="durmeter"><div class="top"><b>'+esc(t.label)+'</b><span class="sc">'+t.count+'</span></div><div class="durbar"><span style="width:'+w+'%;background:var(--leaf)"></span></div></div>'; }).join("");
+      } else { th.innerHTML='<div class="muted">Aucune question posée pour l\'instant.</div>'; }
+      const rec=d.recent||[]; const box=$("adminQRecent");
+      if(rec.length){
+        box.innerHTML='<div style="font-weight:700;color:var(--leaf);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin:6px 0;">Dernières questions</div>'
+          + '<div style="max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;">'
+          + rec.map(function(x){ const when=x.at?new Date(x.at).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"}):""; return '<div style="padding:8px 11px;border-bottom:1px solid var(--line);font-size:.88rem;">'+esc(x.question)+(x.crop?' <span class="muted">· '+esc(x.crop)+'</span>':'')+' <span class="muted" style="float:right;">'+when+'</span></div>'; }).join("")
+          + '</div>';
+      } else { box.innerHTML=""; }
+    }catch(e){}
+  }
+  async function refresh(){
+    if(!me){ return; }
+    try{ const r=await fetch("/api/dashboard"); const d=await r.json(); if(r.ok) fillDashboard(d); }catch(e){}
+  }
+
+  $("themeSel").addEventListener("change", (e)=>applyTheme(e.target.value));
+  (function syncThemeSel(){ let t="nature"; try{ t=localStorage.getItem("trv-theme")||"nature"; }catch(e){} $("themeSel").value=t; })();
+  { const b=$("btnSaveParcel"); if(b) b.addEventListener("click", saveParcelNow); }
+  $("btnNdvi").addEventListener("click", runNdvi);
+  $("btnEau").addEventListener("click", runIrrigation);
+  $("btnPlant").addEventListener("click", runPlantation);
+  $("gpsWx").addEventListener("click", ()=>gpsWeather(false));
+  $("btnSearch").addEventListener("click", searchPlace);
+  $("placeSearch").addEventListener("keydown", (e)=>{ if(e.key==="Enter") searchPlace(); });
+  $("btnLocate").addEventListener("click", locateMe);
+  $("clearMeas").addEventListener("click", clearMeasures);
+  $("revealBtn").addEventListener("click", ()=>{ keyShown=!keyShown; $("revealBtn").textContent=keyShown?"Masquer":"Afficher"; renderKey(); });
+  $("copyKeyBtn").addEventListener("click", copyKey);
+  $("sketchBtn").addEventListener("click", downloadSketch);
+  $("mSave").addEventListener("click", saveManual);
+
+  // ===== Indice de durabilité multicritère (cadre des agrosystèmes durables) =====
+  const DUR_Q = [
+    {p:"Environnemental", k:"mo",      label:"Matière organique au sol (compost, fumier, résidus)", opts:[["Rarement",0],["De temps en temps",50],["Systématiquement",100]]},
+    {p:"Environnemental", k:"cov",     label:"Couverture du sol & travail réduit (paillage, non-labour)", opts:[["Sol nu, labour fréquent",0],["Parfois couvert",50],["Couvert, peu ou pas de labour",100]]},
+    {p:"Environnemental", k:"div",     label:"Diversité des cultures", opts:[["Monoculture",0],["Rotation d'une saison à l'autre",50],["Associations / agroforesterie",100]]},
+    {p:"Environnemental", k:"intrant", label:"Engrais & pesticides chimiques de synthèse", opts:[["Beaucoup",0],["Modéré",50],["Peu ou aucun (bio)",100]]},
+    {p:"Environnemental", k:"eau",     label:"Gestion de l'eau", opts:[["Pluvial non optimisé",0],["Arrosage / collecte de pluie",50],["Goutte-à-goutte / très économe",100]]},
+    {p:"Économique", k:"vente", label:"Débouché de vente", opts:[["Autoconsommation seule",0],["Vente occasionnelle",50],["Marché ou contrat régulier",100]]},
+    {p:"Économique", k:"rev",   label:"Diversité des revenus", opts:[["Une seule source",0],["Quelques cultures",50],["Diversifié + valorisation des résidus",100]]},
+    {p:"Économique", k:"cout",  label:"Maîtrise des coûts d'intrants", opts:[["Dépend surtout d'achats",0],["Mixte",50],["Surtout ressources locales",100]]},
+    {p:"Social", k:"foyer", label:"Nourrit votre foyer (sécurité alimentaire)", opts:[["Non",0],["En partie",50],["Oui",100]]},
+    {p:"Social", k:"form",  label:"Accès à la formation / au conseil", opts:[["Aucun",0],["De temps en temps",50],["Régulier",100]]},
+    {p:"Social", k:"coop",  label:"Entraide / coopérative", opts:[["Seul",0],["Échanges informels",50],["Coopérative / groupe",100]]},
+  ];
+  function durBuildForm(){
+    const box=$("durForm"); if(!box) return; let html=""; let grp="";
+    DUR_Q.forEach(function(q){
+      if(q.p!==grp){ grp=q.p; html+='<div class="durgrp">'+esc(grp)+'</div>'; }
+      html+='<div class="durq"><label for="durq_'+q.k+'">'+esc(q.label)+'</label><select class="sel" id="durq_'+q.k+'" data-k="'+q.k+'" data-p="'+esc(q.p)+'"><option value="">— choisir —</option>'
+        + q.opts.map(function(o){ return '<option value="'+o[1]+'">'+esc(o[0])+'</option>'; }).join("")
+        + '</select></div>';
+    });
+    box.innerHTML=html;
+  }
+  function durBand(s){ return s<40?["bad","Faible"]:s<70?["warn","Moyen"]:s<85?["good","Bon"]:["good","Excellent"]; }
+  function durCol(b){ return b==="bad"?"var(--bad)":b==="warn"?"var(--warn)":"var(--good)"; }
+  function durMeter(label,score){ const r=durBand(score), c=durCol(r[0]); return '<div class="durmeter"><div class="top"><b>'+esc(label)+'</b><span class="sc" style="color:'+c+'">'+Math.round(score)+'/100 <span class="durtag" style="background:'+c+'">'+r[1]+'</span></span></div><div class="durbar"><span style="width:'+Math.max(2,Math.round(score))+'%;background:'+c+'"></span></div></div>'; }
+  function durVal(k){ const el=document.getElementById("durq_"+k); if(!el||el.value==="") return null; return parseFloat(el.value); }
+  function durMean(keys){ const v=keys.map(durVal).filter(function(x){return x!==null;}); if(!v.length) return null; return v.reduce(function(a,b){return a+b;},0)/v.length; }
+  function durCarbon(){
+    // Estimation INDICATIVE de séquestration (tCO2/ha/an) selon les pratiques déclarées.
+    var c=0; const mo=durVal("mo"), cov=durVal("cov"), div=durVal("div"), intr=durVal("intrant");
+    if(mo===100)c+=0.8; else if(mo===50)c+=0.3;
+    if(cov===100)c+=0.6; else if(cov===50)c+=0.25;
+    if(div===100)c+=1.4; else if(div===50)c+=0.3;   // agroforesterie/associations stockent le plus
+    if(intr===100)c+=0.2; else if(intr===50)c+=0.1;
+    return c;
+  }
+  function durCalc(){
+    const out=$("durOut"); if(!out) return;
+    const envKeys=["mo","cov","div","intrant","eau"];
+    let env=durMean(envKeys);
+    // NDVI satellite (santé de la végétation) : intégré au pilier environnemental s'il existe.
+    let ndviScore=null;
+    if(typeof window.lastNdvi==="number"){ ndviScore=Math.max(0,Math.min(100,(window.lastNdvi-0.2)/(0.75-0.2)*100)); }
+    if(ndviScore!==null){ env = (env===null) ? ndviScore : (env*envKeys.length + ndviScore)/(envKeys.length+1); }
+    const eco=durMean(["vente","rev","cout"]);
+    const soc=durMean(["foyer","form","coop"]);
+    const parts=[env,eco,soc].filter(function(x){return x!==null;});
+    if(!parts.length){ out.innerHTML='<div class="valert warn">Répondez à au moins quelques questions pour obtenir votre indice.</div>'; return; }
+    const global=parts.reduce(function(a,b){return a+b;},0)/parts.length;
+    const gb=durBand(global);
+    // Bilan carbone
+    const carb=durCarbon();
+    const area=parseFloat(($("durArea").value||"").replace(",","."));
+    const total=(area>0)? carb*area : null;
+    const km=Math.round(carb* (area>0?area:1) *6000); // 1 tCO2 ≈ 6000 km voiture (indicatif)
+    // Conseils : pilier le plus faible
+    const pil=[["environnemental",env],["économique",eco],["social",soc]].filter(function(x){return x[1]!==null;}).sort(function(a,b){return a[1]-b[1];});
+    const faible=pil[0];
+    const conseils={
+      "environnemental":"Composter et pailler (sol couvert), introduire une rotation ou des associations (ex. une légumineuse qui fixe l'azote), et réduire les intrants chimiques.",
+      "économique":"Diversifier les débouchés (marché, contrat), valoriser les résidus (compost, fourrage, champignons) et s'appuyer davantage sur des ressources locales pour baisser les coûts.",
+      "social":"Rejoindre ou créer une coopérative, et se former régulièrement — Terravive et ses itinéraires techniques comptent comme accès au conseil."
+    };
+    let html='<div class="durhero"><div class="big">'+Math.round(global)+'<small>/100</small></div>'
+      +'<div><div style="font-weight:800;color:'+durCol(gb[0])+';font-size:1.05rem;">Durabilité : '+gb[1]+'</div>'
+      +'<div class="muted" style="font-size:.85rem;">Moyenne des piliers renseignés'+(ndviScore!==null?' · NDVI satellite inclus':'')+'.</div></div></div>';
+    html+='<div class="section-gap">';
+    if(env!==null) html+=durMeter("Environnemental",env);
+    if(eco!==null) html+=durMeter("Économique",eco);
+    if(soc!==null) html+=durMeter("Social",soc);
+    html+='</div>';
+    // Carbone
+    html+='<div class="vchips section-gap">'
+      +'<div class="vchip"><div class="l">Carbone stocké (est.) '+natTag("hypothese")+'</div><div class="v">≈ '+carb.toFixed(1)+' tCO₂/ha/an</div></div>'
+      +(total!==null?('<div class="vchip"><div class="l">Sur '+area+' ha</div><div class="v">≈ '+total.toFixed(1)+' tCO₂/an</div></div>'):'')
+      +'<div class="vchip"><div class="l">Équivalent</div><div class="v">≈ '+km.toLocaleString("fr-FR")+' km en voiture évités</div></div>'
+      +'</div>';
+    if(durMeasured&&durMeasured.carbon){ const K=durMeasured.carbon; html+='<div class="vchips"><div class="vchip"><div class="l">Carbone apporté par le compost noté '+natTag("modele")+'</div><div class="v">'+nf(K.co2e_kg.v)+' kg CO₂e</div><div class="muted" style="font-size:.72rem;">'+nf(durMeasured.compost_kg)+' kg de compost '+natTag("mesure")+' ; dont '+nf(K.retained_co2e_kg.v[0])+' à '+nf(K.retained_co2e_kg.v[1])+' kg durablement '+natTag("hypothese")+'</div></div></div>'; }
+    html+='<div class="valert">Levier prioritaire — pilier <b>'+esc(faible[0])+'</b> ('+Math.round(faible[1])+'/100) : '+esc(conseils[faible[0]])+'</div>';
+    html+='<div class="muted" style="font-size:.78rem;margin-top:6px;">Estimations indicatives, à visée pédagogique (cadre des agrosystèmes durables). Le carbone dépend fortement du sol et du climat réels.</div>';
+    out.innerHTML=html;
+  }
+  durBuildForm();
+  { const b=$("durCalc"); if(b) b.addEventListener("click", durCalc); }
+  // Pré-remplissage depuis le carnet de champ (mesuré) : l'utilisateur garde la main.
+  let durMeasured=null;
+  async function loadDurMeasured(){
+    try{
+      const r=await fetch("/api/impact/summary"); if(!r.ok) return; const d=await r.json(); durMeasured=d;
+      const D=d.durability||{};
+      ["mo","intrant"].forEach(function(k){
+        const el=document.getElementById("durq_"+k); if(!el||!D[k]) return;
+        if(el.value==="") el.value=String(D[k].value);
+        const lab=el.parentNode.querySelector("label"); if(lab&&!lab.querySelector(".nat")) lab.insertAdjacentHTML("beforeend",' <span class="nat mesure" title="'+esc(D[k].why)+'">d\'après le carnet</span>');
+      });
+      if(D.intrant_note){ const el=document.getElementById("durq_intrant"); if(el&&!el.parentNode.querySelector(".durnote")) el.insertAdjacentHTML("afterend",'<div class="muted durnote" style="font-size:.76rem;">'+esc(D.intrant_note)+'</div>'); }
+      if(!$("durArea").value&&d.area_m2) $("durArea").value=String(Math.round(d.area_m2/100)/100).replace(".",",");
+    }catch(e){}
+  }
+  loadDurMeasured();
+
+  load();
+</script>
+<script>
+// La colonne de droite « colle » à l'écran pendant le défilement. Si elle est plus haute que
+// la fenêtre, on la fait coller par le BAS (top négatif) pour qu'on puisse quand même tout lire.
+(function(){
+  var el=document.getElementById("rightCol"); if(!el) return;
+  function fit(){ if(innerWidth<=860){ el.style.top=""; return; } el.style.top=Math.min(16, innerHeight-el.offsetHeight-16)+"px"; }
+  addEventListener("resize", fit); addEventListener("load", fit);
+  if(window.ResizeObserver) new ResizeObserver(fit).observe(el);
+  fit();
+})();
+</script>
+</body>
+</html>

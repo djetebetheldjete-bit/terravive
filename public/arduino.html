@@ -41,6 +41,10 @@
   label{ display:block; font-weight:600; font-size:.85rem; margin:12px 0 4px; color:var(--ink); }
   .hint{ color:var(--faint); font-weight:400; }
   input, select, textarea{ width:100%; font-family:inherit; font-size:.95rem; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:var(--surface2); color:var(--ink); }
+
+  /* en-tête : le sélecteur de thème garde sa taille naturelle, les boutons ne se coupent pas */
+  .top select.themeSel{ width:auto; flex:0 0 auto; max-width:11.5rem; }
+  .top .btn, .top .navlink{ white-space:nowrap; flex:0 0 auto; }
   textarea{ min-height:84px; resize:vertical; }
   .err{ color:var(--bad); font-size:.88rem; margin-top:8px; min-height:1em; }
   .spin{ display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.5); border-top-color:#fff; border-radius:50%; animation:sp .7s linear infinite; vertical-align:-2px; }
@@ -79,7 +83,7 @@
     <span class="grow"></span>
     <select class="themeSel" id="themeSel" title="Thème" style="margin-right:6px;"><option value="nature">Thème : Nature</option><option value="clair">Thème : Clair</option><option value="sombre">Thème : Sombre</option><option value="terre">Thème : Terre</option></select>
     <a href="/tableau" class="navlink">Tableau de bord</a>
-    <a href="/app" class="navlink">Itinéraire de culture</a>
+    <a href="/app" class="navlink">Plan de culture</a>
     <span id="who"></span>
   </div>
 
@@ -94,7 +98,7 @@
           Connectez-vous d'abord pour générer un projet. <a href="/app">Ouvrir la page de connexion</a>
         </div>
 
-        <label>Type de projet</label>
+        <label for="kind">Type de projet</label>
         <select id="kind">
           <option value="Arrosage automatique intelligent">Arrosage automatique intelligent</option>
           <option value="Surveillance de serre (température et humidité)">Surveillance de serre (température / humidité)</option>
@@ -104,13 +108,13 @@
           <option value="Autre (je décris ci-dessous)">Autre (je décris ci-dessous)</option>
         </select>
 
-        <label>Ce que vous voulez automatiser <span class="hint">(détails)</span></label>
+        <label for="need">Ce que vous voulez automatiser <span class="hint">(détails)</span></label>
         <textarea id="need" placeholder="ex. arroser mes tomates quand la terre est sèche, mais pas s'il pleut, et seulement le matin et le soir ; couper la pompe si la cuve est vide."></textarea>
 
-        <label>Région / secteur <span class="hint">(pour la mémoire partagée)</span></label>
+        <label for="sector">Région / secteur <span class="hint">(pour la mémoire partagée)</span></label>
         <input id="sector" placeholder="ex. Bouaké" maxlength="80">
 
-        <label>Mon matériel / mes contraintes <span class="hint">(facultatif)</span></label>
+        <label for="gear">Mon matériel / mes contraintes <span class="hint">(facultatif)</span></label>
         <textarea id="gear" placeholder="ex. j'ai une carte Arduino Uno, un capteur d'humidité capacitif, un relais et une petite pompe 5 V ; budget limité."></textarea>
 
         <div style="margin-top:14px;">
@@ -120,7 +124,7 @@
       </div>
 
       <div class="card" style="margin-top:16px;">
-        <h1 style="font-size:1.05rem;">Mes projets</h1>
+        <h2 style="font-family:var(--f-display);color:var(--deep);font-size:1.05rem;margin:0 0 4px;">Mes projets</h2>
         <div id="projList"><p class="intro" style="margin:0;">Connectez-vous pour retrouver vos projets.</p></div>
       </div>
     </div>
