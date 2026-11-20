@@ -528,6 +528,8 @@
   async function loadMe(){
     try{ const r = await fetch("/api/auth/me"); me = (await r.json()).user || null; }catch(e){ me=null; }
     render();
+    // Arrivée depuis « Se connecter » de la page d'accueil : ouvrir directement la fenêtre de connexion.
+    try{ if(!me && new URLSearchParams(location.search).get("login")) openAuth("login"); }catch(e){}
     handleCropDeepLink();
     loadParcelOptions();
   }
