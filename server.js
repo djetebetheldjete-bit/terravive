@@ -67,6 +67,10 @@ function sendJson(res, code, obj) { res.writeHead(code, { "content-type": "appli
 function readBody(req) { return new Promise((resolve, reject) => { let b = ""; req.on("data", (c) => { b += c; if (b.length > 6e6) req.destroy(); }); req.on("end", () => resolve(b)); req.on("error", reject); }); }
 function normEmail(s) { return String(s || "").trim().toLowerCase(); }
 function validEmail(s) { return typeof s === "string" && s.length <= 200 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s); }
+// --- Planteurs : connexion par téléphone + code PIN (sans e-mail). Le numéro sert d'identifiant interne. ---
+function normPhone(s) { return String(s || "").replace(/[^\d]/g, ""); }
+function planteurEmail(phone) { return normPhone(phone) + "@planteur.terravive"; }
+function isPlanteurPhone(u) { return !!(u && u.email && String(u.email).endsWith("@planteur.terravive")); }
 function escapeHtml(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function newId() { return crypto.randomBytes(12).toString("hex"); }
 
@@ -159,7 +163,7 @@ function userProfile(u) { return (u && u.profile === "client") ? "client" : "cul
 // Un admin / animateur / cultivateur certifié n'est JAMAIS traité comme un client,
 // même si son profil valait « client ». Sert à fermer les pages et API techniques.
 function isClientOnly(u) { return !!u && userProfile(u) === "client" && !isAdmin(u) && !isAnimator(u) && !u.certified; }
-function publicUser(u) { return u ? { id: u.id, email: u.email, name: u.name, region: u.region || null, isAdmin: isAdmin(u), animator: isAnimator(u), certified: !!(u && u.certified), profile: userProfile(u), admin_email: isAdminEmail(u) } : null; }
+function publicUser(u) { return u ? { id: u.id, email: isPlanteurPhone(u) ? null : u.email, phone: isPlanteurPhone(u) ? String(u.email).split("@")[0] : null, name: u.name, region: u.region || null, isAdmin: isAdmin(u), animator: isAnimator(u), certified: !!(u && u.certified), profile: userProfile(u), admin_email: isAdminEmail(u) } : null; }
 async function setUserAnimator(userId, val) {
   if (USE_DB) { try { await sb(`/trv_users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ animator: !!val }) }); } catch (e) { console.error("setUserAnimator:", e.message); } return; }
   const s = loadStore(); if (s.users[userId]) { s.users[userId].animator = !!val; saveStore(s); }
@@ -1015,6 +1019,19 @@ Rédige le projet Arduino complet, avec le sketch commenté.`;
 async function handleRegister(req, res) {
   try {
     let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+    // Inscription PLANTEUR : téléphone + code PIN (pas d'e-mail).
+    if (p.as === "planteur" || p.phone) {
+      const phone = normPhone(p.phone);
+      if (phone.length < 8 || phone.length > 15) return sendJson(res, 400, { error: "Numéro de téléphone invalide." });
+      const pin = String(p.pin || p.password || "");
+      if (!/^\d{4,8}$/.test(pin)) return sendJson(res, 400, { error: "Le code PIN doit comporter 4 à 8 chiffres." });
+      if (!rateOk("register-ip:" + clientIp(req), 10, 60 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de créations de compte depuis cette connexion. Réessayez plus tard." });
+      const pemail = planteurEmail(phone);
+      if (await findUserByEmail(pemail)) return sendJson(res, 409, { error: "Un compte existe déjà avec ce numéro. Connectez-vous." });
+      const puser = await createUser({ email: pemail, name: p.name, password: pin, region: p.region, profile: "cultivateur" });
+      const ptoken = await createSession(puser.id); setSessionCookie(res, ptoken);
+      return sendJson(res, 200, { user: publicUser(puser) });
+    }
     const email = normEmail(p.email);
     if (!validEmail(email)) return sendJson(res, 400, { error: "Adresse e-mail invalide." });
     if (typeof p.password !== "string" || p.password.length < 6) return sendJson(res, 400, { error: "Le mot de passe doit contenir au moins 6 caractères." });
@@ -1028,6 +1045,16 @@ async function handleRegister(req, res) {
 async function handleLogin(req, res) {
   try {
     let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+    // Connexion PLANTEUR : téléphone + code PIN.
+    if (p.as === "planteur" || p.phone) {
+      const phone = normPhone(p.phone);
+      if (!rateOk("login-ip:" + clientIp(req), 30, 10 * 60 * 1000) || !rateOk("login-phone:" + phone, 10, 10 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de tentatives de connexion. Réessayez dans quelques minutes." });
+      const puser = await findUserByEmail(planteurEmail(phone));
+      const pin = String(p.pin || p.password || "");
+      if (!puser || !verifyPassword(pin, puser.pass)) return sendJson(res, 401, { error: "Numéro ou code PIN incorrect." });
+      const ptoken = await createSession(puser.id); setSessionCookie(res, ptoken);
+      return sendJson(res, 200, { user: publicUser(puser) });
+    }
     // Anti-force brute : nombre de tentatives limité par adresse IP et par e-mail.
     if (!rateOk("login-ip:" + clientIp(req), 30, 10 * 60 * 1000) || !rateOk("login:" + normEmail(p.email).slice(0, 200), 10, 10 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de tentatives de connexion. Réessayez dans quelques minutes." });
     const user = await findUserByEmail(p.email);

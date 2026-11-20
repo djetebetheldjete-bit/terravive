@@ -171,7 +171,7 @@ async function boot(){
   if(!me){ location.href="/app"; return; }
   if(me.profile==="client"){ location.href="/boutique"; return; }
   $("topAv").textContent=initials(me.name);$("pAv").textContent=initials(me.name);
-  $("pName").textContent=me.name||"—";$("pMail").textContent=me.email||"";
+  $("pName").textContent=me.name||"—";$("pMail").textContent=me.phone||me.email||"";
   $("hiName").textContent="Bonjour, "+(String(me.name||"").split(" ")[0]||"")+" — vos parcelles";
   loadParcels();
   loadAnimateur();

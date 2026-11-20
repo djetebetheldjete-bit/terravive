@@ -472,9 +472,15 @@
       <p id="authIntro">Gratuit — pour sauvegarder vos plans et suivre vos cultures.</p>
       <div id="nameWrap"><label for="auName" style="font-size:.8rem;color:var(--soft);font-weight:600;">Nom</label><input id="auName" placeholder="Votre nom" maxlength="80"></div>
       <div id="regionWrap"><label for="auRegion" style="font-size:.8rem;color:var(--soft);font-weight:600;">Région (facultatif)</label><input id="auRegion" placeholder="ex. Bouaké" maxlength="80"></div>
+      <div id="emailPassWrap">
       <label for="auEmail" style="font-size:.8rem;color:var(--soft);font-weight:600;">E-mail</label><input id="auEmail" type="email" placeholder="vous@exemple.com" autocomplete="username">
       <label for="auPass" style="font-size:.8rem;color:var(--soft);font-weight:600;">Mot de passe</label>
       <div class="pw-wrap"><input id="auPass" type="password" placeholder="au moins 6 caractères" autocomplete="current-password"><button type="button" class="pw-eye" id="auPassEye" aria-label="Afficher le mot de passe" aria-pressed="false" title="Afficher le mot de passe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+      </div>
+      <div id="phonePinWrap" style="display:none">
+      <label for="auPhone" style="font-size:.8rem;color:var(--soft);font-weight:600;">Numéro de téléphone</label><input id="auPhone" type="tel" inputmode="numeric" placeholder="ex. 07 00 00 00 00" autocomplete="tel">
+      <label for="auPin" style="font-size:.8rem;color:var(--soft);font-weight:600;">Code PIN</label><input id="auPin" type="password" inputmode="numeric" maxlength="8" placeholder="4 à 6 chiffres" autocomplete="current-password">
+      </div>
       <div id="codeWrap" style="display:none;margin-top:12px;"><label for="auCode" style="font-size:.8rem;color:var(--soft);font-weight:600;">Code administrateur</label><input id="auCode" type="password" placeholder="Code secret de l'administrateur" autocomplete="off"></div>
       <div class="err" id="authErr"></div>
       <button class="btn primary" id="authGo" type="button" style="width:100%;">Créer mon compte</button>
@@ -606,6 +612,11 @@
     $("authIntro").textContent = intros[accountType][reg?"reg":"log"];
     $("nameWrap").style.display = reg? "block":"none"; $("regionWrap").style.display = reg? "block":"none";
     $("codeWrap").style.display = (accountType==="admin") ? "block":"none"; var ac=$("auCode"); if(ac) ac.value="";
+    // Planteur : connexion par téléphone + code PIN (les autres profils gardent e-mail + mot de passe).
+    var isPl = (accountType==="planteur");
+    $("emailPassWrap").style.display = isPl ? "none" : "";
+    $("phonePinWrap").style.display = isPl ? "" : "none";
+    var apn=$("auPin"); if(apn) apn.value="";
     $("authGo").textContent = reg? "Créer mon compte":"Se connecter";
     $("authGo").disabled=false;
     // L'administrateur n'a pas d'inscription ; les autres profils gardent la bascule.
@@ -619,13 +630,22 @@
   async function doAuth(){
     const err=$("authErr"); err.style.color=""; err.textContent="";
     const wasRegister = authMode==="register";
-    const email=$("auEmail").value.trim(), pass=$("auPass").value;
-    if(!email||!pass){ err.textContent="Renseignez l'e-mail et le mot de passe."; return; }
     const url = wasRegister ? "/api/auth/register" : "/api/auth/login";
-    const profile = accountType==="client" ? "client" : "cultivateur";
-    const body = wasRegister
-      ? { name:$("auName").value, region:$("auRegion").value, email, password:pass, profile }
-      : { email, password:pass, as:accountType, code: (accountType==="admin" ? ($("auCode")?$("auCode").value:"") : undefined) };
+    let body;
+    if(accountType==="planteur"){
+      const phone=$("auPhone").value.trim(), pin=$("auPin").value.trim();
+      if(!phone||!pin){ err.textContent="Entrez votre numéro de téléphone et votre code PIN."; return; }
+      body = wasRegister
+        ? { as:"planteur", phone, pin, name:$("auName").value, region:$("auRegion").value }
+        : { as:"planteur", phone, pin };
+    } else {
+      const email=$("auEmail").value.trim(), pass=$("auPass").value;
+      if(!email||!pass){ err.textContent="Renseignez l'e-mail et le mot de passe."; return; }
+      const profile = accountType==="client" ? "client" : "cultivateur";
+      body = wasRegister
+        ? { name:$("auName").value, region:$("auRegion").value, email, password:pass, profile }
+        : { email, password:pass, as:accountType, code: (accountType==="admin" ? ($("auCode")?$("auCode").value:"") : undefined) };
+    }
     $("authGo").disabled=true;
     try{
       const r = await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
