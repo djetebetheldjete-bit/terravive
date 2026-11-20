@@ -38,11 +38,7 @@ async function main() {
       assert.strictEqual(r.json.ok, true);
       assert.strictEqual(r.json.db, "local", "ATTENTION : le serveur de test est branché sur une vraie base");
     });
-<<<<<<< HEAD
     for (const url of ["/", "/app", "/tableau", "/planteur", "/conseiller", "/cooperative", "/diagnostic", "/stock", "/boutique", "/quality", "/arduino", "/comprendre"]) {
-=======
-    for (const url of ["/", "/app", "/tableau", "/conseiller", "/cooperative", "/diagnostic", "/stock", "/boutique", "/quality", "/arduino", "/comprendre"]) {
->>>>>>> 64e3c6879ea762ca4b4f44b31ceff82bffb3af8f
       await t.test("la page " + url + " s'affiche", async () => {
         const r = await req("GET", url);
         assert.strictEqual(r.status, 200, "statut " + r.status);
@@ -69,15 +65,12 @@ async function main() {
       for (const u of ["/manifest.webmanifest", "/sw.js", "/logo.png", "/mobile.css"]) assert.strictEqual((await req("GET", u)).status, 200, u);
       JSON.parse((await req("GET", "/manifest.webmanifest")).text);
     });
-<<<<<<< HEAD
     await t.test("la vue planteur est branchée sur les vraies données (aucune donnée inventée)", async () => {
       const html = (await req("GET", "/planteur")).text;
       for (const api of ["/api/auth/me", "/api/parcels", "/api/today", "/api/fieldlog"]) assert.ok(html.includes(api), "la vue planteur doit appeler " + api);
       assert.ok(html.includes('kind:"observation"') || html.includes("kind:'observation'"), "« C'est fait » doit noter une observation réelle");
       assert.ok(!/messages?\s+animateur|données?\s+fictives|lorem/i.test(html), "la vue planteur ne doit pas afficher de contenu fictif");
     });
-=======
->>>>>>> 64e3c6879ea762ca4b4f44b31ceff82bffb3af8f
 
     // ------------------------------------------------------------- Sécurité
     t.section("Sécurité de base");
@@ -194,11 +187,7 @@ async function main() {
       assert.strictEqual(r.status, 200, r.text);
       assert.strictEqual(r.json.user.profile, "client");
       clientCookie = cookieOf(r);
-<<<<<<< HEAD
       for (const page of ["/tableau", "/planteur", "/conseiller", "/stock", "/quality", "/arduino", "/cooperative", "/diagnostic", "/comprendre"]) {
-=======
-      for (const page of ["/tableau", "/conseiller", "/stock", "/quality", "/arduino", "/cooperative", "/diagnostic", "/comprendre"]) {
->>>>>>> 64e3c6879ea762ca4b4f44b31ceff82bffb3af8f
         const p = await req("GET", page, { cookie: clientCookie });
         assert.strictEqual(p.status, 302, page + " → " + p.status);
         assert.strictEqual(p.headers.location, "/boutique", page);

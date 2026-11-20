@@ -1,6 +1,5 @@
 # Journal des versions — Terravive
 
-<<<<<<< HEAD
 ## v8.9 — 17 novembre 2026 : vue planteur (interface simplifiée du cultivateur)
 - **Nouvelle page `/planteur`** : une interface dédiée au planteur / cultivateur, séparée de l'espace technique complet. Pensée pour le téléphone et la lecture rapide sur le terrain : grandes cartes, ton « vous », un seul geste par tâche.
 - **Vos parcelles** : la liste des parcelles du cultivateur (plusieurs parcelles gérées), chacune avec sa culture et un repère clair — « 2 choses à faire », « À jour », ou « Culture à renseigner ».
@@ -10,8 +9,6 @@
 - 100 % conforme au système Terravive : mêmes couleurs et thèmes (nature, clair, sombre, terre), même logo, mêmes icônes (trait 1,8, arrondi), même ton. Aucune donnée fictive, aucune fausse messagerie. Réutilise l'authentification existante ; page fermée aux comptes « client » (redirigés vers la boutique), comme les autres espaces techniques.
 - Lien « Vue planteur » ajouté dans les raccourcis du tableau de bord. 2 tests de bout en bout ajoutés (page servie au cultivateur, branchée sur les vraies API ; fermée au client). Service worker v29.
 
-=======
->>>>>>> 64e3c6879ea762ca4b4f44b31ceff82bffb3af8f
 ## v8.8 — 15 novembre 2026 : valoriser ses résidus, test de germination du compost
 - **Guide « Valoriser mes résidus »** (tableau de bord, au-dessus du carnet) : le producteur choisit ce qu'il a (tiges, paille de riz, feuilles, cabosses de cacao, branches, fumier, résidus de transformation) et lit quoi en faire (compost, paillis, biochar, alimentation animale, biogaz), comment, et avec quelles précautions. Un bouton prépare la saisie dans le carnet. Contenu reformulé à partir du cours « Typologie et caractérisation des déchets agricoles » du Prof. Karamoko Ouattara (Master 1, UFR-ARHAI, Université de San-Pédro), source affichée. Le cours ne donne aucune dose : le guide non plus, et un test automatique vérifie qu'il ne contient aucun chiffre.
 - **Carnet de champ : « Résidus valorisés »** : résidu, ce qu'on en a fait, quantité en kg ou en brouettes, sacs, seaux, bottes. Aucun poids par défaut pour ces mesures : le producteur pèse une fois, et le poids est gardé pour chaque résidu. Le conseil du guide s'affiche pendant la saisie.
