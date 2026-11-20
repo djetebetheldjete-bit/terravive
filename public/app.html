@@ -172,7 +172,7 @@
         <h1 class="sec">Créer mon plan de culture <span style="font-weight:400;font-size:.8em;color:var(--faint);">(itinéraire technique)</span></h1>
         <p class="hint">Décrivez votre parcelle. L'IA agronome prépare un plan de culture complet, du sol à la récolte, tourné vers l'agroécologie. <a href="/comprendre" style="color:var(--leaf);font-weight:600;">Comprendre les notions</a></p>
         <label for="crop">Que voulez-vous cultiver ? *</label>
-        <input id="crop" placeholder="ex. tomate, maïs, cacao, gombo…" maxlength="120">
+        <input id="crop" placeholder="ex. tomate, maïs, cacao, gombo…" maxlength="120" data-tour="1" data-tour-title="Que voulez-vous cultiver ?" data-tour-text="Écrivez votre culture — tomate, maïs, cacao… C'est le point de départ.">
         <div id="parcelPick" style="display:none;">
           <label for="parcelSel">Parcelle enregistrée <span style="color:var(--faint);font-weight:400;">(facultatif — pour adapter l'itinéraire à la nature de son sol)</span></label>
           <select id="parcelSel"><option value="">— aucune —</option></select>
@@ -239,7 +239,7 @@
         <label for="notes">Moyens / contraintes (facultatif)</label>
         <textarea id="notes" placeholder="ex. peu d'eau disponible, pas de tracteur, budget limité, présence de fourmis…" maxlength="500"></textarea>
         <div class="err" id="formErr"></div>
-        <button class="btn primary" id="genBtn" type="button" style="width:100%;margin-top:6px;">Générer mon plan de culture</button>
+        <button class="btn primary" id="genBtn" type="button" style="width:100%;margin-top:6px;" data-tour="2" data-tour-title="Générer le plan" data-tour-text="Appuyez ici : l'assistant prépare votre itinéraire complet, du sol à la récolte.">Générer mon plan de culture</button>
       </div>
 
       <div class="card plans">
@@ -251,7 +251,7 @@
     <!-- Colonne droite : plan + conseiller -->
     <div>
       <div class="card planbox" id="planCard">
-        <div class="placeholder" id="planPlaceholder">
+        <div class="placeholder" id="planPlaceholder" data-tour="3" data-tour-title="Votre plan apparaît ici" data-tour-text="Une fois généré, votre plan personnalisé s'affiche de ce côté, étape par étape.">
           <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 20c-.5-8 5-14.5 15-15.5.7 10.5-5.5 16.5-13.5 16.5"/><path d="M8.5 20c1.3-5 4-8.5 8.5-10.5"/></svg></div>
           <p>Remplissez le formulaire à gauche et cliquez sur <b>« Générer mon plan de culture »</b>.<br>Votre plan personnalisé s'affichera ici.</p>
         </div>

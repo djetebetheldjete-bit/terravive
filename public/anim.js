@@ -29,10 +29,9 @@
   /* ---------- Apparition au défilement ---------- */
   function initReveal() {
     var sel = "[data-reveal], .hero, .heroart, .heroX, .card, .pcard, .planrow, .fsec, .doc, .sec, .panel, .tile, .kpi, .statcard";
-    var els = all(sel).filter(function (el) {
-      return !el.closest("[data-no-reveal]") && !el.classList.contains("reveal");
-    });
-    els.forEach(function (el) { el.classList.add("reveal"); });
+    all(sel).forEach(function (el) { if (!el.closest("[data-no-reveal]")) el.classList.add("reveal"); });
+    // Observe TOUS les .reveal (ajoutés par le moteur ou posés à la main dans le HTML).
+    var els = all(".reveal").filter(function (el) { return !el.closest("[data-no-reveal]"); });
 
     // délai échelonné entre frères
     var groups = new Map();

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Terravive — Centre de formation (animateurs)</title>
+<meta name="description" content="Tutoriels vidéo pour les animateurs Terravive : accompagner les planteurs, pas à pas.">
+<link rel="icon" type="image/png" href="/favicon-32.png">
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("trv-theme")||"nature");}catch(e){}</script>
+<style>
+  :root{ --leaf:#2E7D46; --deep:#1B5E34; --sun:#E0A93B; --ink:#14261A; --soft:#5b6b5f; --bg:#eef4ec; --surface:#fff; --surface2:#f3f8f1; --line:#dde7dc; --f-display:Georgia,"Times New Roman",serif; }
+  :root[data-theme="sombre"]{ --ink:#e8f1ea; --soft:#9fb0a4; --bg:#101a13; --surface:#18241b; --surface2:#1e2c21; --line:#2b3a2f; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Segoe UI',system-ui,Arial,sans-serif; color:var(--ink); background:var(--bg); line-height:1.5; }
+  .top{ display:flex; align-items:center; gap:12px; padding:14px 20px; background:var(--surface); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20; }
+  .top .logo{ width:34px; height:34px; border-radius:50%; background:radial-gradient(circle at 50% 35%,#4CAF6A,#1B5E34); display:grid; place-items:center; }
+  .top .brand{ font-family:var(--f-display); font-weight:700; color:var(--deep); font-size:1.2rem; }
+  .top .brand small{ display:block; font-family:'Segoe UI',system-ui,sans-serif; font-size:.68rem; color:var(--soft); font-weight:600; letter-spacing:.02em; }
+  .top .back{ margin-left:auto; text-decoration:none; color:var(--soft); font-weight:600; font-size:.9rem; border:1px solid var(--line); padding:8px 13px; border-radius:10px; background:var(--surface2); }
+  .wrap{ max-width:1080px; margin:0 auto; padding:26px 20px 60px; }
+  .lead h1{ font-family:var(--f-display); color:var(--deep); font-size:1.7rem; }
+  .lead p{ color:var(--soft); margin-top:6px; max-width:640px; }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:22px; margin-top:26px; }
+  .vcard{ background:var(--surface); border:1px solid var(--line); border-radius:18px; overflow:hidden; box-shadow:0 6px 20px rgba(20,38,26,.06); display:flex; flex-direction:column; }
+  .vcard video{ width:100%; display:block; background:#0c1a11; aspect-ratio:9/16; max-height:420px; object-fit:contain; }
+  .vbody{ padding:15px 16px 17px; }
+  .vbody .meta{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .vbody .dur{ font-size:.72rem; font-weight:700; color:var(--deep); background:var(--surface2); border:1px solid var(--line); padding:2px 8px; border-radius:999px; }
+  .vbody h3{ font-family:var(--f-display); font-size:1.12rem; color:var(--ink); }
+  .vbody p{ color:var(--soft); font-size:.9rem; margin-top:5px; }
+  .soon{ position:relative; }
+  .soon .ph{ aspect-ratio:9/16; max-height:420px; background:linear-gradient(160deg,var(--surface2),#e7f0e7); display:grid; place-items:center; color:var(--leaf); }
+  :root[data-theme="sombre"] .soon .ph{ background:linear-gradient(160deg,#1e2c21,#16211a); }
+  .soon .badge{ position:absolute; top:12px; left:12px; background:var(--sun); color:#3a2a06; font-weight:700; font-size:.72rem; padding:4px 10px; border-radius:999px; }
+  .note{ margin-top:30px; background:var(--surface2); border:1px solid var(--line); border-radius:14px; padding:14px 16px; font-size:.9rem; color:var(--soft); }
+  .note b{ color:var(--ink); }
+</style>
+<link rel="stylesheet" href="/anim.css">
+<script src="/anim.js" defer></script>
+<link rel="stylesheet" href="/help.css">
+<script src="/help.js" defer></script>
+</head>
+<body data-no-fab>
+<div class="top">
+  <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#dff5e6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M12 20.5v-8.6"/><path d="M12 12.6c0-3.3-2.2-5.3-6.2-5.3 0 3.7 2.3 5.3 6.2 5.3z"/><path d="M12 10.4c0-2.9 2-4.8 5.8-4.8 0 3.3-2.1 4.8-5.8 4.8z"/></svg></span>
+  <span class="brand">Terravive<small>Centre de formation · animateurs</small></span>
+  <a class="back" href="/cooperative">← Ma coopérative</a>
+</div>
+
+<div class="wrap">
+  <div class="lead reveal">
+    <h1>Tutoriels vidéo</h1>
+    <p>De courtes vidéos pour vous aider à accompagner vos planteurs sur le terrain : comment les connecter, utiliser l'application et suivre leurs cultures.</p>
+  </div>
+
+  <div class="grid">
+
+    <div class="vcard reveal">
+      <video controls preload="none" playsinline poster="/videos/connexion-planteur.jpg">
+        <source src="/videos/connexion-planteur.mp4" type="video/mp4">
+        Votre navigateur ne peut pas lire cette vidéo.
+      </video>
+      <div class="vbody">
+        <div class="meta"><span class="dur">0:18</span></div>
+        <h3>Connecter un planteur (téléphone + code PIN)</h3>
+        <p>Montrez au planteur comment se connecter avec son numéro et un code PIN, sans e-mail — et ce qu'il voit ensuite.</p>
+      </div>
+    </div>
+
+    <div class="vcard soon reveal">
+      <div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" style="width:54px;height:54px;opacity:.55"><path d="M8 5v14l11-7z"/></svg></div>
+      <span class="badge">Bientôt</span>
+      <div class="vbody"><h3>Découverte de l'espace planteur</h3><p>Les parcelles, les tâches du jour, « C'est fait » et l'écoute à voix haute.</p></div>
+    </div>
+
+    <div class="vcard soon reveal">
+      <div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" style="width:54px;height:54px;opacity:.55"><path d="M8 5v14l11-7z"/></svg></div>
+      <span class="badge">Bientôt</span>
+      <div class="vbody"><h3>Créer un plan de culture</h3><p>Saisir la parcelle et générer l'itinéraire technique complet.</p></div>
+    </div>
+
+    <div class="vcard soon reveal">
+      <div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" style="width:54px;height:54px;opacity:.55"><path d="M8 5v14l11-7z"/></svg></div>
+      <span class="badge">Bientôt</span>
+      <div class="vbody"><h3>Le diagnostic par photo</h3><p>Prendre une plante en photo et lire la cause probable et les solutions.</p></div>
+    </div>
+
+    <div class="vcard soon reveal">
+      <div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" style="width:54px;height:54px;opacity:.55"><path d="M8 5v14l11-7z"/></svg></div>
+      <span class="badge">Bientôt</span>
+      <div class="vbody"><h3>Gérer ma coopérative</h3><p>Suivre les membres, leurs parcelles et leurs cultures depuis votre espace.</p></div>
+    </div>
+
+  </div>
+
+  <div class="note reveal"><b>Pour les animateurs.</b> Ces vidéos sont pensées pour vous, formés et équipés. Côté planteur, l'application reste légère : une visite guidée et de courtes animations (sans vidéo) les aident directement dans l'app, pour économiser leur forfait.</div>
+</div>
+</body>
+</html>

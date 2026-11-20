@@ -107,9 +107,9 @@
       </div>
       <div class="thread" id="thread"><div class="empty" id="threadEmpty">Votre conversation apparaîtra ici. Posez une question — par écrit ou avec le micro.</div></div>
       <div class="composer">
-        <input id="chatInput" aria-label="Votre question au conseiller" placeholder="ex. Mes feuilles de maïs jaunissent, que faire ?" maxlength="500" autocomplete="off">
-        <button class="btn" id="micBtn" type="button" title="Dicter la question (en français)" aria-label="Dicter"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg></button>
-        <button class="btn primary" id="sendBtn" type="button">Envoyer</button>
+        <input id="chatInput" aria-label="Votre question au conseiller" placeholder="ex. Mes feuilles de maïs jaunissent, que faire ?" maxlength="500" autocomplete="off" data-tour="1" data-tour-title="Posez votre question" data-tour-text="Écrivez votre question en langage simple, comme à un technicien.">
+        <button class="btn" id="micBtn" type="button" title="Dicter la question (en français)" aria-label="Dicter" data-tour="2" data-tour-title="Parler au lieu d'écrire" data-tour-text="Appuyez sur le micro et posez votre question à voix haute, en français."><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg></button>
+        <button class="btn primary" id="sendBtn" type="button" data-tour="3" data-tour-title="Envoyer" data-tour-text="Appuyez sur Envoyer pour recevoir une réponse courte et concrète.">Envoyer</button>
       </div>
     </div>
     <div class="note" id="loginNote" style="display:none;">Pour poser vos questions, <a href="/app">connectez-vous</a> (gratuit). Vos échanges restent privés.</div>

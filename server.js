@@ -2183,6 +2183,7 @@ function serveStatic(req, res) {
   if (urlPath === "/planteur" || urlPath === "/cultivateur") urlPath = "/planteur.html";
   if (urlPath === "/conseiller" || urlPath === "/chat") urlPath = "/conseiller.html";
   if (urlPath === "/cooperative" || urlPath === "/coop") urlPath = "/cooperative.html";
+  if (urlPath === "/formation") urlPath = "/formation.html";
   if (urlPath === "/diagnostic" || urlPath === "/diagnostic.html") urlPath = "/diagnostic.html";
   const safe = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(PUBLIC_DIR, safe);
@@ -3428,7 +3429,8 @@ const CLIENT_BLOCKED_PAGES = new Set([
   "/comprendre", "/comprendre.html",
   "/diagnostic", "/diagnostic.html",
   "/stock", "/stock.html",
-  "/quality", "/quality.html"
+  "/quality", "/quality.html",
+  "/formation", "/formation.html"
 ]);
 // Seules ces API sont ouvertes à un compte client (le reste est refusé).
 function clientApiAllowed(url) {
