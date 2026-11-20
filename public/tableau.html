@@ -329,7 +329,7 @@ html.simple .adv{display:none!important}
     <div id="board" style="display:none;">
       <div class="card today" id="todayCard" style="display:none;">
         <div class="todayhead">
-          <h2 class="ct" style="margin:0;"><span data-ico="check"></span>Aujourd'hui</h2>
+          <h2 class="ct" style="margin:0;" data-tour="1" data-tour-title="Votre journée" data-tour-text="L'essentiel du jour : ce qu'il y a à faire, les alertes et la météo, en un coup d'œil."><span data-ico="check"></span>Aujourd'hui</h2>
           <select class="sel" id="todayParcel" aria-label="Parcelle"></select>
         </div>
         <div id="todayDay" class="todayday"></div>
@@ -382,7 +382,7 @@ html.simple .adv{display:none!important}
 
 
           <div class="card">
-            <h2 class="ct">Ma parcelle — surveillance satellite</h2>
+            <h2 class="ct" data-tour="2" data-tour-title="Votre parcelle" data-tour-text="Analyse du sol par satellite et suivi de vos capteurs, pour mieux décider.">Ma parcelle — surveillance satellite</h2>
             <div class="muted" id="mapSub">Repérez votre champ (recherche ou GPS), puis dessinez votre parcelle (outil rectangle ou polygone, en haut à gauche de la carte) et lancez une analyse satellite via Vertea.</div>
             <div class="maprow" style="margin-top:10px;">
               <input id="placeSearch" aria-label="Rechercher un lieu" class="sel" style="flex:1;min-width:150px;" placeholder="Rechercher un lieu (village, ville…)">
@@ -472,7 +472,7 @@ html.simple .adv{display:none!important}
             <div class="chartwrap section-gap" id="chartWrap"><div class="muted" style="padding:30px 0;text-align:center;" id="chartEmpty">Aucune mesure pour l'instant. Branchez votre station (voir « Ma station » à droite).</div></div>
           </div>
           <div class="card section-gap">
-            <h2 class="ct">Accès rapide</h2>
+            <h2 class="ct" data-tour="3" data-tour-title="Accès rapide" data-tour-text="Créer un plan, poser une question, diagnostiquer une plante ou gérer votre coopérative.">Accès rapide</h2>
             <div class="list">
               <a href="/app"><span>Nouveau plan de culture</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
               <a href="/arduino" class="adv"><span>Nouveau projet d'automatisation</span><span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></a>
