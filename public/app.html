@@ -86,7 +86,7 @@
   .composer{ display:flex; gap:8px; margin-top:12px; }
   .composer input{ flex:1; }
   /* Modale */
-  .modal-bg{ position:fixed; inset:0; background:rgba(20,38,26,.5); display:none; align-items:center; justify-content:center; z-index:50; padding:16px; }
+  .modal-bg{ position:fixed; inset:0; background:rgba(14,26,18,.82); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); display:none; align-items:center; justify-content:center; z-index:50; padding:16px; }
   .modal-bg.show{ display:flex; }
   .modal{ background:var(--surface); border-radius:14px; padding:22px; width:100%; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,.3); }
   .modal h3{ font-family:var(--f-display); color:var(--deep); margin:0 0 4px; }
@@ -464,9 +464,10 @@
     <div class="modal">
       <h3 id="authTitle">Créer mon compte</h3>
       <div class="authseg" id="authSeg" role="tablist" aria-label="Type de profil">
-        <button type="button" class="seg active" data-type="client" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><path d="M16 3.5a3 3 0 0 1 0 5.8"/></svg>Client</button>
+        <button type="button" class="seg active" data-type="planteur" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.5v-8.6"/><path d="M12 12.6c0-3.3-2.2-5.3-6.2-5.3 0 3.7 2.3 5.3 6.2 5.3z"/><path d="M12 10.4c0-2.9 2-4.8 5.8-4.8 0 3.3-2.1 4.8-5.8 4.8z"/><path d="M7.5 20.5h9"/></svg>Planteur</button>
+        <button type="button" class="seg" data-type="client" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><path d="M16 3.5a3 3 0 0 1 0 5.8"/></svg>Client</button>
         <button type="button" class="seg" data-type="animateur" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><path d="M16 3.5a3 3 0 0 1 0 5.8M22 20c0-2.4-1.8-4.3-4-4.8"/></svg>Animateur</button>
-        <button type="button" class="seg" data-type="admin" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>Administrateur</button>
+        <button type="button" class="seg" data-type="admin" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>Admin</button>
       </div>
       <p id="authIntro">Gratuit — pour sauvegarder vos plans et suivre vos cultures.</p>
       <div id="nameWrap"><label for="auName" style="font-size:.8rem;color:var(--soft);font-weight:600;">Nom</label><input id="auName" placeholder="Votre nom" maxlength="80"></div>
@@ -484,7 +485,7 @@
 <script>
   const $ = (id) => document.getElementById(id);
   let me = null, authMode = "register", currentPlan = null, chatHistory = [];
-  let accountType = "client";   // client | animateur | admin (admin = par e-mail, pas un vrai choix)
+  let accountType = "planteur";   // planteur | client | animateur | admin (admin = par e-mail, pas un vrai choix)
 
   // ---- Rendu Markdown minimal (##, listes -, **gras**, TABLEAUX, paragraphes) ----
   function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
@@ -596,8 +597,9 @@
     const reg = authMode==="register";
     // Marque le segment actif.
     document.querySelectorAll('#authSeg .seg').forEach(function(b){ var on=b.dataset.type===accountType; b.classList.toggle('active',on); b.setAttribute('aria-pressed',on?'true':'false'); });
-    var titles={ client:{ reg:"Créer mon compte client", log:"Connexion client" }, animateur:{ reg:"Devenir animateur", log:"Connexion animateur" }, admin:{ reg:"Accès administrateur", log:"Accès administrateur" } };
-    var intros={ client:{ reg:"Pour voir nos produits et suivre vos cultures.", log:"Content de vous revoir." },
+    var titles={ planteur:{ reg:"Créer mon espace planteur", log:"Connexion planteur" }, client:{ reg:"Créer mon compte client", log:"Connexion client" }, animateur:{ reg:"Devenir animateur", log:"Connexion animateur" }, admin:{ reg:"Accès administrateur", log:"Accès administrateur" } };
+    var intros={ planteur:{ reg:"Suivez vos parcelles et recevez vos tâches, avec l'appui d'un animateur.", log:"Content de vous revoir." },
+                 client:{ reg:"Pour voir nos produits et suivre vos cultures.", log:"Content de vous revoir." },
                  animateur:{ reg:"Créez votre compte : votre demande d'animateur sera envoyée à l'administrateur, qui la confirmera.", log:"Connectez-vous ; vous gérez le stock une fois confirmé par l'administrateur." },
                  admin:{ reg:"", log:"Réservé à l'adresse de l'administrateur. Connectez-vous avec ce compte." } };
     $("authTitle").textContent = titles[accountType][reg?"reg":"log"];
@@ -629,6 +631,8 @@
       const r = await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
       const d = await r.json(); if(!r.ok){ err.textContent=d.error||"Erreur"; $("authGo").disabled=false; return; }
       me = d.user;
+      // Planteur : on l'emmène directement vers son espace planteur (tâches du jour, carte, animateur).
+      if(accountType==="planteur"){ location.href="/planteur"; return; }
       // Inscription en tant qu'animateur : on envoie la demande, confirmée ensuite par l'administrateur.
       if(wasRegister && accountType==="animateur"){
         try{ await fetch("/api/animator/request",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({region:$("auRegion").value||""})}); }catch(e){}

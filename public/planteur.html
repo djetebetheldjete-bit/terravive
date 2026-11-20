@@ -35,6 +35,8 @@
   .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 4px 18px rgba(20,38,26,.05);margin-bottom:12px}
   .btn{width:100%;font-family:inherit;font-weight:600;border-radius:9px;padding:13px;cursor:pointer;font-size:1rem;border:1px solid var(--line);background:var(--surface2);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:11px;text-decoration:none}
   .btn.primary{border:none;background:var(--leaf);color:#fff}.btn.sun{border:none;background:var(--sun);color:#3a2a06}
+  .btn.listen{padding:11px;font-size:.95rem;color:var(--deep)}.btn.listen.on{background:var(--leaf);color:#fff;border-color:var(--leaf)}
+  .btn.wa{background:#25D366;border:none;color:#fff}
   .pcard{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:11px;cursor:pointer;box-shadow:0 4px 18px rgba(20,38,26,.05);font-family:inherit}
   .ptile{width:46px;height:46px;border-radius:12px;background:var(--surface2);display:grid;place-items:center;flex:none;color:var(--leaf)}
   .pcard .nm{font-family:var(--f-display);font-weight:700;font-size:1.04rem;color:var(--ink)}
@@ -82,6 +84,7 @@
   <section class="scr on" data-s="home">
     <h1 class="sec" id="hiName">Vos parcelles</h1>
     <div class="sub">Touchez une parcelle pour voir ce qu'il y a à faire.</div>
+    <div id="animateurCard"></div>
     <div id="parcelList"><div class="load">Chargement…</div></div>
   </section>
 
@@ -137,7 +140,9 @@ var P={
  chat:'<path d="M20 4H4a1.6 1.6 0 0 0-1.6 1.6v9.2A1.6 1.6 0 0 0 4 16.4h3.2L12 20.4l4.8-4H20a1.6 1.6 0 0 0 1.6-1.6V5.6A1.6 1.6 0 0 0 20 4z"/>',
  user:'<circle cx="12" cy="8" r="4"/><path d="M5 20.4v-1a7 7 0 0 1 14 0v1"/>',
  users:'<circle cx="9" cy="8" r="3.4"/><path d="M3 20v-1a6 6 0 0 1 12 0v1"/><path d="M16 5.5a3.4 3.4 0 0 1 0 6.5"/><path d="M17 20v-1a6 6 0 0 0-3-5"/>',
- grid:'<rect x="3.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.4"/>'
+ grid:'<rect x="3.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.4"/>',
+ stop:'<rect x="6.5" y="6.5" width="11" height="11" rx="2.2"/>',
+ send:'<path d="M21 3L3 10.6l6.8 2.6L12.4 21 21 3z"/><path d="M9.8 13.2L21 3"/>'
 };
 function ic(n,px){var s=px||22;return '<svg class="ico" viewBox="0 0 24 24" width="'+s+'" height="'+s+'" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:'+s+'px;height:'+s+'px">'+(P[n]||'')+'</svg>';}
 var $=function(id){return document.getElementById(id);},el=function(s){return document.querySelector(s);};
@@ -169,6 +174,22 @@ async function boot(){
   $("pName").textContent=me.name||"—";$("pMail").textContent=me.email||"";
   $("hiName").textContent="Bonjour, "+(String(me.name||"").split(" ")[0]||"")+" — vos parcelles";
   loadParcels();
+  loadAnimateur();
+}
+async function loadAnimateur(){
+  var box=$("animateurCard"); if(!box) return;
+  try{
+    var r=await fetch("/api/coop/me"); if(!r.ok){ box.innerHTML=""; return; }
+    var d=await r.json();
+    if(d.isAnimateur){ box.innerHTML=""; return; }
+    if(d.animateur){
+      var c=d.animateurContact||{};
+      var contact=c.email ? '<a class="btn" style="margin-top:10px" href="mailto:'+esc(c.email)+'">'+ic("chat",18)+' Contacter mon animateur</a>' : '';
+      box.innerHTML='<div class="card" style="border-left:4px solid var(--leaf);margin-bottom:12px"><div class="t2"><span class="ti">'+ic("user",24)+'</span><span><div style="color:var(--soft);font-size:.8rem;font-weight:600">Votre animateur technique</div><h3 style="font-family:var(--f-display);font-size:1.08rem;color:var(--ink);margin:2px 0">'+esc(d.animateur)+'</h3><div style="color:var(--soft);font-size:.84rem">'+(c.region?esc(c.region)+' · ':'')+'vous accompagne et suit vos pratiques</div></span></div>'+contact+'</div>';
+    } else {
+      box.innerHTML='<div class="info" style="margin-bottom:12px"><b>En attente d\'attribution d\'un animateur.</b> Un animateur technique vous sera rattaché dès qu\'il rejoint Terravive pour votre région.</div>';
+    }
+  }catch(e){ box.innerHTML=""; }
 }
 async function loadParcels(){
   try{ var r=await fetch("/api/parcels"); var d=await r.json(); PARCELS=(d.parcels||[]); }
@@ -205,8 +226,21 @@ function openParcel(id){
 function fdate(iso){ try{ return new Date(String(iso).slice(0,10)+"T12:00:00").toLocaleDateString("fr-FR"); }catch(e){ return iso; } }
 function taskCard(x,parcelId,i){
   var doneKey="done:"+parcelId+":"+i, done=sessionDone[doneKey];
-  return '<div class="card task'+(done?' done':'')+'" data-k="'+doneKey+'"><div class="t2"><span class="ti">'+ic("leaf",24)+'</span><span><h3>'+esc(x.faire)+'</h3>'+(x.detail?'<div class="dt">'+esc(x.detail)+'</div>':'')+(x.quand?'<div class="qd">'+esc(x.quand)+'</div>':'')+'</span></div><button class="btn primary" onclick="markDone(this,\''+esc(parcelId)+'\','+i+',\''+esc(x.faire).replace(/'/g,"\\'")+'\')">'+(done?ic("check",16)+' Fait':'C\'est fait')+'</button></div>';
+  TASK_SAY[parcelId+":"+i]=[x.faire,x.detail,x.quand].filter(Boolean).join(". ");
+  var canSay=!!(window.trvCanSpeak&&trvCanSpeak());
+  var listenBtn=canSay?'<button class="btn listen" type="button" onclick="sayTaskAt(\''+esc(parcelId)+'\','+i+',this)">'+ic("speaker",16)+' Écouter</button>':'';
+  return '<div class="card task'+(done?' done':'')+'" data-k="'+doneKey+'"><div class="t2"><span class="ti">'+ic("leaf",24)+'</span><span><h3>'+esc(x.faire)+'</h3>'+(x.detail?'<div class="dt">'+esc(x.detail)+'</div>':'')+(x.quand?'<div class="qd">'+esc(x.quand)+'</div>':'')+'</span></div>'+listenBtn+'<button class="btn primary" onclick="markDone(this,\''+esc(parcelId)+'\','+i+',\''+esc(x.faire).replace(/'/g,"\\'")+'\')">'+(done?ic("check",16)+' Fait':'C\'est fait')+'</button></div>';
 }
+var TASK_SAY={};
+function sayTaskAt(pid,i,btn){
+  var txt=TASK_SAY[pid+":"+i]; if(!txt||!window.trvSpeak)return;
+  if(window.trvSpeaking&&trvSpeaking()){ trvStop(); resetListenBtns(); return; }
+  resetListenBtns();
+  if(btn){ btn.innerHTML=ic("stop",16)+' Arrêter'; btn.classList.add("on"); }
+  trvSpeak(txt,function(){ if(btn){ btn.innerHTML=ic("speaker",16)+' Écouter'; btn.classList.remove("on"); } },"fr");
+  toast("Lecture à voix haute…");
+}
+function resetListenBtns(){ try{ var b=document.querySelectorAll(".btn.listen.on"); for(var j=0;j<b.length;j++){ b[j].innerHTML=ic("speaker",16)+' Écouter'; b[j].classList.remove("on"); } }catch(e){} }
 var sessionDone={};
 function renderTodayBody(t){
   var h="";
@@ -214,11 +248,13 @@ function renderTodayBody(t){
   if(!t.plan){ h='<div class="info"><b>Pas encore de fiche de culture pour '+esc(t.crop)+'.</b> Créez d\'abord le plan de culture. <a class="btn primary" href="/app">Créer le plan</a></div>'; $("todayBody").innerHTML=h; return; }
   if(!t.fiche||!t.tasks){ h='<div class="info">Ouvrez une fois votre plan de culture pour préparer la fiche : vos tâches apparaîtront ici. <a class="btn" href="/app?plan='+encodeURIComponent(t.plan.id)+'">Ouvrir le plan</a></div>'; $("todayBody").innerHTML=h; return; }
   var k=t.tasks, pid=t.parcel.id;
-  h+='<div class="day">Aujourd\'hui</div><div class="date">'+new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})+'</div>';
+  var dstr=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+  h+='<div class="day">Aujourd\'hui</div><div class="date">'+dstr+'</div>';
   var main = (k.day==null) ? (k.start||[]) : (k.now||[]);
   if(main.length){ h+=main.map(function(x,i){return taskCard(x,pid,i);}).join(""); }
   else { h+='<div class="empty"><div class="ic">'+ic("check",30)+'</div><div style="font-family:var(--f-display);font-size:1.1rem;color:var(--ink)">Rien de prévu cette semaine</div><div>Surveillez votre culture et revenez demain.</div></div>'; }
   if(k.next&&k.next.length){ h+='<div class="nextw">La semaine prochaine</div>'+k.next.map(function(x){return '<div class="card" style="padding:13px"><h3 style="font-family:var(--f-display);font-size:1rem">'+esc(x.faire)+'</h3>'+(x.detail?'<div class="dt" style="color:var(--soft);font-size:.86rem;margin-top:3px">'+esc(x.detail)+'</div>':'')+'</div>';}).join(""); }
+  if(main.length){ var waText="Terravive — "+cur.name+" ("+dstr+")\n"+main.map(function(x,n){return (n+1)+". "+x.faire+(x.quand?" ("+x.quand+")":"");}).join("\n"); h+='<a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(waText)+'">'+ic("send",18)+' Partager mes tâches sur WhatsApp</a>'; }
   h+='<button class="btn" onclick="openTravail()">'+ic("notebook",20)+' Votre travail noté</button>';
   $("todayBody").innerHTML=h;
 }

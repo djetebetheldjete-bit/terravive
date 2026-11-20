@@ -1610,15 +1610,49 @@ async function handleStationSketch(req, res) {
 }
 // --- Coopérative ---
 async function coopPublic(coop) { return coop ? { id: coop.id, name: coop.name, region: coop.region || null, code: coop.code, created_at: coop.created_at } : null; }
+// ---- Rattachement automatique planteur -> animateur (1er animateur inscrit, par région) ----
+async function listAllUsersLite() {
+  if (USE_DB) { try { return (await sb(`/trv_users?select=id,email,name,region,animator,certified,created_at&order=created_at.asc`)) || []; } catch (e) { return []; } }
+  return Object.values(loadStore().users);
+}
+async function firstAnimator(region) {
+  const anims = (await listAllUsersLite()).filter((u) => !!u.animator)
+    .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+  if (!anims.length) return null;
+  if (region) { const r = normKey(region); const hit = anims.find((u) => normKey(u.region || "") === r); if (hit) return hit; }
+  return anims[0];
+}
+async function defaultAnimatorCoop(region) {
+  const anim = await firstAnimator(region);
+  if (!anim) return null;
+  const m = await getMembership(anim.id);
+  if (m) { const c = await getCoopById(m.coop_id); if (c) return c; }
+  let code; for (let i = 0; i < 6; i++) { code = coopCode(); if (!(await getCoopByCode(code))) break; }
+  const coop = { id: newId(), name: "Coopérative de " + (anim.region || "San-Pédro"), region: (anim.region || "San-Pédro"), code, owner_id: anim.id, created_at: new Date().toISOString() };
+  await createCoop(coop);
+  await addMembership({ id: newId(), coop_id: coop.id, user_id: anim.id, role: "animateur", joined_at: new Date().toISOString() });
+  return coop;
+}
+async function autoAssignAnimator(user) {
+  try {
+    if (!user || isAnimator(user) || isAdmin(user)) return;
+    if (userProfile(user) !== "cultivateur") return;
+    if (await getMembership(user.id)) return;
+    const coop = await defaultAnimatorCoop(user.region);
+    if (!coop) return;
+    await addMembership({ id: newId(), coop_id: coop.id, user_id: user.id, role: "membre", joined_at: new Date().toISOString() });
+  } catch (e) { console.error("autoAssignAnimator:", e.message); }
+}
 async function handleCoopMe(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  await autoAssignAnimator(user);
   const m = await getMembership(user.id);
   if (!m) return sendJson(res, 200, { coop: null, animator: isAnimator(user) });
   const coop = await getCoopById(m.coop_id);
   if (!coop) { await removeMembership(user.id); return sendJson(res, 200, { coop: null, animator: isAnimator(user) }); }
   const members = await listCoopMembers(coop.id);
-  let animateur = null; try { const a = members.find((x) => x.role === "animateur"); if (a) { const au = await getUserById(a.user_id); animateur = au ? (au.name || au.email) : null; } } catch (e) {}
-  sendJson(res, 200, { coop: await coopPublic(coop), role: m.role, membersCount: members.length, animateur, isAnimateur: m.role === "animateur", animator: isAnimator(user) });
+  let animateur = null, animateurContact = null; try { const a = members.find((x) => x.role === "animateur"); if (a) { const au = await getUserById(a.user_id); if (au) { animateur = au.name || au.email; animateurContact = { name: au.name || null, email: au.email || null, region: au.region || null }; } } } catch (e) {}
+  sendJson(res, 200, { coop: await coopPublic(coop), role: m.role, membersCount: members.length, animateur, animateurContact, isAnimateur: m.role === "animateur", animator: isAnimator(user) });
 }
 async function handleCoopCreate(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Connectez-vous pour créer une coopérative." });
