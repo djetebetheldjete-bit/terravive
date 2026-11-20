@@ -70,6 +70,10 @@
   .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(18px);background:var(--ink);color:var(--surface);padding:11px 17px;border-radius:11px;font-size:.88rem;font-weight:600;opacity:0;transition:.25s;pointer-events:none;max-width:90%;z-index:50}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .load{text-align:center;color:var(--soft);padding:40px 10px}
 </style>
+  <link rel="stylesheet" href="/anim.css">
+  <script src="/anim.js" defer></script>
+  <link rel="stylesheet" href="/help.css">
+  <script src="/help.js" defer></script>
 </head>
 <body>
 <div class="top">
@@ -85,7 +89,7 @@
     <h1 class="sec" id="hiName">Vos parcelles</h1>
     <div class="sub">Touchez une parcelle pour voir ce qu'il y a à faire.</div>
     <div id="animateurCard"></div>
-    <div id="parcelList"><div class="load">Chargement…</div></div>
+    <div id="parcelList" data-tour="1" data-tour-title="Vos parcelles" data-tour-text="Touchez une parcelle pour voir ce qu'il y a à faire aujourd'hui."><div class="load">Chargement…</div></div>
   </section>
 
   <!-- AUJOURD'HUI (par parcelle) -->
@@ -113,15 +117,17 @@
     <div class="card" style="display:flex;align-items:center;gap:13px"><span class="av" id="pAv" style="width:50px;height:50px;font-size:1.2rem">?</span><div><div style="font-family:var(--f-display);font-size:1.1rem;color:var(--ink)" id="pName">—</div><div class="rm" style="color:var(--soft);font-size:.84rem" id="pMail"></div></div></div>
     <a class="row" href="/cooperative" style="text-decoration:none"><span class="ri" id="icCoop"></span><div><div class="rt">Ma coopérative</div><div class="rm">Voir ma coopérative et mon animateur</div></div><span class="ra">→</span></a>
     <a class="row" href="/tableau" style="text-decoration:none"><span class="ri" id="icFull"></span><div><div class="rt">Espace complet</div><div class="rm">Tableau de bord, bilan, carnet détaillé</div></div><span class="ra">→</span></a>
+    <a class="row" style="text-decoration:none;cursor:pointer" onclick="trvTour.start()"><span class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div><div class="rt">Revoir la visite guidée</div><div class="rm">Les bases de l'application, pas à pas</div></div><span class="ra">→</span></a>
+    <a class="row" style="text-decoration:none;cursor:pointer" data-help="tache-faite"><span class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></span><div><div class="rt">Comment marquer une tâche ?</div><div class="rm">Voir une courte démonstration</div></div><span class="ra">→</span></a>
     <button class="btn" style="margin-top:16px;color:var(--bad)" onclick="logout()">Se déconnecter</button>
   </section>
 </div>
 
 <nav class="nav">
   <a class="on" id="navHome" onclick="go('home')"></a>
-  <a href="/conseiller" id="navConseil"></a>
-  <a href="/diagnostic" id="navDiag"></a>
-  <a id="navProfil" onclick="go('profil')"></a>
+  <a href="/conseiller" id="navConseil" data-tour="2" data-tour-title="Le conseiller" data-tour-text="Posez vos questions à l'assistant agricole, par écrit ou à la voix."></a>
+  <a href="/diagnostic" id="navDiag" data-tour="3" data-tour-title="Diagnostic photo" data-tour-text="Un problème sur une plante ? Prenez une photo, l'app vous aide à l'identifier."></a>
+  <a id="navProfil" onclick="go('profil')" data-tour="4" data-tour-title="Votre profil" data-tour-text="Votre animateur, votre coopérative, et pour revoir cette visite quand vous voulez."></a>
 </nav>
 <div class="toast" id="toast"></div>
 
