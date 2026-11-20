@@ -171,6 +171,7 @@ create index if not exists trv_stock_order_items_order_idx on trv_stock_order_it
 create or replace function trv_stock_validate_sale(p_sale_id text, p_actor text)
 returns json
 language plpgsql
+set search_path = public, extensions
 as $$
 declare
   v_status text;

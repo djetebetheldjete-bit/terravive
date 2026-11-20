@@ -126,9 +126,9 @@ create table if not exists trv_field_log (
   user_id text,
   parcel_id text,
   date date,
-  kind text,                  -- arrosage | compost | engrais | traitement | semis | recolte | observation
+  kind text,                  -- arrosage | pluie | compost | engrais | traitement | semis | recolte | perte | residu | germination | incident | observation
   qty numeric,
-  unit text,                  -- L ou kg
+  unit text,                  -- L, kg, mm ou % (test de germination)
   note text,
   created_at timestamptz default now()
 );
@@ -146,6 +146,13 @@ create table if not exists trv_parcel_ref (
   chem_kg numeric,
   yield_kg numeric,
   note text,
+  updated_at timestamptz default now()
+);
+-- v8.2 : test côte à côte — parcelle Terravive et sa parcelle témoin
+create table if not exists trv_parcel_pair (
+  parcel_id text primary key, -- parcelle conduite avec Terravive
+  user_id text,
+  control_id text,            -- parcelle témoin (pratique habituelle)
   updated_at timestamptz default now()
 );
 

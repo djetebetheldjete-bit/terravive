@@ -27,9 +27,9 @@
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'
   };
   function svg(n) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (I[n] || n) + "</svg>"; }
-  var TITLES = { "/tableau": "Tableau de bord", "/app": "Itinéraire de culture", "/conseiller": "Conseiller", "/diagnostic": "Diagnostic photo", "/cooperative": "Coopérative", "/comprendre": "Comprendre", "/arduino": "Automatisation", "/stock": "Stock", "/quality": "Quality Guard" };
+  var TITLES = { "/tableau": "Tableau de bord", "/app": "Plan de culture", "/conseiller": "Conseiller", "/diagnostic": "Diagnostic photo", "/cooperative": "Coopérative", "/comprendre": "Comprendre", "/arduino": "Automatisation", "/stock": "Stock", "/quality": "Quality Guard" };
   var GLOBAL = [
-    { href: "/tableau", lb: "Tableau", ic: "tableau" }, { href: "/app", lb: "Itinéraire", ic: "plan" },
+    { href: "/tableau", lb: "Tableau", ic: "tableau" }, { href: "/app", lb: "Plan", ic: "plan" },
     { href: "/conseiller", lb: "Conseiller", ic: "conseil" }, { href: "/diagnostic", lb: "Diagnostic", ic: "photo" }
   ];
   function h(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
