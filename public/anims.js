@@ -41,12 +41,15 @@
     // nombres trop grands ou identiques : pas d'animation
     if (Math.abs(info.val) > 1e12) return;
     if (el.__tvLast === info.val) { el.__tvShown = el.textContent; return; }
+    // Première apparition : on part de 0. Mise à jour (rafraîchissement toutes les 60 s) :
+    // on part de l'ancienne valeur, pour ne pas refaire défiler tout le compteur à chaque fois.
+    var prev = (typeof el.__tvLast === "number") ? el.__tvLast : 0;
     el.__tvLast = info.val; el.__tvRun = true;
     var tok = (el.__tvTok || 0) + 1; el.__tvTok = tok;
     var finalTxt = el.textContent;
     el.classList.add("tv-count");
     if (REDUCED) { el.__tvShown = finalTxt; el.__tvRun = false; return; }
-    var from = 0, to = info.val, dur = Math.min(1500, 500 + Math.abs(to) * 2), t0 = null;
+    var from = prev, to = info.val, dur = prev ? 400 : 700, t0 = null;
     function step(ts) {
       if (el.__tvTok !== tok) return;              // une valeur plus récente a pris la main
       if (!t0) t0 = ts; var p = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - p, 3);
@@ -82,15 +85,12 @@
     if (!items.length) return;
     if (REDUCED || !("IntersectionObserver" in window)) { items.forEach(function (e) { e.__tvSeen = 1; if (e.matches(COUNT_SEL) || e.querySelector) revealCounts(e); }); return; }
     if (!io) io = new IntersectionObserver(function (es) {
-      es.forEach(function (en) { if (!en.isIntersecting) return; var e = en.target; io.unobserve(e); e.classList.add("tv-in"); revealCounts(e); drawCharts(e); });
+      es.forEach(function (en) { if (!en.isIntersecting) return; var e = en.target; io.unobserve(e); revealCounts(e); drawCharts(e); });
     }, { threshold: .12, rootMargin: "0px 0px -40px 0px" });
     // groupe par rangée pour un léger décalage
-    items.forEach(function (e, i) {
-      e.__tvSeen = 1; e.classList.add("tv-reveal");
-      var sibIndex = 0, p = e.previousElementSibling; while (p) { sibIndex++; p = p.previousElementSibling; }
-      e.style.setProperty("--tv-d", (Math.min(sibIndex, 4) * 70) + "ms");
-      io.observe(e);
-    });
+    // Ne masque rien (l'apparition est faite par anim.js) : sert seulement à lancer
+    // les compteurs et le tracé des graphiques quand le bloc devient visible.
+    items.forEach(function (e) { e.__tvSeen = 1; io.observe(e); });
   }
   function revealCounts(scope) {
     var els = scope.matches && scope.matches(COUNT_SEL) ? [scope] : [];

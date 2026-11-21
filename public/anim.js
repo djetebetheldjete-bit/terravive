@@ -40,7 +40,7 @@
       var arr = groups.get(p) || []; arr.push(el); groups.set(p, arr);
     });
     groups.forEach(function (arr) {
-      arr.forEach(function (el, i) { el.style.animationDelay = Math.min(i * 65, 420) + "ms"; });
+      arr.forEach(function (el, i) { el.style.animationDelay = Math.min(i * 40, 200) + "ms"; });
     });
 
     if (!("IntersectionObserver" in window)) { els.forEach(function (el) { el.classList.add("in"); }); return; }
@@ -52,7 +52,7 @@
     els.forEach(function (el) { io.observe(el); });
 
     // Filet de sécurité : tout révéler après 2,5 s (jamais de contenu caché).
-    setTimeout(function () { all(".reveal").forEach(function (el) { el.classList.add("in"); }); }, 2500);
+    setTimeout(function () { all(".reveal").forEach(function (el) { el.classList.add("in"); }); }, 1500);
   }
 
   /* ---------- Onde au clic sur les boutons principaux ---------- */
@@ -69,7 +69,7 @@
       s.style.left = (e.clientX - r.left - d / 2) + "px";
       s.style.top = (e.clientY - r.top - d / 2) + "px";
       b.appendChild(s);
-      setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 650);
+      setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 500);
     }, { passive: true });
   }
 
@@ -86,7 +86,7 @@
       var num = parseFloat(String(raw).replace(/[^\d.,-]/g, "").replace(/\s/g, "").replace(",", "."));
       if (!isFinite(num)) return;
       var suffix = el.getAttribute("data-suffix") || "";
-      var dur = 1100, t0 = performance.now(), dec = (String(num).split(".")[1] || "").length;
+      var dur = 700, t0 = performance.now(), dec = (String(num).split(".")[1] || "").length;
       el.classList.add("trv-count");
       function tick(t) {
         var k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);

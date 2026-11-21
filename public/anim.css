@@ -2,36 +2,40 @@
    Sûr : les éléments ne sont masqués que si <html class="anim"> est présent (ajouté par anim.js).
    Si le JS ne charge pas, rien n'est caché. */
 
-/* ---------- Apparition au défilement ---------- */
-html.anim .reveal{ opacity:0; transform:translateY(18px); will-change:opacity,transform; }
-html.anim .reveal.in{
-  animation:trvIn .62s cubic-bezier(.22,.68,.24,1) both;
-}
-@keyframes trvIn{ from{ opacity:0; transform:translateY(18px); } to{ opacity:1; transform:none; } }
+/* Courbes partagées (guide « Animations on the Web ») :
+   ease-out pour ce qui entre ou réagit au doigt, ease-in-out pour ce qui bouge déjà à l'écran.
+   Durées d'interface : 100-150 ms (appui), 200-300 ms (fenêtres), jamais plus de 400 ms. */
+:root{ --trv-out:cubic-bezier(.165,.84,.44,1); --trv-inout:cubic-bezier(.645,.045,.355,1); }
+
+/* ---------- Apparition au défilement (seul moteur d'apparition du site) ---------- */
+html.anim .reveal{ opacity:0; transform:translateY(8px); }
+html.anim .reveal.in{ animation:trvIn .36s var(--trv-out) both; }
+@keyframes trvIn{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
 
 /* ---------- Boutons : pression + onde ---------- */
-.btn, button, .pcard, .seg{ transition:transform .12s ease, box-shadow .2s ease, background .2s ease, filter .2s ease; }
+.btn, button, .pcard, .seg{ transition:transform .12s var(--trv-out), box-shadow .15s ease, background-color .15s ease, filter .15s ease; }
 .btn:active, button:active, .pcard:active{ transform:scale(.97); }
 .trv-rip{ position:relative; overflow:hidden; }
 .trv-rip > .trv-ripple{
   position:absolute; border-radius:50%; pointer-events:none;
-  background:rgba(255,255,255,.45); transform:scale(0); animation:trvRipple .6s ease-out forwards;
+  background:rgba(255,255,255,.4); transform:scale(.2); animation:trvRipple .45s var(--trv-out) forwards;
 }
 @keyframes trvRipple{ to{ transform:scale(2.6); opacity:0; } }
 
-/* ---------- Cartes : survol vivant ---------- */
-.card, .pcard, .planrow, .row, .fsec{ transition:transform .22s cubic-bezier(.2,.7,.2,1), box-shadow .22s ease; }
-@media(hover:hover){
-  .card:hover, .planrow:hover, .row:hover{ transform:translateY(-3px); box-shadow:0 12px 26px rgba(20,38,26,.12); }
-  .pcard:hover{ transform:translateY(-3px); box-shadow:0 14px 30px rgba(20,38,26,.14); }
+/* ---------- Cartes cliquables : survol discret ----------
+   Seuls les éléments qu'on peut toucher réagissent au survol. Les cartes qui contiennent
+   un formulaire ou une information ne bougent pas (elles « sautaient » à chaque passage de souris). */
+.pcard, .planrow, a.card, a.tile{ transition:transform .2s var(--trv-out), box-shadow .2s ease; }
+@media (hover:hover) and (pointer:fine){
+  .pcard:hover, .planrow:hover, a.card:hover, a.tile:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(20,38,26,.12); }
 }
 
-/* ---------- Fenêtre (modale) : entrée en pop ---------- */
-.modal-bg.show .modal{ animation:trvPop .42s cubic-bezier(.2,.9,.25,1) both; }
-@keyframes trvPop{ 0%{ opacity:0; transform:translateY(14px) scale(.96); } 100%{ opacity:1; transform:none; } }
+/* ---------- Fenêtre (modale) : entrée courte ---------- */
+.modal-bg.show .modal{ animation:trvPop .22s var(--trv-out) both; }
+@keyframes trvPop{ 0%{ opacity:0; transform:translateY(6px) scale(.97); } 100%{ opacity:1; transform:none; } }
 
 /* ---------- Champs : focus en douceur ---------- */
-input, select, textarea{ transition:box-shadow .2s ease, border-color .2s ease, background .2s ease; }
+input, select, textarea{ transition:box-shadow .15s ease, border-color .15s ease, background-color .15s ease; }
 
 /* ---------- Chargement : petite pousse qui respire ---------- */
 .load, .loading{ position:relative; }
@@ -59,27 +63,31 @@ html.anim .load::after, html.anim .loading::after{
 .trv-fab-actions{ display:flex; flex-direction:column; align-items:flex-end; gap:12px; }
 .trv-fab{ width:58px; height:58px; border-radius:50%; background:var(--leaf,#2E7D46); color:#fff; border:none; cursor:pointer;
   display:grid; place-items:center; box-shadow:0 12px 26px rgba(27,94,52,.42);
-  transition:transform .25s cubic-bezier(.2,.8,.2,1), background .2s, box-shadow .2s; }
+  transition:transform .15s var(--trv-out), background-color .2s ease, box-shadow .2s ease; }
 .trv-fab:hover{ box-shadow:0 16px 32px rgba(27,94,52,.5); }
 .trv-fab:active{ transform:scale(.93); }
-.trv-fab svg{ width:28px; height:28px; transition:transform .32s cubic-bezier(.2,.8,.2,1); }
+.trv-fab svg{ width:28px; height:28px; transition:transform .22s var(--trv-inout); }
 .trv-fab-wrap.open .trv-fab{ background:var(--deep,#1B5E34); }
 .trv-fab-wrap.open .trv-fab svg{ transform:rotate(135deg); }
 .trv-fab-chip{ display:flex; align-items:center; gap:10px; background:var(--surface,#fff); border:1px solid var(--line,#dde7dc);
   border-radius:999px; padding:9px 15px; box-shadow:0 8px 20px rgba(20,38,26,.16); font-weight:700; font-size:14px;
   color:var(--ink,#14261A); text-decoration:none; white-space:nowrap;
   opacity:0; transform:translateY(12px) scale(.95); pointer-events:none;
-  transition:opacity .22s ease, transform .24s cubic-bezier(.2,.8,.2,1); }
+  transition:opacity .2s var(--trv-out), transform .2s var(--trv-out); }
 .trv-fab-wrap.open .trv-fab-chip{ opacity:1; transform:none; pointer-events:auto; }
 .trv-fab-wrap.open .trv-fab-chip:nth-last-child(1){ transition-delay:0s; }
-.trv-fab-wrap.open .trv-fab-chip:nth-last-child(2){ transition-delay:.05s; }
-.trv-fab-wrap.open .trv-fab-chip:nth-last-child(3){ transition-delay:.1s; }
+.trv-fab-wrap.open .trv-fab-chip:nth-last-child(2){ transition-delay:.03s; }
+.trv-fab-wrap.open .trv-fab-chip:nth-last-child(3){ transition-delay:.06s; }
 .trv-fab-chip .ci{ width:34px; height:34px; border-radius:50%; display:grid; place-items:center; color:#fff; flex:none; }
 .trv-fab-chip svg{ width:19px; height:19px; }
 @media print{ .trv-fab-wrap{ display:none !important; } }
 
-/* ---------- Respect de l'accessibilité ---------- */
+/* ---------- Respect de l'accessibilité ----------
+   « Réduire les animations » coupe TOUT mouvement, sur toutes les pages (y compris les règles
+   écrites dans chaque page) : pas d'exception pour les fondus, ni pour les boucles. */
 @media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; animation-delay:0s !important; transition-duration:.01ms !important; transition-delay:0s !important; }
+  .btn:active, button:active, .pcard:active{ transform:none; }
   html.anim .reveal{ opacity:1 !important; transform:none !important; animation:none !important; }
   .modal-bg.show .modal{ animation:none !important; }
   .trv-ambient{ display:none !important; }

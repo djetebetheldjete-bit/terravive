@@ -179,6 +179,8 @@
 
   /* ---------- révélation douce au défilement (accueil) ---------- */
   function revealAll() {
+    // Désactivé : anim.js fait déjà apparaître ces blocs ; deux moteurs superposaient deux apparitions.
+    return;
     var sel = LANDING ? ".step, .card, .panel, .feat, .grid > *, section, .foot, .how > *" : "";
     if (!sel || !("IntersectionObserver" in window)) return;
     var items = [].slice.call(document.querySelectorAll(sel)).filter(function (e) { return !e.closest(".top") && !e.classList.contains("hero"); });
