@@ -20,6 +20,7 @@ const FERT = require("./lib/fertil");
 const FICHE = require("./lib/fiche");
 const IMPACT = require("./lib/impact");
 const TODAY = require("./lib/today");
+const DIST = require("./lib/distribution"); // module Distribution (projet ASTRIDE)
 const RESIDUS = require("./lib/residus"); // guide des résidus et test de germination (partagé avec le navigateur)
 
 // ---------- Configuration ----------
@@ -105,7 +106,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.parcelSoil) s.parcelSoil = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; if (!s.fieldLog) s.fieldLog = []; if (!s.parcelRef) s.parcelRef = {}; if (!s.parcelPair) s.parcelPair = {}; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, parcelSoil: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [], fieldLog: [], parcelRef: {}, parcelPair: {} }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.parcelSoil) s.parcelSoil = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; if (!s.fieldLog) s.fieldLog = []; if (!s.parcelRef) s.parcelRef = {}; if (!s.parcelPair) s.parcelPair = {}; if (!s.distSites) s.distSites = []; if (!s.distLots) s.distLots = []; if (!s.parcelNdvi) s.parcelNdvi = {}; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, parcelSoil: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [], fieldLog: [], parcelRef: {}, parcelPair: {}, distSites: [], distLots: [], parcelNdvi: {} }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -2199,6 +2200,159 @@ async function handleDashboard(req, res) {
   });
 }
 
+// ================================================================
+// Distribution (projet ASTRIDE) : de la parcelle au client.
+// Données propres à une coopérative : centres de groupage, points de vente, lots.
+// Les parcelles affichées sont les vraies parcelles des membres ; rien n'est inventé.
+// Accès : rôles du module Stock (admin, opérateur = animateur ou cultivateur certifié, lecteur).
+// ================================================================
+const safeIds = (ids) => [...new Set((ids || []).map(String).filter((x) => /^[\w-]{1,64}$/.test(x)))];
+const inList = (ids) => "in.(" + safeIds(ids).map(encodeURIComponent).join(",") + ")";
+async function distListSites(coopIds) {
+  if (USE_DB) { try { return (await sb(`/trv_dist_sites?select=*${coopIds ? "&coop_id=" + inList(coopIds) : ""}&order=created_at.asc`)) || []; } catch (e) { console.error("distListSites (exécutez schema.sql) :", e.message); return []; } }
+  return (loadStore().distSites || []).filter((x) => !coopIds || coopIds.includes(x.coop_id));
+}
+async function distSaveSite(rec) {
+  if (USE_DB) { await sb(`/trv_dist_sites?on_conflict=id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([rec]) }); return; }
+  const s = loadStore(); s.distSites = (s.distSites || []).filter((x) => x.id !== rec.id); s.distSites.push(rec); saveStore(s);
+}
+async function distDeleteSite(id) {
+  if (USE_DB) { await sb(`/trv_dist_sites?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); return; }
+  const s = loadStore(); s.distSites = (s.distSites || []).filter((x) => x.id !== id); saveStore(s);
+}
+async function distListLots(coopIds) {
+  if (USE_DB) { try { return (await sb(`/trv_dist_lots?select=*${coopIds ? "&coop_id=" + inList(coopIds) : ""}&order=created_at.desc&limit=1000`)) || []; } catch (e) { console.error("distListLots (exécutez schema.sql) :", e.message); return []; } }
+  return (loadStore().distLots || []).filter((x) => !coopIds || coopIds.includes(x.coop_id)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+}
+async function distSaveLot(rec) {
+  if (USE_DB) { await sb(`/trv_dist_lots?on_conflict=id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([rec]) }); return; }
+  const s = loadStore(); s.distLots = (s.distLots || []).filter((x) => x.id !== rec.id); s.distLots.push(rec); saveStore(s);
+}
+async function distDeleteLot(id) {
+  if (USE_DB) { await sb(`/trv_dist_lots?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); return; }
+  const s = loadStore(); s.distLots = (s.distLots || []).filter((x) => x.id !== id); saveStore(s);
+}
+// Dernière analyse NDVI d'une parcelle (envoyée par le tableau de bord après chaque analyse satellite).
+async function saveParcelNdvi(rec) {
+  if (USE_DB) { try { await sb(`/trv_parcel_ndvi?on_conflict=parcel_id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("saveParcelNdvi (exécutez schema.sql) :", e.message); } return; }
+  const s = loadStore(); s.parcelNdvi = s.parcelNdvi || {}; s.parcelNdvi[rec.parcel_id] = rec; saveStore(s);
+}
+// Parcelles, cultures, NDVI et noms des membres d'un ensemble de comptes, en quelques requêtes.
+async function distParcelsOf(userIds) {
+  const ids = safeIds(userIds); if (!ids.length) return [];
+  let parcels, soils, ndvis, users;
+  if (USE_DB) {
+    const q = async (p) => { try { return (await sb(p)) || []; } catch (e) { return []; } };
+    parcels = await q(`/trv_parcels?user_id=${inList(ids)}&select=id,user_id,name,geom,created_at`);
+    const pids = parcels.map((p) => p.id);
+    soils = pids.length ? await q(`/trv_parcel_soil?parcel_id=${inList(pids)}&select=parcel_id,crop,sown_at`) : [];
+    ndvis = pids.length ? await q(`/trv_parcel_ndvi?parcel_id=${inList(pids)}&select=*`) : [];
+    users = await q(`/trv_users?id=${inList(ids)}&select=id,name,email`);
+  } else {
+    const s = loadStore();
+    parcels = Object.values(s.parcels).filter((p) => ids.includes(p.user_id));
+    soils = Object.values(s.parcelSoil); ndvis = Object.values(s.parcelNdvi || {}); users = ids.map((id) => s.users[id]).filter(Boolean);
+  }
+  const soilBy = {}, ndviBy = {}, userBy = {};
+  soils.forEach((x) => { soilBy[x.parcel_id] = x; }); ndvis.forEach((x) => { ndviBy[x.parcel_id] = x; }); users.forEach((u) => { userBy[u.id] = u; });
+  return parcels.map((p) => {
+    let z = p.geom; if (typeof z === "string") { try { z = JSON.parse(z); } catch (e) { z = null; } }
+    const nd = ndviBy[p.id] || null, u = userBy[p.user_id];
+    return { id: p.id, user_id: p.user_id, name: p.name, owner: (u && (u.name || (isPlanteurPhone(u) ? null : u.email))) || "—", crop: (soilBy[p.id] && soilBy[p.id].crop) || null,
+      center: DIST.zoneCenter(z), area_ha: DIST.zoneAreaHa(z), ndvi: nd ? Number(nd.ndvi) : null, ndvi_at: nd ? nd.measured_at : null, health: DIST.healthOf(nd ? { ndvi: Number(nd.ndvi), pct_faible: nd.pct_faible, pct_moyen: nd.pct_moyen } : null) };
+  });
+}
+async function allCoopMembers() {
+  if (USE_DB) { try { return (await sb(`/trv_coop_members?select=*`)) || []; } catch (e) { return []; } }
+  return loadStore().coopMembers || [];
+}
+// Périmètre de l'utilisateur : sa coopérative, ou toutes (administrateur ou lecteur hors coopérative, en lecture).
+async function distScope(user) {
+  const role = stockRole(user);
+  if (!role) return { error: "Réservé aux animateurs de coopérative, aux cultivateurs certifiés et aux partenaires désignés.", status: 403 };
+  const m = await getMembership(user.id);
+  if (m) { const coop = await getCoopById(m.coop_id); if (coop) return { role, coop, coopIds: [coop.id], canWrite: role !== "lecteur" }; }
+  if (role === "admin" || role === "lecteur") return { role, coop: null, coopIds: null, canWrite: false };
+  return { error: "Créez ou rejoignez d'abord une coopérative : la distribution s'organise à son échelle.", status: 400 };
+}
+async function distState(scope) {
+  const members = scope.coopIds ? (await Promise.all(scope.coopIds.map(listCoopMembers))).flat() : await allCoopMembers();
+  const [parcels, sites, lots] = await Promise.all([distParcelsOf(members.map((x) => x.user_id)), distListSites(scope.coopIds), distListLots(scope.coopIds)]);
+  const views = lots.map(DIST.lotView);
+  return { parcels, sites, lots: views, indicators: DIST.indicators(views, parcels, sites) };
+}
+async function handleDistGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const sc = await distScope(user); if (sc.error) return sendJson(res, sc.status, { error: sc.error });
+  const st = await distState(sc);
+  sendJson(res, 200, Object.assign({ role: sc.role, canWrite: sc.canWrite, coop: sc.coop ? { id: sc.coop.id, name: sc.coop.name, region: sc.coop.region || null } : null, canals: DIST.CANALS, steps: DIST.LOT_LABEL }, st));
+}
+async function distWriteScope(req, res) {
+  const user = await currentUser(req); if (!user) { sendJson(res, 401, { error: "Non connecté." }); return null; }
+  const sc = await distScope(user); if (sc.error) { sendJson(res, sc.status, { error: sc.error }); return null; }
+  if (!sc.canWrite) { sendJson(res, 403, { error: sc.coop ? "Lecture seule." : "Rejoignez une coopérative pour saisir des données de distribution." }); return null; }
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { sendJson(res, 400, { error: "Requête invalide." }); return null; }
+  return { user, sc, p };
+}
+async function handleDistSite(req, res) {
+  const w = await distWriteScope(req, res); if (!w) return;
+  const chk = DIST.checkSite(w.p); if (chk.error) return sendJson(res, 400, { error: chk.error });
+  const sites = await distListSites(w.sc.coopIds);
+  let rec;
+  if (w.p.id) {
+    const old = sites.find((x) => x.id === w.p.id); if (!old) return sendJson(res, 404, { error: "Site introuvable." });
+    if (old.kind !== chk.site.kind) return sendJson(res, 400, { error: "Le type d'un site ne peut pas changer." });
+    rec = Object.assign({}, old, chk.site);
+  } else {
+    if (sites.length >= 200) return sendJson(res, 400, { error: "Nombre maximal de sites atteint." });
+    rec = Object.assign({ id: newId(), coop_id: w.sc.coop.id, created_by: w.user.id, created_at: new Date().toISOString() }, chk.site);
+  }
+  try { await distSaveSite(rec); } catch (e) { console.error("distSaveSite :", e.message); return sendJson(res, 500, { error: "Enregistrement impossible (base à mettre à jour : exécutez schema.sql)." }); }
+  sendJson(res, 200, { site: rec });
+}
+async function handleDistSiteDelete(req, res) {
+  const w = await distWriteScope(req, res); if (!w) return;
+  const site = (await distListSites(w.sc.coopIds)).find((x) => x.id === w.p.id); if (!site) return sendJson(res, 404, { error: "Site introuvable." });
+  if ((await distListLots(w.sc.coopIds)).some((l) => l.centre_id === site.id || l.client_id === site.id)) return sendJson(res, 400, { error: "Des lots passent par ce site : il ne peut pas être supprimé." });
+  await distDeleteSite(site.id); sendJson(res, 200, { ok: true });
+}
+async function handleDistLot(req, res) {
+  const w = await distWriteScope(req, res); if (!w) return;
+  const action = String(w.p.action || "");
+  const [sites, lots] = await Promise.all([distListSites(w.sc.coopIds), distListLots(w.sc.coopIds)]);
+  const siteBy = {}; sites.forEach((s) => { siteBy[s.id] = s; });
+  const now = new Date();
+  if (action === "forecast") {
+    const members = await listCoopMembers(w.sc.coop.id);
+    const parcel = (await distParcelsOf(members.map((m) => m.user_id))).find((x) => x.id === w.p.parcel_id) || null;
+    const r = DIST.lotAction(null, "forecast", w.p, { now, sites: siteBy, parcel }); if (r.error) return sendJson(res, 400, { error: r.error });
+    const rec = Object.assign({ id: newId(), coop_id: w.sc.coop.id, code: DIST.nextLotCode(lots.map((l) => l.code)), created_by: w.user.id, created_at: now.toISOString(), updated_at: now.toISOString() }, r.patch);
+    try { await distSaveLot(rec); } catch (e) { console.error("distSaveLot :", e.message); return sendJson(res, 500, { error: "Enregistrement impossible (base à mettre à jour : exécutez schema.sql)." }); }
+    return sendJson(res, 200, { lot: DIST.lotView(rec) });
+  }
+  const lot = lots.find((l) => l.id === w.p.id);
+  const r = DIST.lotAction(lot || null, action, w.p, { now, sites: siteBy }); if (r.error) return sendJson(res, lot ? 400 : 404, { error: r.error });
+  const rec = Object.assign({}, lot, r.patch, { updated_at: now.toISOString() });
+  try { await distSaveLot(rec); } catch (e) { console.error("distSaveLot :", e.message); return sendJson(res, 500, { error: "Enregistrement impossible." }); }
+  sendJson(res, 200, { lot: DIST.lotView(rec) });
+}
+async function handleDistLotDelete(req, res) {
+  const w = await distWriteScope(req, res); if (!w) return;
+  const lot = (await distListLots(w.sc.coopIds)).find((l) => l.id === w.p.id); if (!lot) return sendJson(res, 404, { error: "Lot introuvable." });
+  if (DIST.lotStep(lot) !== "prevu") return sendJson(res, 400, { error: "Seule une prévision (lot pas encore reçu) peut être supprimée." });
+  await distDeleteLot(lot.id); sendJson(res, 200, { ok: true });
+}
+async function handleParcelNdvi(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  if (!(await listParcelsForUser(user.id)).some((x) => x.id === p.parcel_id)) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const nd = Number(p.ndvi), f = Number(p.pct_faible), m = Number(p.pct_moyen);
+  if (!Number.isFinite(nd) || nd < -1 || nd > 1) return sendJson(res, 400, { error: "Valeur NDVI invalide." });
+  const clampPct = (x) => (Number.isFinite(x) ? Math.max(0, Math.min(100, Math.round(x * 10) / 10)) : null);
+  const rec = { parcel_id: p.parcel_id, user_id: user.id, ndvi: Math.round(nd * 1000) / 1000, pct_faible: clampPct(f), pct_moyen: clampPct(m), measured_at: new Date().toISOString() };
+  await saveParcelNdvi(rec); sendJson(res, 200, { ndvi: rec, health: DIST.healthOf(rec) });
+}
+
 // ---------- Fichiers statiques ----------
 function serveStatic(req, res) {
   let urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
@@ -2209,6 +2363,7 @@ function serveStatic(req, res) {
   if (urlPath === "/tableau" || urlPath === "/dashboard") urlPath = "/tableau.html";
   if (urlPath === "/quality") urlPath = "/quality.html";
   if (urlPath === "/stock") urlPath = "/stock.html";
+  if (urlPath === "/distribution") urlPath = "/distribution.html";
   if (urlPath === "/boutique") urlPath = "/boutique.html";
   if (urlPath === "/comprendre") urlPath = "/comprendre.html";
   if (urlPath === "/planteur" || urlPath === "/cultivateur") urlPath = "/planteur.html";
@@ -3460,6 +3615,7 @@ const CLIENT_BLOCKED_PAGES = new Set([
   "/comprendre", "/comprendre.html",
   "/diagnostic", "/diagnostic.html",
   "/stock", "/stock.html",
+  "/distribution", "/distribution.html",
   "/quality", "/quality.html",
   "/formation", "/formation.html"
 ]);
@@ -3551,6 +3707,12 @@ async function routeRequest(req, res) {
   if (req.method === "POST" && url === "/api/plan/fiche") return handlePlanFiche(req, res);
   if (req.method === "GET" && url === "/api/today") return handleToday(req, res);
   if (req.method === "GET" && url === "/api/parcels") return handleParcelsList(req, res);
+  if (req.method === "POST" && url === "/api/parcels/ndvi") return handleParcelNdvi(req, res);
+  if (req.method === "GET" && url === "/api/dist") return handleDistGet(req, res);
+  if (req.method === "POST" && url === "/api/dist/site") return handleDistSite(req, res);
+  if (req.method === "POST" && url === "/api/dist/site/delete") return handleDistSiteDelete(req, res);
+  if (req.method === "POST" && url === "/api/dist/lot") return handleDistLot(req, res);
+  if (req.method === "POST" && url === "/api/dist/lot/delete") return handleDistLotDelete(req, res);
   if (req.method === "POST" && url === "/api/parcels") return handleParcelSave(req, res);
   if (req.method === "POST" && url === "/api/parcels/delete") return handleParcelDelete(req, res);
   if (req.method === "GET" && url === "/api/impact") return handleImpactGet(req, res);

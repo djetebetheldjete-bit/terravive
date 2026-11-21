@@ -350,6 +350,88 @@ async function main() {
       assert.ok(blocked, "le numéro devait être bloqué");
     });
 
+    // ------------------------------------------- Distribution (projet ASTRIDE)
+    t.section("Distribution : de la parcelle au client");
+    const jpost = (url, cookie, json, ip) => req("POST", url, { cookie, json, ip: ip || "10.3.0.1" });
+    let animC = null, plC = null, dParcel = null, centre = null, shop = null, lot = null;
+    await t.test("la page et les données sont réservées aux animateurs (et rôles du Stock)", async () => {
+      plC = cookieOf(await plLog("0766666666", "1357", "10.3.0.1"));
+      assert.strictEqual((await req("GET", "/api/dist", { cookie: plC })).status, 403, "un planteur n'a pas accès");
+      assert.strictEqual((await req("GET", "/api/dist")).status, 401);
+      animC = cookieOf(await login("anim@test.ci", "secret123", "10.3.0.1"));
+      const r = await req("GET", "/api/dist", { cookie: animC });
+      assert.strictEqual(r.status, 200, r.text);
+      assert.strictEqual(r.json.canWrite, true);
+      assert.ok(r.json.coop && r.json.coop.name, "la distribution s'organise à l'échelle de la coopérative");
+      assert.deepStrictEqual([r.json.sites.length, r.json.lots.length], [0, 0], "aucune donnée inventée");
+      assert.strictEqual(r.json.indicators.loss_pct, null);
+      assert.strictEqual((await req("GET", "/distribution", { cookie: animC })).status, 200);
+      const html = (await req("GET", "/distribution", { cookie: animC })).text;
+      for (const api of ["/api/dist", "/api/dist/site", "/api/dist/lot"]) assert.ok(html.includes(api), "la page doit appeler " + api);
+      assert.ok(!/Koné Adama|Centre Nord|L-0101/.test(html), "aucune donnée d'exemple dans la page");
+    });
+    await t.test("les parcelles des membres apparaissent, avec leur dernière analyse satellite", async () => {
+      const zone = { polygon: [[-6.640, 4.750], [-6.638, 4.750], [-6.638, 4.752], [-6.640, 4.752]] };
+      const sp = await jpost("/api/parcels", plC, { name: "Champ du bas", zone });
+      assert.strictEqual(sp.status, 200, sp.text); dParcel = sp.json.parcel.id;
+      assert.strictEqual((await jpost("/api/parcels/ndvi", animC, { parcel_id: dParcel, ndvi: 0.3 })).status, 404, "seul le planteur enregistre l'analyse de sa parcelle");
+      assert.strictEqual((await jpost("/api/parcels/ndvi", plC, { parcel_id: dParcel, ndvi: 7 })).status, 400);
+      const nd = await jpost("/api/parcels/ndvi", plC, { parcel_id: dParcel, ndvi: 0.31, pct_faible: 30, pct_moyen: 20 });
+      assert.strictEqual(nd.json.health, "Alerte");
+      const r = await req("GET", "/api/dist", { cookie: animC });
+      const p = r.json.parcels.find((x) => x.id === dParcel);
+      assert.ok(p, "la parcelle du membre doit apparaître");
+      assert.ok(Math.abs(p.center.lat - 4.751) < 1e-6 && Math.abs(p.center.lon + 6.639) < 1e-6, "position réelle de la parcelle");
+      assert.strictEqual(p.health, "Alerte"); assert.strictEqual(r.json.indicators.watch, 1);
+      assert.ok(p.area_ha > 4.8 && p.area_ha < 5.0, "surface calculée depuis le contour (≈ 222 m × 221 m) : " + p.area_ha);
+      assert.ok(!r.json.parcels.some((x) => x.owner && /@/.test(x.owner) && /planteur\.terravive/.test(x.owner)), "l'adresse interne d'un planteur n'est jamais montrée");
+    });
+    await t.test("centres et points de vente : saisies contrôlées, réservées aux opérateurs", async () => {
+      assert.strictEqual((await jpost("/api/dist/site", plC, { kind: "centre", name: "Centre", lat: 4.76, lon: -6.63, capacity_kg: 8000 })).status, 403);
+      assert.strictEqual((await jpost("/api/dist/site", animC, { kind: "centre", name: "Centre", lat: 4.76, lon: -6.63 })).status, 400, "capacité obligatoire");
+      const c = await jpost("/api/dist/site", animC, { kind: "centre", name: "Centre de Grand-Béréby", lat: 4.76, lon: -6.63, capacity_kg: 8000, cold: true });
+      assert.strictEqual(c.status, 200, c.text); centre = c.json.site.id;
+      const v = await jpost("/api/dist/site", animC, { kind: "vente", name: "Marché de gros", lat: 4.74, lon: -6.64, canal: "grossistes" });
+      assert.strictEqual(v.status, 200, v.text); shop = v.json.site.id;
+    });
+    await t.test("un lot va de la parcelle au client ; pertes et délai sont calculés par le serveur", async () => {
+      assert.strictEqual((await jpost("/api/dist/lot", animC, { action: "forecast", parcel_id: "inconnue", kg_expected: 100, expected_on: "2026-12-01", centre_id: centre })).status, 400, "parcelle hors coopérative");
+      const f = await jpost("/api/dist/lot", animC, { action: "forecast", parcel_id: dParcel, crop: "tomate", kg_expected: 500, expected_on: "2026-12-01", centre_id: centre });
+      assert.strictEqual(f.status, 200, f.text); lot = f.json.lot;
+      assert.strictEqual(lot.code, "L-0001"); assert.strictEqual(lot.step, "prevu");
+      assert.strictEqual((await jpost("/api/dist/lot", animC, { action: "ship", id: lot.id, client_id: shop })).status, 400, "pas de départ avant réception");
+      const ago = (h) => new Date(Date.now() - h * 3600000).toISOString();
+      assert.strictEqual((await jpost("/api/dist/lot", animC, { action: "harvest", id: lot.id, kg_harvested: 480, harvested_at: ago(30), quality: "B" })).status, 200);
+      assert.strictEqual((await jpost("/api/dist/lot", animC, { action: "ship", id: lot.id, client_id: shop, departed_at: ago(28), vehicle: "tricycle" })).status, 200);
+      assert.strictEqual((await jpost("/api/dist/lot", animC, { action: "deliver", id: lot.id, kg_delivered: 600 })).status, 400, "plus que le poids reçu");
+      const d = await jpost("/api/dist/lot", animC, { action: "deliver", id: lot.id, kg_delivered: 456 });
+      assert.strictEqual(d.status, 200, d.text);
+      assert.strictEqual(d.json.lot.step, "livre"); assert.strictEqual(d.json.lot.loss_kg, 24);
+      assert.ok(Math.abs(d.json.lot.hours - 30) < 0.2, "délai récolte → livraison : " + d.json.lot.hours);
+      const r = await req("GET", "/api/dist", { cookie: animC });
+      assert.strictEqual(r.json.indicators.loss_pct, 5); assert.strictEqual(r.json.indicators.fast_pct, 100);
+      assert.strictEqual(r.json.indicators.forecast_gap_pct, 4);
+    });
+    await t.test("on ne supprime ni un site traversé par un lot, ni un lot déjà reçu", async () => {
+      assert.strictEqual((await jpost("/api/dist/site/delete", animC, { id: centre })).status, 400);
+      assert.strictEqual((await jpost("/api/dist/lot/delete", animC, { id: lot.id })).status, 400);
+      assert.strictEqual((await jpost("/api/dist/lot", animC, { action: "forecast", parcel_id: dParcel, kg_expected: 200, expected_on: "2026-12-10", centre_id: centre })).status, 400, "produit obligatoire quand la culture de la parcelle est inconnue");
+      const f = await jpost("/api/dist/lot", animC, { action: "forecast", parcel_id: dParcel, crop: "piment", kg_expected: 200, expected_on: "2026-12-10", centre_id: centre });
+      assert.strictEqual(f.json.lot.code, "L-0002");
+      assert.strictEqual((await jpost("/api/dist/lot/delete", animC, { id: f.json.lot.id })).status, 200, "une prévision peut être retirée");
+    });
+    await t.test("une autre coopérative ne voit rien de celle-ci", async () => {
+      const adm = await login(ADMIN, "admin-secret", "10.3.0.2", { as: "admin", code: ADMIN_CODE });
+      assert.strictEqual((await req("POST", "/api/admin/animator", { cookie: cookieOf(adm), json: { email: "voisin@test.ci" } })).status, 200);
+      const vC = cookieOf(await login("voisin@test.ci", "secret123", "10.3.0.2"));
+      assert.strictEqual((await req("GET", "/api/dist", { cookie: vC })).status, 400, "il faut d'abord une coopérative");
+      assert.strictEqual((await jpost("/api/coop/create", vC, { name: "Coop voisine" }, "10.3.0.2")).status, 200);
+      const r = await req("GET", "/api/dist", { cookie: vC });
+      assert.strictEqual(r.status, 200);
+      assert.deepStrictEqual([r.json.sites.length, r.json.lots.length, r.json.parcels.filter((p) => p.id === dParcel).length], [0, 0, 0]);
+      assert.strictEqual((await jpost("/api/dist/lot", vC, { action: "harvest", id: lot.id, kg_harvested: 1 }, "10.3.0.2")).status, 404);
+    });
+
     // -------------------------------------------------- Limites anti-abus
     t.section("Limites anti-abus");
     await t.test("après 10 essais de mot de passe sur un compte, la connexion est bloquée (429)", async () => {

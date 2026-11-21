@@ -693,7 +693,7 @@ html.simple .adv{display:none!important}
 
   // ===== Carte de la parcelle (vue satellite) + appels à Vertea =====
   const VERTEA_BASE = "https://agriscan-z7dc.onrender.com";
-  let MAP=null, drawGroup=null, zoneActive=null, ndviLayer=null;
+  let MAP=null, drawGroup=null, zoneActive=null, ndviLayer=null, activeParcelId=null; // activeParcelId : parcelle enregistrée affichée (pour garder son NDVI)
   function savedParcelle(){ try{ const s=localStorage.getItem("trv-parcelle"); const o=s?JSON.parse(s):null; return (o&&(o.bbox||o.polygon))?o:null; }catch(e){ return null; } }
   function ymd(dt){ return dt.toISOString().slice(0,10); }
   function daysAgo(n){ const dt=new Date(); dt.setDate(dt.getDate()-n); return dt; }
@@ -1247,7 +1247,7 @@ html.simple .adv{display:none!important}
       + '<div style="display:flex;flex-direction:column;gap:6px;">'
       + myParcels.map(function(p){ const when=p.created_at?(" · "+new Date(p.created_at).toLocaleDateString("fr-FR")):""; const kind=p.zone&&p.zone.polygon?"polygone":"rectangle"; return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--surface2);"><span style="flex:1;font-weight:600;min-width:120px;">'+esc(p.name)+'<span class="muted" style="font-weight:400;font-size:.8rem;"> · '+kind+when+'</span></span><button class="btn" type="button" data-view="'+esc(p.id)+'">Voir sur la carte</button><button class="btn" type="button" data-soil="'+esc(p.id)+'" title="Nature du sol, profondeur des racines, arrosage et capteur">Sol &amp; racines'+(p.soil&&p.soil.analyzed?' ✓':'')+'</button><button class="btn" type="button" data-del="'+esc(p.id)+'" title="Supprimer" style="border-color:#c0392b;color:#c0392b;">Supprimer</button></div>'; }).join("")
       + '</div>';
-    box.querySelectorAll("[data-view]").forEach(function(b){ b.addEventListener("click", function(){ const p=myParcels.find(function(x){return x.id===b.getAttribute("data-view");}); if(p&&p.zone) viewParcel(p.zone); }); });
+    box.querySelectorAll("[data-view]").forEach(function(b){ b.addEventListener("click", function(){ const p=myParcels.find(function(x){return x.id===b.getAttribute("data-view");}); if(p&&p.zone){ viewParcel(p.zone); activeParcelId=p.id; } }); });
     box.querySelectorAll("[data-del]").forEach(function(b){ b.addEventListener("click", function(){ delParcel(b.getAttribute("data-del"), b); }); });
     box.querySelectorAll("[data-soil]").forEach(function(b){ b.addEventListener("click", function(){ openSoil(b.getAttribute("data-soil")); }); });
   }
@@ -1277,8 +1277,8 @@ html.simple .adv{display:none!important}
     await loadParcels();
   }
   function setZoneFromLayer(layer){
-    if(layer instanceof L.Rectangle){ const b=layer.getBounds(); zoneActive={ bbox:[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()] }; }
-    else if(layer.getLatLngs){ zoneActive={ polygon: layer.getLatLngs()[0].map(p=>[p.lng,p.lat]) }; }
+    if(layer instanceof L.Rectangle){ const b=layer.getBounds(); activeParcelId=null; zoneActive={ bbox:[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()] }; }
+    else if(layer.getLatLngs){ activeParcelId=null; zoneActive={ polygon: layer.getLatLngs()[0].map(p=>[p.lng,p.lat]) }; }
     try{ localStorage.setItem("trv-parcelle", JSON.stringify(zoneActive)); }catch(e){}
     try{ MAP.fitBounds(layer.getBounds()); }catch(e){}
     showControls();
@@ -1303,7 +1303,7 @@ html.simple .adv{display:none!important}
       });
       MAP.addControl(dc);
       MAP.on(L.Draw.Event.CREATED, (e)=>{ drawGroup.clearLayers(); if(ndviLayer){MAP.removeLayer(ndviLayer);ndviLayer=null;} drawGroup.addLayer(e.layer); setZoneFromLayer(e.layer); });
-      MAP.on(L.Draw.Event.DELETED, ()=>{ zoneActive=null; try{localStorage.removeItem("trv-parcelle");}catch(e){} $("verteaControls").style.display="none"; var r=$("parcelSaveRow"); if(r) r.style.display="none"; $("vOut").innerHTML=""; $("mapSub").textContent="Dessinez votre parcelle sur la carte, puis lancez une analyse satellite."; });
+      MAP.on(L.Draw.Event.DELETED, ()=>{ zoneActive=null; activeParcelId=null; try{localStorage.removeItem("trv-parcelle");}catch(e){} $("verteaControls").style.display="none"; var r=$("parcelSaveRow"); if(r) r.style.display="none"; $("vOut").innerHTML=""; $("mapSub").textContent="Dessinez votre parcelle sur la carte, puis lancez une analyse satellite."; });
     }
     if(sv){ restoreZone(sv); }
     setTimeout(()=>{ try{ MAP.invalidateSize(); }catch(e){} }, 300);
@@ -1504,7 +1504,9 @@ html.simple .adv{display:none!important}
       const d = await vFetch("/ndvi", Object.assign({}, zoneActive, { date_debut: ymd(daysAgo(180)), date_fin: ymd(new Date()) }));
       if(d.erreur){ vSetBusy(false, "Erreur : "+d.erreur); return; }
       // Mémorise pour l'indice de durabilité (pilier environnemental) et le bilan carbone.
-      if(typeof d.ndvi_moyen==="number"){ window.lastNdvi = d.ndvi_moyen; }
+      if(typeof d.ndvi_moyen==="number"){ window.lastNdvi = d.ndvi_moyen;
+        // Parcelle enregistrée : on garde sa dernière mesure (carte de la distribution, parcelles à surveiller).
+        if(activeParcelId){ fetch("/api/parcels/ndvi",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ parcel_id:activeParcelId, ndvi:d.ndvi_moyen, pct_faible:d.pct_faible, pct_moyen:d.pct_moyen })}).catch(function(){}); } }
       if(typeof d.surface_ha==="number"){ window.lastSurfaceHa = d.surface_ha; var _da=document.getElementById("durArea"); if(_da && !_da.value) _da.value = d.surface_ha; }
       saveCtx({ ndvi:d.ndvi_moyen, pctFaible:d.pct_faible, surface:d.surface_ha, culture:($("vCulture").value||"").trim() });
       if(ndviLayer) MAP.removeLayer(ndviLayer);
@@ -1698,6 +1700,13 @@ html.simple .adv{display:none!important}
         s.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg> Stock';
         if(!document.getElementById('qualityGuardNav')){ s.style.marginTop='8px'; s.style.borderTop='1px solid rgba(255,255,255,.18)'; s.style.paddingTop='14px'; }
         menu.appendChild(s);
+      }
+      // Onglet Distribution (projet ASTRIDE) : mêmes acteurs que le Stock.
+      if(menu && !document.getElementById('distNav')){
+        const d=document.createElement('a');
+        d.id='distNav'; d.href='/distribution';
+        d.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4.5L3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2-6-2z"/><path d="M9 4.5v13"/><path d="M15 6.5v13"/></svg> Distribution';
+        menu.appendChild(d);
       }
     }
   }
