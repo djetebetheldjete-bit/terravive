@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Terravive — Distribution</title>
+<meta name="description" content="De la parcelle au client : centres de groupage, tournées et livraisons de la coopérative, sur une carte.">
+<style>
+  :root{
+    --leaf:#2E7D46; --deep:#174D2B; --sun:#C58A2A; --line:#dce6da;
+    --bg:#eef4ec; --surface:#ffffff; --surface2:#f4f9f2;
+    --ink:#15251B; --soft:#53625a; --faint:#8a988e;
+    --good:#2E8B6F; --warn:#C58A2A; --bad:#c0392b; --flow:#2b6a9a; --land:#e7efe3; --grid:#d3dfcf;
+    --shadow:0 8px 28px rgba(20,50,30,.08); --f-display:Georgia,'Times New Roman',serif;
+  }
+  :root[data-theme="clair"]{ --leaf:#2f855a; --deep:#276749; --sun:#b7791f; --line:#e6e9ec; --bg:#f3f5f7; --surface:#ffffff; --surface2:#f7f9fb; --ink:#1a2430; --soft:#5a6675; --faint:#95a0ae; --land:#eef1f3; --grid:#dfe4e8; --shadow:0 8px 28px rgba(30,40,60,.07); }
+  :root[data-theme="sombre"]{ --leaf:#5bbf84; --deep:#8fd6a9; --sun:#e0b25a; --line:#223228; --bg:#0e1712; --surface:#15241b; --surface2:#1a2c21; --ink:#e7f1ea; --soft:#a6b7ad; --faint:#7c8d83; --good:#4fb98f; --warn:#e0b25a; --bad:#e46a5c; --flow:#6fb0dd; --land:#132019; --grid:#223228; --shadow:0 10px 30px rgba(0,0,0,.35); }
+  :root[data-theme="terre"]{ --leaf:#7a6a3a; --deep:#5c4a22; --sun:#c7892f; --line:#e6ddcb; --bg:#f4efe3; --surface:#fffdf8; --surface2:#f7f1e5; --ink:#2a2416; --soft:#6b6150; --faint:#9a8f78; --land:#efe8d8; --grid:#e0d6c1; --shadow:0 8px 28px rgba(80,60,20,.1); }
+
+  *{ box-sizing:border-box; } html,body{ margin:0; }
+  body{ font-family:"Segoe UI",system-ui,Arial,sans-serif; color:var(--ink); background:var(--bg); line-height:1.5; }
+  a{ color:var(--leaf); text-decoration:none; font-weight:600; }
+  .top{ position:sticky; top:0; z-index:10; background:var(--surface); border-bottom:1px solid var(--line); }
+  .topin{ max-width:1320px; margin:0 auto; padding:12px 18px; display:flex; align-items:center; gap:12px; }
+  .brand{ display:flex; align-items:center; gap:9px; font-family:var(--f-display); font-weight:700; font-size:18px; color:var(--deep); }
+  .brand .em{ width:30px; height:30px; } .spacer{ flex:1; }
+  .sel{ padding:8px 10px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); font:inherit; width:100%; }
+  .btn{ padding:8px 13px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); font:inherit; font-weight:600; cursor:pointer; }
+  .btn.primary{ background:var(--leaf); color:#fff; border-color:var(--leaf); }
+  .btn.small{ padding:5px 10px; font-size:.85rem; }
+  .btn:disabled{ opacity:.6; cursor:default; }
+  .btn:focus-visible,.chip:focus-visible,.sel:focus-visible{ outline:2px solid var(--leaf); outline-offset:2px; }
+  main{ max-width:1320px; margin:0 auto; padding:18px 18px 50px; }
+  h1{ font-family:var(--f-display); font-size:1.7rem; color:var(--deep); margin:0; }
+  .lead{ color:var(--soft); margin:2px 0 0; font-size:.95rem; }
+  .head{ display:flex; flex-wrap:wrap; gap:14px 28px; align-items:flex-end; margin-bottom:14px; }
+  .kpis{ display:flex; flex-wrap:wrap; gap:8px; margin-left:auto; }
+  .kpi{ background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:7px 12px; min-width:128px; }
+  .kpi b{ display:block; font-size:1.35rem; color:var(--deep); font-variant-numeric:tabular-nums; }
+  .kpi span{ font-size:.76rem; color:var(--faint); }
+  .kpi.alert b{ color:var(--bad); } .kpi.ok b{ color:var(--good); }
+  .board{ display:grid; grid-template-columns:220px 1fr 330px; background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; min-height:560px; }
+  .rail{ padding:14px; border-right:1px solid var(--line); }
+  .panel{ padding:16px; border-left:1px solid var(--line); overflow:auto; max-height:720px; }
+  h2{ font-size:.78rem; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); margin:0 0 8px; font-weight:700; }
+  fieldset{ border:0; padding:0; margin:0 0 18px; display:flex; flex-direction:column; gap:6px; }
+  label.ck{ display:flex; align-items:center; gap:8px; cursor:pointer; font-size:.9rem; }
+  input[type=checkbox],input[type=radio]{ accent-color:var(--leaf); width:16px; height:16px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font:600 .8rem inherit; font-family:inherit; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:999px; padding:4px 10px; cursor:pointer; display:flex; align-items:center; gap:6px; }
+  .chip[aria-pressed="false"]{ opacity:.45; }
+  .chip i{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .mapwrap{ position:relative; background:var(--land); min-height:420px; }
+  svg#map{ width:100%; height:100%; display:block; }
+  svg#map.placing{ cursor:crosshair; }
+  .lbl{ font:600 12px "Segoe UI",system-ui,sans-serif; fill:var(--ink); paint-order:stroke; stroke:var(--land); stroke-width:3px; pointer-events:none; }
+  .lbl.small{ font-size:11px; fill:var(--soft); font-weight:500; }
+  .hit{ cursor:pointer; }
+  .dim{ opacity:.16; }
+  #tip{ position:absolute; pointer-events:none; background:var(--ink); color:var(--surface); font-size:12px; padding:5px 8px; border-radius:6px; white-space:nowrap; opacity:0; transform:translate(-50%,-135%); z-index:3; }
+  .legend{ position:absolute; left:10px; bottom:10px; background:var(--surface); border:1px solid var(--line); border-radius:9px; padding:8px 10px; font-size:12px; display:grid; gap:4px; max-width:calc(100% - 20px); }
+  .legend div{ display:flex; align-items:center; gap:8px; }
+  .sw{ width:13px; height:13px; border-radius:3px; flex:none; display:inline-block; }
+  .mapnote{ position:absolute; right:10px; top:10px; font-size:12px; color:var(--soft); background:var(--surface); border:1px solid var(--line); border-radius:7px; padding:4px 8px; }
+  .banner{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px; max-width:360px; text-align:center; box-shadow:var(--shadow); font-size:.9rem; }
+  .placebar{ position:absolute; left:50%; top:10px; transform:translateX(-50%); background:var(--deep); color:#fff; border-radius:999px; padding:6px 14px; font-size:.85rem; font-weight:600; }
+  .panel h3{ font-family:var(--f-display); font-size:1.3rem; color:var(--deep); margin:0 0 4px; }
+  .pill{ display:inline-block; font-size:.74rem; font-weight:700; border-radius:999px; padding:2px 9px; color:#fff; }
+  dl{ display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:12px 0; font-size:.9rem; }
+  dt{ color:var(--soft); } dd{ margin:0; text-align:right; font-variant-numeric:tabular-nums; }
+  table{ width:100%; border-collapse:collapse; font-size:.86rem; font-variant-numeric:tabular-nums; }
+  th{ text-align:left; color:var(--faint); font-weight:600; border-bottom:1px solid var(--line); padding:5px 6px 5px 0; font-size:.78rem; }
+  td{ padding:6px 6px 6px 0; border-bottom:1px solid var(--line); } td.r,th.r{ text-align:right; }
+  tr.click{ cursor:pointer; } tr.click:hover td{ background:var(--surface2); }
+  .empty{ color:var(--soft); font-size:.9rem; }
+  .bar{ height:7px; border-radius:4px; background:var(--surface2); border:1px solid var(--line); overflow:hidden; margin-top:3px; }
+  .bar span{ display:block; height:100%; background:var(--leaf); }
+  .form{ display:grid; gap:8px; margin-top:10px; padding:12px; border:1px solid var(--line); border-radius:11px; background:var(--surface2); }
+  .form label{ font-size:.8rem; color:var(--soft); font-weight:600; display:grid; gap:3px; }
+  .form .two{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .err{ color:var(--bad); font-size:.85rem; min-height:1em; } .okmsg{ color:var(--good); font-size:.85rem; }
+  .steps{ display:flex; gap:4px; margin:10px 0 4px; }
+  .steps span{ flex:1; text-align:center; font-size:.72rem; padding:4px 2px; border-radius:6px; background:var(--surface2); color:var(--faint); border:1px solid var(--line); }
+  .steps span.on{ background:var(--leaf); color:#fff; border-color:var(--leaf); }
+  .section{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-top:16px; box-shadow:var(--shadow); }
+  .section .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .tablewrap{ overflow-x:auto; }
+  .note{ color:var(--faint); font-size:.8rem; margin-top:12px; }
+  @media (max-width:1000px){
+    .board{ grid-template-columns:1fr; }
+    .rail{ border-right:0; border-top:1px solid var(--line); display:flex; flex-wrap:wrap; gap:14px 24px; order:2; }
+    .mapwrap{ order:1; } .panel{ order:3; }
+    .rail fieldset{ margin:0; }
+    .mapwrap{ height:62vh; min-height:340px; }
+    .panel{ border-left:0; border-top:1px solid var(--line); max-height:none; }
+    .kpis{ margin-left:0; }
+  }
+  #lotsTable table{ min-width:820px; }
+  @media (max-width:520px){
+    main{ padding:14px 16px 40px; }
+    .kpis{ display:grid; grid-template-columns:1fr 1fr; width:100%; } .kpi{ min-width:0; }
+    .form .two{ grid-template-columns:1fr; }
+    .mapwrap{ height:auto; min-height:0; display:flex; flex-direction:column; }
+    svg#map{ height:56vh; min-height:300px; }
+    .legend{ position:static; margin:8px; grid-template-columns:1fr 1fr; font-size:11px; }
+    .mapnote{ display:none; }
+  }
+  @media (prefers-reduced-motion:reduce){ *{ transition:none!important; } }
+</style>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2E7D46">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<script src="/pwa.js" defer></script>
+<link rel="icon" type="image/png" href="/favicon-32.png">
+<link rel="stylesheet" href="/mobile.css">
+<script src="/mobile.js" defer></script>
+</head>
+<body>
+  <div class="top"><div class="topin">
+    <span class="brand"><span class="em"><img src="/logo.png" alt="Terravive" style="display:block;width:100%;height:100%;object-fit:contain"></span>Terravive</span>
+    <span class="spacer"></span>
+    <a href="/stock" class="btn">Stock</a>
+    <a href="/tableau" class="btn">← Tableau de bord</a>
+    <select class="sel" id="themeSel" title="Thème" aria-label="Thème" style="width:auto">
+      <option value="nature">Nature</option><option value="clair">Clair</option><option value="sombre">Sombre</option><option value="terre">Terre</option>
+    </select>
+  </div></div>
+
+  <main>
+    <div class="head">
+      <div>
+        <h1>De la parcelle au client</h1>
+        <p class="lead" id="lead">Chargement…</p>
+      </div>
+      <div class="kpis" id="kpis"></div>
+    </div>
+
+    <div class="board" id="board" hidden>
+      <aside class="rail">
+        <fieldset>
+          <h2>Couches</h2>
+          <label class="ck"><input type="checkbox" id="L-parcels" checked> Parcelles</label>
+          <label class="ck"><input type="checkbox" id="L-collect" checked> Collecte vers les centres</label>
+          <label class="ck"><input type="checkbox" id="L-deliv" checked> Livraisons</label>
+          <label class="ck"><input type="checkbox" id="L-centres" checked> Centres de groupage</label>
+          <label class="ck"><input type="checkbox" id="L-shops" checked> Points de vente</label>
+        </fieldset>
+        <fieldset>
+          <h2>Couleur des parcelles</h2>
+          <label class="ck"><input type="radio" name="mode" value="health" checked> État (satellite)</label>
+          <label class="ck"><input type="radio" name="mode" value="ndvi"> Indice NDVI</label>
+        </fieldset>
+        <fieldset>
+          <h2>État</h2>
+          <div class="chips" id="chips"></div>
+        </fieldset>
+        <fieldset id="centreFs">
+          <h2>Centre</h2>
+          <div class="chips" id="cchips"></div>
+        </fieldset>
+      </aside>
+      <div class="mapwrap" id="mapwrap">
+        <svg id="map" role="img" aria-label="Carte des parcelles, centres de groupage, points de vente et livraisons de la coopérative"></svg>
+        <div id="tip"></div>
+        <div class="mapnote">Fond schématique · nord en haut</div>
+        <div class="legend" id="legend"></div>
+        <div id="overlay"></div>
+      </div>
+      <section class="panel" id="panel" aria-live="polite"></section>
+    </div>
+
+    <div class="section" id="lotsSection" hidden>
+      <div class="row">
+        <h2 style="margin:0">Lots</h2>
+        <span class="spacer"></span>
+        <select class="sel" id="lotFilter" aria-label="Filtrer les lots" style="width:auto">
+          <option value="">Tous</option><option value="prevu">Prévus</option><option value="centre">Au centre</option><option value="route">En route</option><option value="livre">Livrés</option>
+        </select>
+        <button class="btn primary small" id="btnForecast" type="button" hidden>Annoncer une récolte</button>
+        <button class="btn small" id="btnSite" type="button" hidden>Ajouter un site</button>
+      </div>
+      <div class="tablewrap" id="lotsTable"></div>
+    </div>
+
+    <p class="note">La carte n'affiche que des données réelles : les parcelles dessinées par les membres de la coopérative (position et surface), leur dernière analyse satellite, et les sites et lots saisis ici. Les indicateurs restent vides tant qu'il n'y a rien à mesurer. Cibles du pilote : pertes sous 15 %, 80 % des lots livrés en moins de 48 h.</p>
+  </main>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(id){ return document.getElementById(id); };
+  function esc(s){ var d=document.createElement("div"); d.textContent=(s==null?"":String(s)); return d.innerHTML; }
+  (function(){ var sel=$("themeSel"), t="nature"; try{ t=localStorage.getItem("trv-theme")||"nature"; }catch(e){} document.documentElement.setAttribute("data-theme",t); sel.value=t; sel.addEventListener("change",function(){ document.documentElement.setAttribute("data-theme",sel.value); try{ localStorage.setItem("trv-theme",sel.value); }catch(e){} }); })();
+
+  var NS="http://www.w3.org/2000/svg", svg=$("map"), tip=$("tip");
+  var D=null; // données du serveur
+  var HEALTH={ OK:"var(--good)", Surveillance:"var(--warn)", Alerte:"var(--bad)", "Non mesuré":"var(--faint)" };
+  var state={ mode:"health", health:{ OK:true, Surveillance:true, Alerte:true, "Non mesuré":true }, centres:{}, sel:null, placing:null, filter:"",
+    layers:{ parcels:true, collect:true, deliv:true, centres:true, shops:true } };
+  var fmt=function(n,d){ return Number(n).toLocaleString("fr-FR",{ maximumFractionDigits:d||0, minimumFractionDigits:d||0 }); };
+  var kgT=function(kg){ return kg>=1000 ? fmt(kg/1000,1)+" t" : fmt(kg)+" kg"; };
+  var dayFr=function(s){ if(!s) return "—"; var d=new Date(String(s).length===10 ? s+"T12:00:00" : s); return d.toLocaleDateString("fr-FR",{ day:"numeric", month:"short" }); };
+  var timeFr=function(s){ if(!s) return "—"; var d=new Date(s); return d.toLocaleDateString("fr-FR",{ day:"numeric", month:"short" })+" "+d.toLocaleTimeString("fr-FR",{ hour:"2-digit", minute:"2-digit" }); };
+  var by={ parcel:{}, site:{}, lot:{} };
+  function healthOf(p){ return p.health || "Non mesuré"; }
+  function cropOf(p){ return p.crop || p.crop_from_lot || null; }
+
+  // ------------------------------------------------------------------ Chargement
+  async function load(keepSel){
+    var r=await fetch("/api/dist"); var d={}; try{ d=await r.json(); }catch(e){}
+    if(r.status===401){ $("lead").innerHTML='Connectez-vous pour voir la distribution. <a href="/app?login=1">Se connecter</a>'; return; }
+    if(!r.ok){ $("lead").textContent=d.error||"Accès impossible."; return; }
+    D=d; by={ parcel:{}, site:{}, lot:{} };
+    D.parcels.forEach(function(p){ by.parcel[p.id]=p; }); D.sites.forEach(function(s){ by.site[s.id]=s; }); D.lots.forEach(function(l){ by.lot[l.id]=l; });
+    D.sites.filter(function(s){ return s.kind==="centre"; }).forEach(function(s){ if(state.centres[s.id]==null) state.centres[s.id]=true; });
+    $("lead").textContent=(D.coop ? D.coop.name+(D.coop.region ? " · "+D.coop.region : "") : "Toutes les coopératives")+" · "+(D.canWrite ? "vous pouvez saisir les sites et les lots" : "lecture seule");
+    $("board").hidden=false; $("lotsSection").hidden=false;
+    $("btnForecast").hidden=!D.canWrite; $("btnSite").hidden=!D.canWrite;
+    if(!keepSel) state.sel=null; else if(state.sel && !exists(state.sel)) state.sel=null;
+    D.parcels.forEach(function(p){ if(!p.crop){ var l=D.lots.filter(function(x){ return x.parcel_id===p.id && x.crop; })[0]; if(l) p.crop_from_lot=l.crop; } });
+    project(); chips(); kpis(); draw(); panel(); lotsTable();
+  }
+  function exists(s){ return s.kind==="new-site" || s.kind==="forecast" || (s.kind==="parcel" ? by.parcel[s.id] : s.kind==="lot" ? by.lot[s.id] : by.site[s.id]); }
+
+  // ------------------------------------------------------------------ Projection (équirectangulaire corrigée de la latitude)
+  var W=1000, H=640, PAD=48, P={};
+  // La carte prend la taille réelle de son cadre : le texte reste lisible, sans agrandissement ni réduction.
+  function fitSize(){ var r=svg.getBoundingClientRect(); W=Math.max(300, Math.round(r.width||1000)); H=Math.max(280, Math.round(r.height||640)); }
+  function project(){
+    fitSize();
+    var pts=[]; D.parcels.forEach(function(p){ if(p.center) pts.push([p.center.lat,p.center.lon]); }); D.sites.forEach(function(s){ pts.push([+s.lat,+s.lon]); });
+    var lat0,lat1,lon0,lon1;
+    if(pts.length){ lat0=Math.min.apply(null,pts.map(function(x){return x[0];})); lat1=Math.max.apply(null,pts.map(function(x){return x[0];})); lon0=Math.min.apply(null,pts.map(function(x){return x[1];})); lon1=Math.max.apply(null,pts.map(function(x){return x[1];})); }
+    else { lat0=4.62; lat1=4.88; lon0=-6.8; lon1=-6.48; } // région de San-Pédro, en attendant les premières données
+    var cLat=(lat0+lat1)/2, cLon=(lon0+lon1)/2, k=Math.cos(cLat*Math.PI/180);
+    var spanLat=Math.max(lat1-lat0, 0.02), spanLon=Math.max(lon1-lon0, 0.02/k);
+    // cadre adapté au rapport largeur / hauteur de la carte, avec une marge
+    var ratio=(W-2*PAD)/(H-2*PAD);
+    if(spanLon*k/spanLat > ratio) spanLat=spanLon*k/ratio; else spanLon=spanLat*ratio/k;
+    spanLat*=1.18; spanLon*=1.18;
+    P={ lat0:cLat-spanLat/2, lat1:cLat+spanLat/2, lon0:cLon-spanLon/2, lon1:cLon+spanLon/2, k:k };
+    P.sx=(W-2*PAD)/(spanLon*k);
+  }
+  var X=function(lon){ return PAD+(lon-P.lon0)*P.k*P.sx; };
+  var Y=function(lat){ return PAD+(P.lat1-lat)*P.sx; };
+  var toLatLon=function(x,y){ return { lat:P.lat1-(y-PAD)/P.sx, lon:P.lon0+(x-PAD)/(P.k*P.sx) }; };
+
+  function el(tag, attrs, parent){ var e=document.createElementNS(NS,tag); for(var a in attrs) if(attrs[a]!=null) e.setAttribute(a,attrs[a]); if(parent) parent.appendChild(e); return e; }
+  function txt(x,y,t,cls,anchor,parent){ var e=el("text",{ x:x, y:y, "class":cls, "text-anchor":anchor||"middle" },parent); e.textContent=t; return e; }
+
+  // Forme de parcelle stylisée : position réelle, taille liée à la surface (exagérée pour rester visible).
+  function parcelPath(p){
+    var cx=X(p.center.lon), cy=Y(p.center.lat), r=11+Math.sqrt(Math.max(0.05, p.area_ha||0.3))*12;
+    var seed=0; for(var i=0;i<p.id.length;i++) seed+=p.id.charCodeAt(i)*(i+3);
+    var pts=[];
+    for(var j=0;j<6;j++){ var a=(j/6)*Math.PI*2+(seed%7)*0.11, rr=r*(0.78+((seed*(j+5))%23)/60); pts.push((cx+Math.cos(a)*rr*1.15).toFixed(1)+","+(cy+Math.sin(a)*rr*0.85).toFixed(1)); }
+    return "M"+pts.join("L")+"Z";
+  }
+  function ndviColor(v){ if(v==null) return "var(--faint)"; var t=Math.max(0,Math.min(1,(v-0.25)/0.55)); return "hsl("+(35+t*85).toFixed(0)+",52%,44%)"; }
+  function parcelColor(p){ return state.mode==="health" ? HEALTH[healthOf(p)] : ndviColor(p.ndvi); }
+  function niceStep(span){ var s=[0.005,0.01,0.02,0.05,0.1,0.2,0.5,1]; for(var i=0;i<s.length;i++) if(span/s[i]<=8) return s[i]; return 2; }
+  function visibleParcel(p){ if(!p.center || !state.health[healthOf(p)]) return false; var c=centreOfParcel(p.id); return !c || state.centres[c]!==false; }
+  function centreOfParcel(pid){ var l=D.lots.filter(function(x){ return x.parcel_id===pid && x.centre_id; })[0]; return l ? l.centre_id : null; }
+  function lotVisible(l){ var p=by.parcel[l.parcel_id]; return (!p || visibleParcel(p) || !p.center) && state.centres[l.centre_id]!==false; }
+
+  // ------------------------------------------------------------------ Dessin
+  function draw(){
+    svg.innerHTML="";
+    svg.setAttribute("viewBox","0 0 "+W+" "+H); svg.setAttribute("preserveAspectRatio","xMidYMid meet");
+    svg.classList.toggle("placing", !!(state.placing && state.placing.lat==null));
+    var defs=el("defs",{},svg), m=el("marker",{ id:"arr", viewBox:"0 0 10 10", refX:"9", refY:"5", markerWidth:"11", markerHeight:"11", markerUnits:"userSpaceOnUse", orient:"auto-start-reverse" },defs);
+    el("path",{ d:"M0 0L10 5L0 10z", style:"fill:var(--flow)" },m);
+    el("rect",{ x:0, y:0, width:W, height:H, style:"fill:var(--land)" },svg);
+    // grille
+    var g=el("g",{},svg), st=niceStep(P.lat1-P.lat0), dec=st<0.01?3:2;
+    for(var la=Math.ceil(P.lat0/st)*st; la<=P.lat1; la+=st){ var y=Y(la); el("line",{ x1:0, x2:W, y1:y, y2:y, style:"stroke:var(--grid)", "stroke-width":1 },g); txt(6,y-3,Math.abs(la).toFixed(dec)+"°"+(la>=0?"N":"S"),"lbl small","start",g); }
+    for(var lo=Math.ceil(P.lon0/st)*st; lo<=P.lon1; lo+=st){ var x=X(lo); el("line",{ x1:x, x2:x, y1:0, y2:H, style:"stroke:var(--grid)", "stroke-width":1 },g); txt(x,H-8,Math.abs(lo).toFixed(dec)+"°"+(lo>=0?"E":"O"),"lbl small","middle",g); }
+    // échelle
+    var pxKm=P.sx/111.2, km=[0.5,1,2,5,10,20,50].filter(function(v){ return v*pxKm<=W*0.22; }).pop()||0.5;
+    var sbx=W-PAD-km*pxKm, sby=H-30;
+    el("line",{ x1:sbx, x2:W-PAD, y1:sby, y2:sby, style:"stroke:var(--ink)", "stroke-width":3 },svg); txt((sbx+W-PAD)/2,sby-7,(km<1?fmt(km*1000)+" m":km+" km"),"lbl","middle",svg);
+
+    var rel=relatedSet(state.sel);
+    var dim=function(keys){ if(!rel) return ""; for(var i=0;i<keys.length;i++) if(!rel[keys[i]]) return "dim"; return ""; };
+
+    // collecte : parcelle → centre (d'après les lots)
+    if(state.layers.collect){
+      var gc=el("g",{},svg), seen={};
+      D.lots.forEach(function(l){ var p=by.parcel[l.parcel_id], c=by.site[l.centre_id]; if(!p||!p.center||!c||!visibleParcel(p)||state.centres[c.id]===false) return;
+        var key=p.id+">"+c.id; if(seen[key]) return; seen[key]=1;
+        el("line",{ x1:X(p.center.lon), y1:Y(p.center.lat), x2:X(+c.lon), y2:Y(+c.lat), style:"stroke:var(--soft)", "stroke-width":1.3, "stroke-dasharray":"4 4", "class":dim([p.id,c.id]) },gc); });
+    }
+    // livraisons : centre → point de vente
+    if(state.layers.deliv){
+      var gd=el("g",{ fill:"none" },svg);
+      D.lots.forEach(function(l){ if(!l.client_id || !lotVisible(l)) return; var c=by.site[l.centre_id], s=by.site[l.client_id]; if(!c||!s) return;
+        var x1=X(+c.lon),y1=Y(+c.lat),x2=X(+s.lon),y2=Y(+s.lat), mx=(x1+x2)/2+(y2-y1)*0.18, my=(y1+y2)/2-(x2-x1)*0.18;
+        var kg=+(l.kg_delivered||l.kg_harvested||0), w=1.5+Math.sqrt(kg)/9;
+        var path=el("path",{ d:"M"+x1+" "+y1+"Q"+mx+" "+my+" "+x2+" "+y2, style:"stroke:var(--flow)", "stroke-width":w.toFixed(1), "stroke-linecap":"round", "stroke-opacity":l.step==="livre"?0.7:1, "stroke-dasharray":l.step==="route"?"10 5":null, "marker-end":"url(#arr)", "class":"hit "+dim([l.id,c.id,s.id]) },gd);
+        hover(path, l.code+" · "+fmt(kg)+" kg · "+l.step_label); path.addEventListener("click",function(){ select({ kind:"lot", id:l.id }); });
+      });
+    }
+    // parcelles
+    if(state.layers.parcels){
+      var gp=el("g",{},svg);
+      D.parcels.forEach(function(p){ if(!visibleParcel(p)) return;
+        var col=parcelColor(p), isSel=state.sel&&state.sel.kind==="parcel"&&state.sel.id===p.id;
+        var sh=el("path",{ d:parcelPath(p), style:"fill:"+col+";stroke:"+col, "fill-opacity":0.5, "stroke-width":isSel?3.5:1.5, "class":"hit "+dim([p.id]), tabindex:0, role:"button", "aria-label":"Parcelle "+p.name+(cropOf(p)?", "+cropOf(p):"")+", "+healthOf(p) },gp);
+        sh.addEventListener("click",function(){ select({ kind:"parcel", id:p.id }); }); keyAct(sh,function(){ select({ kind:"parcel", id:p.id }); });
+        hover(sh, p.name+(cropOf(p)?" · "+cropOf(p):"")+" · "+healthOf(p)+(p.ndvi!=null?" · NDVI "+fmt(p.ndvi,2):""));
+        txt(X(p.center.lon),Y(p.center.lat)+4,short(p.name),"lbl "+dim([p.id]),"middle",gp);
+      });
+    }
+    // sites
+    var gs=el("g",{},svg);
+    D.sites.forEach(function(s){
+      if(s.kind==="centre" && (!state.layers.centres || state.centres[s.id]===false)) return;
+      if(s.kind==="vente" && !state.layers.shops) return;
+      var x=X(+s.lon), y=Y(+s.lat), cls="hit "+dim([s.id]), isSel=state.sel&&state.sel.kind==="site"&&state.sel.id===s.id, node;
+      if(s.kind==="centre"){
+        node=el("rect",{ x:x-11, y:y-11, width:22, height:22, rx:4, style:"fill:var(--surface);stroke:var(--ink)", "stroke-width":isSel?4:2.5, "class":cls, tabindex:0, role:"button", "aria-label":"Centre "+s.name },gs);
+        el("rect",{ x:x-5, y:y-5, width:10, height:10, rx:2, style:"fill:var(--ink)", "class":dim([s.id]), "pointer-events":"none" },gs);
+        txt(x,y-17,s.name,"lbl "+dim([s.id]),"middle",gs);
+        var stock=(D.indicators.stock_kg||{})[s.id]||0; hover(node, s.name+" · stock "+kgT(stock)+" / "+kgT(+s.capacity_kg));
+      } else {
+        node=el("circle",{ cx:x, cy:y, r:isSel?9:7, style:"fill:var(--flow);stroke:var(--surface)", "stroke-width":2.5, "class":cls, tabindex:0, role:"button", "aria-label":"Point de vente "+s.name },gs);
+        txt(x+12,y+4,s.name,"lbl small "+dim([s.id]),"start",gs);
+        hover(node, s.name+" · "+(D.canals[s.canal]||""));
+      }
+      node.addEventListener("click",function(){ select({ kind:"site", id:s.id }); }); keyAct(node,function(){ select({ kind:"site", id:s.id }); });
+    });
+    // repère du site en cours de placement
+    if(state.placing && state.placing.lat!=null){ el("circle",{ cx:X(state.placing.lon), cy:Y(state.placing.lat), r:9, style:"fill:none;stroke:var(--sun)", "stroke-width":3 },svg); }
+    legend(); overlay();
+  }
+  function short(s){ s=String(s||""); return s.length>14 ? s.slice(0,13)+"…" : s; }
+  function keyAct(node,fn){ node.addEventListener("keydown",function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fn(); } }); }
+  function hover(node,text){
+    node.addEventListener("mousemove",function(e){ var b=$("mapwrap").getBoundingClientRect(); tip.textContent=text; tip.style.left=(e.clientX-b.left)+"px"; tip.style.top=(e.clientY-b.top)+"px"; tip.style.opacity=1; });
+    node.addEventListener("mouseleave",function(){ tip.style.opacity=0; });
+  }
+  function relatedSet(sel){
+    if(!sel || sel.kind==="new-site" || sel.kind==="forecast") return null;
+    var r={}; r[sel.id]=1;
+    var lots=D.lots.filter(function(l){ return sel.kind==="parcel" ? l.parcel_id===sel.id : sel.kind==="lot" ? l.id===sel.id : (l.centre_id===sel.id || l.client_id===sel.id); });
+    lots.forEach(function(l){ r[l.id]=1; r[l.parcel_id]=1; if(l.centre_id) r[l.centre_id]=1; if(l.client_id) r[l.client_id]=1; });
+    return r;
+  }
+  function legend(){
+    var h="";
+    if(state.mode==="health") ["OK","Surveillance","Alerte","Non mesuré"].forEach(function(k){ h+='<div><span class="sw" style="background:'+HEALTH[k]+';opacity:.75"></span>Parcelle · '+k+'</div>'; });
+    else h+='<div><span class="sw" style="background:'+ndviColor(0.3)+'"></span>NDVI 0,30 · végétation faible</div><div><span class="sw" style="background:'+ndviColor(0.55)+'"></span>NDVI 0,55</div><div><span class="sw" style="background:'+ndviColor(0.8)+'"></span>NDVI 0,80 · vigoureuse</div>';
+    h+='<div><span class="sw" style="border:2.5px solid var(--ink);background:var(--surface)"></span>Centre de groupage</div><div><span class="sw" style="border-radius:50%;background:var(--flow)"></span>Point de vente</div>';
+    h+='<div><svg width="26" height="8" aria-hidden="true"><line x1="0" y1="4" x2="26" y2="4" style="stroke:var(--flow)" stroke-width="3"/></svg>Livré · <svg width="26" height="8" aria-hidden="true"><line x1="0" y1="4" x2="26" y2="4" style="stroke:var(--flow)" stroke-width="3" stroke-dasharray="8 4"/></svg>En route</div>';
+    $("legend").innerHTML=h;
+  }
+  function overlay(){
+    var o=$("overlay");
+    if(state.placing && state.placing.lat==null){ o.innerHTML='<div class="placebar">Touchez la carte pour placer le site</div>'; return; }
+    var located=D.parcels.filter(function(p){ return p.center; }).length;
+    if(!located && !D.sites.length){ o.innerHTML='<div class="banner"><b>La carte est encore vide.</b><br>Elle se remplit avec les parcelles dessinées par les membres (tableau de bord → « Ma parcelle »)'+(D.canWrite?', puis avec vos centres de groupage et points de vente (« Ajouter un site »).':'.')+'</div>'; return; }
+    o.innerHTML="";
+  }
+
+  // ------------------------------------------------------------------ Indicateurs
+  function kpis(){
+    var I=D.indicators, T=I.targets, h="";
+    var tile=function(v,label,cls){ return '<div class="kpi '+(cls||"")+'"><b>'+v+'</b><span>'+label+'</span></div>'; };
+    h+=tile(I.forecast_kg ? kgT(I.forecast_kg) : "—","récolte annoncée");
+    h+=tile(I.watch,"parcelles à surveiller",I.watch?"alert":"");
+    h+=tile(I.loss_pct==null?"—":fmt(I.loss_pct,1)+" %","pertes (cible &lt; "+T.lossPct+" %)",I.loss_pct==null?"":(I.loss_pct<T.lossPct?"ok":"alert"));
+    h+=tile(I.fast_pct==null?"—":fmt(I.fast_pct)+" %","livrés en &lt; "+T.fastHours+" h (cible "+T.fastPct+" %)",I.fast_pct==null?"":(I.fast_pct>=T.fastPct?"ok":"alert"));
+    h+=tile(I.forecast_gap_pct==null?"—":fmt(I.forecast_gap_pct,1)+" %","écart prévision (cible &lt; "+T.forecastGapPct+" %)",I.forecast_gap_pct==null?"":(I.forecast_gap_pct<T.forecastGapPct?"ok":"alert"));
+    $("kpis").innerHTML=h;
+  }
+  function chips(){
+    var c=$("chips"); c.innerHTML="";
+    Object.keys(state.health).forEach(function(k){ c.appendChild(chip(k,state.health,HEALTH[k])); });
+    var cc=$("cchips"); cc.innerHTML=""; var centres=D.sites.filter(function(s){ return s.kind==="centre"; });
+    $("centreFs").hidden=!centres.length;
+    centres.forEach(function(s){ var b=chip(s.name,state.centres,null,s.id); cc.appendChild(b); });
+  }
+  function chip(label,obj,color,key){
+    key=key||label; var b=document.createElement("button"); b.type="button"; b.className="chip"; b.setAttribute("aria-pressed",obj[key]!==false?"true":"false");
+    b.innerHTML=(color?'<i style="background:'+color+'"></i>':'')+esc(label);
+    b.addEventListener("click",function(){ obj[key]=obj[key]===false; b.setAttribute("aria-pressed",obj[key]!==false?"true":"false"); draw(); lotsTable(); });
+    return b;
+  }
+
+  // ------------------------------------------------------------------ Panneau de détail
+  function pill(h){ return '<span class="pill" style="background:'+HEALTH[h]+'">'+esc(h)+'</span>'; }
+  function stepPill(l){ var col={ prevu:"var(--faint)", centre:"var(--sun)", route:"var(--flow)", livre:"var(--good)" }[l.step]; return '<span class="pill" style="background:'+col+'">'+esc(l.step_label)+'</span>'; }
+  function select(s){
+    // Pendant le placement d'un site, un toucher sur une parcelle ou un site sert à placer, pas à ouvrir le détail.
+    if(state.placing && state.placing.lat==null && s && s.kind!=="new-site") return;
+    if(state.placing && (!s || s.kind!=="new-site")) state.placing=null;
+    state.sel=s; draw(); panel();
+  }
+  function back(){ return '<button class="btn small" type="button" data-act="back" style="margin-top:14px">Retour à la vue d\'ensemble</button>'; }
+  function panel(){
+    var P=$("panel"), s=state.sel, h="";
+    if(!s){
+      h='<h2>Vue d\'ensemble</h2><h3>'+esc(D.coop?D.coop.name:"Toutes les coopératives")+'</h3><p class="empty">Touchez une parcelle, un centre, un point de vente ou une livraison pour voir le détail et ses flux.</p>';
+      var centres=D.sites.filter(function(x){ return x.kind==="centre"; });
+      h+='<h2 style="margin-top:16px">Stocks des centres</h2>';
+      if(!centres.length) h+='<p class="empty">Aucun centre de groupage.</p>';
+      centres.forEach(function(c){ var st=(D.indicators.stock_kg||{})[c.id]||0, r=c.capacity_kg>0?st/c.capacity_kg:0;
+        h+='<div style="margin:9px 0;font-size:.88rem"><div style="display:flex;justify-content:space-between"><span>'+esc(c.name)+(c.cold?' · froid':'')+'</span><span>'+kgT(st)+' / '+kgT(+c.capacity_kg)+'</span></div><div class="bar"><span style="width:'+Math.min(100,r*100).toFixed(0)+'%;background:'+(r>0.8?"var(--warn)":"var(--leaf)")+'"></span></div></div>'; });
+      var watch=D.parcels.filter(function(p){ return p.health==="Alerte"||p.health==="Surveillance"; }).sort(function(a,b){ return (a.ndvi||0)-(b.ndvi||0); });
+      h+='<h2 style="margin-top:16px">Parcelles à surveiller</h2>';
+      if(!watch.length) h+='<p class="empty">Aucune, d\'après les dernières analyses satellite.</p>';
+      else { h+='<table><tr><th>Parcelle</th><th>Culture</th><th class="r">NDVI</th></tr>'; watch.forEach(function(p){ h+='<tr class="click" data-sel="parcel:'+esc(p.id)+'"><td>'+esc(p.name)+' '+pill(p.health)+'</td><td>'+esc(cropOf(p)||"—")+'</td><td class="r">'+fmt(p.ndvi,2)+'</td></tr>'; }); h+='</table>'; }
+      var soon=D.lots.filter(function(l){ return l.step==="prevu"; }).sort(function(a,b){ return String(a.expected_on).localeCompare(String(b.expected_on)); }).slice(0,6);
+      h+='<h2 style="margin-top:16px">Prochaines récoltes annoncées</h2>';
+      if(!soon.length) h+='<p class="empty">Aucune prévision.</p>';
+      else { h+='<table><tr><th>Date</th><th>Parcelle</th><th class="r">kg</th></tr>'; soon.forEach(function(l){ var p=by.parcel[l.parcel_id]; h+='<tr class="click" data-sel="lot:'+esc(l.id)+'"><td>'+dayFr(l.expected_on)+'</td><td>'+esc(p?p.name:"—")+' · '+esc(l.crop)+'</td><td class="r">'+fmt(l.kg_expected)+'</td></tr>'; }); h+='</table>'; }
+      var unloc=D.parcels.filter(function(p){ return !p.center; }).length;
+      if(unloc) h+='<p class="note">'+unloc+' parcelle(s) sans contour : elles ne peuvent pas être placées sur la carte.</p>';
+    }
+    else if(s.kind==="parcel") h=parcelPanel(by.parcel[s.id]);
+    else if(s.kind==="site") h=sitePanel(by.site[s.id]);
+    else if(s.kind==="lot") h=lotPanel(by.lot[s.id]);
+    else if(s.kind==="new-site") h=siteForm(s.edit ? by.site[s.edit] : null);
+    else if(s.kind==="forecast") h=forecastForm(s.parcel);
+    P.innerHTML=h; wirePanel();
+  }
+  function lotsMini(list,col){
+    if(!list.length) return '<p class="empty">Aucun lot.</p>';
+    var h='<h2 style="margin-top:8px">Lots</h2><table><tr><th>Lot</th><th>'+(col==="client"?"Destination":"Parcelle")+'</th><th class="r">kg</th><th>Étape</th></tr>';
+    list.forEach(function(l){ var p=by.parcel[l.parcel_id], c=by.site[l.client_id]; h+='<tr class="click" data-sel="lot:'+esc(l.id)+'"><td>'+esc(l.code)+'</td><td>'+esc(col==="client"?(c?c.name:"—"):(p?p.name:"—"))+'</td><td class="r">'+fmt(l.kg_delivered||l.kg_harvested||l.kg_expected)+'</td><td>'+stepPill(l)+'</td></tr>'; });
+    return h+'</table>';
+  }
+  function parcelPanel(p){
+    var h='<h2>Parcelle</h2><h3>'+esc(p.name)+'</h3>'+pill(healthOf(p));
+    h+='<dl><dt>Planteur</dt><dd>'+esc(p.owner)+'</dd><dt>Culture</dt><dd>'+esc(cropOf(p)||"à renseigner")+'</dd><dt>Surface</dt><dd>'+(p.area_ha!=null?fmt(p.area_ha,2)+" ha":"—")+'</dd>';
+    h+='<dt>NDVI</dt><dd>'+(p.ndvi!=null?fmt(p.ndvi,2)+' <span class="empty">('+dayFr(p.ndvi_at)+')</span>':"pas encore mesuré")+'</dd>';
+    h+='<dt>Position</dt><dd>'+(p.center?Math.abs(p.center.lat).toFixed(4)+(p.center.lat>=0?" N, ":" S, ")+Math.abs(p.center.lon).toFixed(4)+(p.center.lon<0?" O":" E"):"sans contour")+'</dd></dl>';
+    if(p.ndvi==null) h+='<p class="note">L\'état vient de la dernière analyse satellite faite depuis le tableau de bord du planteur (parcelle enregistrée → « Voir », puis analyse NDVI).</p>';
+    if(D.canWrite && D.sites.some(function(s){ return s.kind==="centre"; })) h+='<button class="btn primary small" type="button" data-act="forecast" data-id="'+esc(p.id)+'">Annoncer une récolte</button>';
+    h+=lotsMini(D.lots.filter(function(l){ return l.parcel_id===p.id; }),"client");
+    return h+back();
+  }
+  function sitePanel(x){
+    var h;
+    if(x.kind==="centre"){
+      var st=(D.indicators.stock_kg||{})[x.id]||0, ps={};
+      D.lots.forEach(function(l){ if(l.centre_id===x.id) ps[l.parcel_id]=1; });
+      h='<h2>Centre de groupage</h2><h3>'+esc(x.name)+'</h3><dl><dt>Stock au centre</dt><dd>'+kgT(st)+' / '+kgT(+x.capacity_kg)+' ('+fmt(x.capacity_kg>0?st/x.capacity_kg*100:0)+' %)</dd><dt>Chambre froide</dt><dd>'+(x.cold?"oui":"non")+'</dd><dt>Parcelles reliées</dt><dd>'+Object.keys(ps).length+'</dd></dl>';
+      h+=lotsMini(D.lots.filter(function(l){ return l.centre_id===x.id; }),"client");
+    } else {
+      var ds=D.lots.filter(function(l){ return l.client_id===x.id; });
+      h='<h2>Point de vente</h2><h3>'+esc(x.name)+'</h3><dl><dt>Canal</dt><dd>'+esc(D.canals[x.canal]||"—")+'</dd><dt>Reçu (livré)</dt><dd>'+fmt(ds.filter(function(l){ return l.step==="livre"; }).reduce(function(a,l){ return a+(+l.kg_delivered||0); },0))+' kg</dd><dt>En route</dt><dd>'+fmt(ds.filter(function(l){ return l.step==="route"; }).reduce(function(a,l){ return a+(+l.kg_harvested||0); },0))+' kg</dd></dl>';
+      h+=lotsMini(ds,"parcel");
+    }
+    if(D.canWrite) h+='<div style="display:flex;gap:8px;margin-top:12px"><button class="btn small" type="button" data-act="edit-site" data-id="'+esc(x.id)+'">Modifier</button><button class="btn small" type="button" data-act="del-site" data-id="'+esc(x.id)+'">Supprimer</button></div><div class="err" id="siteErr"></div>';
+    return h+back();
+  }
+  function lotPanel(l){
+    var p=by.parcel[l.parcel_id], c=by.site[l.centre_id], cl=by.site[l.client_id], idx=["prevu","centre","route","livre"].indexOf(l.step);
+    var h='<h2>Lot</h2><h3>'+esc(l.code)+' · '+esc(l.crop)+'</h3>';
+    h+='<div class="steps">'+["Prévu","Au centre","En route","Livré"].map(function(t,i){ return '<span class="'+(i<=idx?"on":"")+'">'+t+'</span>'; }).join("")+'</div>';
+    h+='<dl><dt>Parcelle</dt><dd>'+esc(p?p.name:"—")+'</dd><dt>Planteur</dt><dd>'+esc(p?p.owner:"—")+'</dd><dt>Récolte annoncée</dt><dd>'+fmt(l.kg_expected)+' kg · '+dayFr(l.expected_on)+'</dd><dt>Centre</dt><dd>'+esc(c?c.name:"—")+'</dd>';
+    if(l.harvested_at) h+='<dt>Reçu au centre</dt><dd>'+fmt(l.kg_harvested,1)+' kg'+(l.quality?' · qualité '+esc(l.quality):'')+'</dd><dt>Récolte</dt><dd>'+timeFr(l.harvested_at)+'</dd>';
+    if(l.departed_at) h+='<dt>Client</dt><dd>'+esc(cl?cl.name:"—")+'</dd><dt>Départ</dt><dd>'+timeFr(l.departed_at)+(l.vehicle?' · '+esc(l.vehicle):'')+'</dd>';
+    if(l.delivered_at) h+='<dt>Accepté par le client</dt><dd>'+fmt(l.kg_delivered,1)+' kg</dd><dt>Perte</dt><dd>'+fmt(l.loss_kg,1)+' kg ('+fmt(l.kg_harvested>0?l.loss_kg/l.kg_harvested*100:0,1)+' %)</dd><dt>Récolte → livraison</dt><dd>'+fmt(l.hours,1)+' h</dd>';
+    h+='</dl>';
+    if(D.canWrite) h+=lotActionForm(l);
+    return h+back();
+  }
+  function nowLocal(){ var d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); }
+  function opts(list,sel,ph){ return (ph?'<option value="">'+esc(ph)+'</option>':'')+list.map(function(x){ return '<option value="'+esc(x.id)+'"'+(x.id===sel?' selected':'')+'>'+esc(x.name)+'</option>'; }).join(""); }
+  function lotActionForm(l){
+    var centres=D.sites.filter(function(s){ return s.kind==="centre"; }), shops=D.sites.filter(function(s){ return s.kind==="vente"; });
+    if(l.step==="prevu") return '<form class="form" data-form="harvest"><b>Réception au centre</b><div class="two"><label>Poids pesé (kg)<input class="sel" name="kg_harvested" type="number" min="0" step="0.1" inputmode="decimal" required></label><label>Qualité<select class="sel" name="quality"><option value="">—</option><option>A</option><option>B</option><option>C</option></select></label></div><label>Heure de récolte<input class="sel" name="harvested_at" type="datetime-local" value="'+nowLocal()+'"></label><label>Centre<select class="sel" name="centre_id">'+opts(centres,l.centre_id)+'</select></label><button class="btn primary" type="submit">Enregistrer la réception</button><div class="err"></div><button class="btn small" type="button" data-act="del-lot" data-id="'+esc(l.id)+'">Supprimer cette prévision</button></form>';
+    if(l.step==="centre"){ if(!shops.length) return '<p class="note">Ajoutez un point de vente pour organiser la livraison.</p>';
+      return '<form class="form" data-form="ship"><b>Départ en tournée</b><label>Point de vente<select class="sel" name="client_id" required>'+opts(shops,null,"Choisir…")+'</select></label><div class="two"><label>Véhicule<input class="sel" name="vehicle" maxlength="60" placeholder="tricycle, camionnette…"></label><label>Départ<input class="sel" name="departed_at" type="datetime-local" value="'+nowLocal()+'"></label></div><button class="btn primary" type="submit">Enregistrer le départ</button><div class="err"></div></form>'; }
+    if(l.step==="route") return '<form class="form" data-form="deliver"><b>Livraison</b><div class="two"><label>kg acceptés par le client<input class="sel" name="kg_delivered" type="number" min="0" step="0.1" max="'+esc(l.kg_harvested)+'" inputmode="decimal" required></label><label>Livré le<input class="sel" name="delivered_at" type="datetime-local" value="'+nowLocal()+'"></label></div><p class="note" style="margin:0">La perte est calculée : poids reçu au centre moins poids accepté. L\'encaissement se suit ensuite dans <a href="/stock">Stock</a>.</p><button class="btn primary" type="submit">Enregistrer la livraison</button><div class="err"></div></form>';
+    return "";
+  }
+  function siteForm(x){
+    var kind=x?x.kind:"centre", lat=x?x.lat:"", lon=x?x.lon:"";
+    var h='<h2>'+(x?"Modifier le site":"Nouveau site")+'</h2><form class="form" data-form="site" style="margin-top:4px">';
+    h+='<label>Type<select class="sel" name="kind"'+(x?" disabled":"")+'><option value="centre"'+(kind==="centre"?" selected":"")+'>Centre de groupage</option><option value="vente"'+(kind==="vente"?" selected":"")+'>Point de vente</option></select></label>';
+    h+='<label>Nom<input class="sel" name="name" maxlength="80" required value="'+esc(x?x.name:"")+'"></label>';
+    h+='<div data-only="centre"'+(kind==="centre"?"":" hidden")+'><div class="two"><label>Capacité (kg)<input class="sel" name="capacity_kg" type="number" min="1" step="1" value="'+esc(x&&x.capacity_kg?x.capacity_kg:"")+'"></label><label class="ck" style="align-self:end;font-size:.85rem;color:var(--ink)"><input type="checkbox" name="cold"'+(x&&x.cold?" checked":"")+'> Chambre froide</label></div></div>';
+    h+='<label data-only="vente"'+(kind==="vente"?"":" hidden")+'>Canal<select class="sel" name="canal">'+Object.keys(D.canals).map(function(k){ return '<option value="'+k+'"'+(x&&x.canal===k?" selected":"")+'>'+esc(D.canals[k])+'</option>'; }).join("")+'</select></label>';
+    h+='<div class="two"><label>Latitude<input class="sel" name="lat" inputmode="decimal" value="'+esc(lat)+'"></label><label>Longitude<input class="sel" name="lon" inputmode="decimal" value="'+esc(lon)+'"></label></div>';
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small" type="button" data-act="place">Placer sur la carte</button><button class="btn small" type="button" data-act="geo">Ma position</button></div>';
+    if(x) h+='<input type="hidden" name="id" value="'+esc(x.id)+'">';
+    h+='<button class="btn primary" type="submit">Enregistrer</button><div class="err"></div></form>';
+    return h+back();
+  }
+  function forecastForm(pid){
+    var centres=D.sites.filter(function(s){ return s.kind==="centre"; }), p=pid?by.parcel[pid]:null;
+    if(!centres.length) return '<h2>Annoncer une récolte</h2><p class="empty">Ajoutez d\'abord un centre de groupage : il recevra la récolte.</p>'+back();
+    var parcels=D.parcels.slice().sort(function(a,b){ return String(a.owner).localeCompare(String(b.owner)); }).map(function(x){ return { id:x.id, name:x.owner+" · "+x.name+(x.crop?" ("+x.crop+")":"") }; });
+    var d=new Date(Date.now()+7*864e5).toISOString().slice(0,10);
+    return '<h2>Annoncer une récolte</h2><p class="empty" style="margin:0">Le centre sait ce qui arrive, idéalement 7 jours avant.</p><form class="form" data-form="forecast"><label>Parcelle<select class="sel" name="parcel_id" required>'+opts(parcels,pid,"Choisir…")+'</select></label><div class="two"><label>Produit<input class="sel" name="crop" maxlength="60" value="'+esc(p&&p.crop?p.crop:"")+'" placeholder="tomate, piment…"></label><label>Récolte attendue (kg)<input class="sel" name="kg_expected" type="number" min="1" step="1" inputmode="numeric" required></label></div><div class="two"><label>Date prévue<input class="sel" name="expected_on" type="date" value="'+d+'" required></label><label>Centre<select class="sel" name="centre_id">'+opts(centres)+'</select></label></div><button class="btn primary" type="submit">Annoncer</button><div class="err"></div></form>'+back();
+  }
+
+  async function post(url,body){ var r=await fetch(url,{ method:"POST", headers:{ "content-type":"application/json" }, body:JSON.stringify(body) }); var d={}; try{ d=await r.json(); }catch(e){} if(!r.ok) throw new Error(d.error||"Erreur."); return d; }
+  function formData(f){ var o={}; Array.prototype.forEach.call(f.elements,function(e){ if(!e.name||e.disabled) return; o[e.name]=e.type==="checkbox"?e.checked:e.value; }); return o; }
+  function isoLocal(v){ return v ? new Date(v).toISOString() : ""; }
+  function wirePanel(){
+    var P=$("panel");
+    P.querySelectorAll("[data-sel]").forEach(function(r){ r.addEventListener("click",function(){ var a=r.getAttribute("data-sel").split(":"); select({ kind:a[0], id:a[1] }); }); });
+    P.querySelectorAll("[data-act]").forEach(function(b){ b.addEventListener("click",async function(){
+      var act=b.getAttribute("data-act"), id=b.getAttribute("data-id");
+      if(act==="back") return select(null);
+      if(act==="forecast") return select({ kind:"forecast", parcel:id });
+      if(act==="edit-site"){ state.placing=null; return select({ kind:"new-site", edit:id, id:id }); }
+      if(act==="place"){ state.placing={ lat:null, lon:null }; b.textContent="Toucher la carte…"; draw(); return; }
+      if(act==="geo"){ if(!navigator.geolocation){ return; } navigator.geolocation.getCurrentPosition(function(pos){ var f=P.querySelector("form"); f.elements.lat.value=pos.coords.latitude.toFixed(6); f.elements.lon.value=pos.coords.longitude.toFixed(6); },function(){ var e=P.querySelector(".err"); if(e) e.textContent="Position indisponible."; }); return; }
+      if(act==="del-site"){ if(!confirm("Supprimer ce site ?")) return; try{ await post("/api/dist/site/delete",{ id:id }); await load(); }catch(e){ $("siteErr").textContent=e.message; } return; }
+      if(act==="del-lot"){ if(!confirm("Supprimer cette prévision ?")) return; try{ await post("/api/dist/lot/delete",{ id:id }); await load(); }catch(e){ var er=P.querySelector(".err"); if(er) er.textContent=e.message; } return; }
+    }); });
+    var kindSel=P.querySelector('form[data-form="site"] select[name="kind"]');
+    if(kindSel) kindSel.addEventListener("change",function(){ P.querySelectorAll("[data-only]").forEach(function(n){ n.hidden=n.getAttribute("data-only")!==kindSel.value; }); });
+    var f=P.querySelector("form[data-form]"); if(!f) return;
+    f.addEventListener("submit",async function(e){
+      e.preventDefault(); var kind=f.getAttribute("data-form"), d=formData(f), err=f.querySelector(".err"), btn=f.querySelector('button[type="submit"]'); err.textContent=""; btn.disabled=true;
+      try{
+        if(kind==="site"){ if(!d.kind && state.sel.edit) d.kind=by.site[state.sel.edit].kind; var r=await post("/api/dist/site",d); state.placing=null; await load(true); select({ kind:"site", id:r.site.id }); }
+        else if(kind==="forecast"){ d.action="forecast"; var r2=await post("/api/dist/lot",d); await load(true); select({ kind:"lot", id:r2.lot.id }); }
+        else { d.action=kind; d.id=state.sel.id; ["harvested_at","departed_at","delivered_at"].forEach(function(k){ if(d[k]!=null) d[k]=isoLocal(d[k]); }); await post("/api/dist/lot",d); await load(true); }
+      }catch(ex){ err.textContent=ex.message; btn.disabled=false; }
+    });
+  }
+  // Placement d'un site : un toucher sur la carte donne sa position.
+  // Le formulaire reste tel quel (rien de ce qui a été saisi n'est perdu) : seules latitude et longitude changent.
+  svg.addEventListener("click",function(e){
+    if(!state.placing || state.placing.lat!=null) return;
+    var f=$("panel").querySelector('form[data-form="site"]'); if(!f){ state.placing=null; return draw(); }
+    var pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY; var q=pt.matrixTransform(svg.getScreenCTM().inverse());
+    var ll=toLatLon(q.x,q.y); state.placing.lat=ll.lat; state.placing.lon=ll.lon;
+    f.elements.lat.value=ll.lat.toFixed(6); f.elements.lon.value=ll.lon.toFixed(6);
+    var b=f.querySelector('[data-act="place"]'); if(b) b.textContent="Placer sur la carte";
+    draw();
+  });
+
+  // ------------------------------------------------------------------ Tableau des lots
+  function lotsTable(){
+    var list=D.lots.filter(function(l){ return (!state.filter || l.step===state.filter) && lotVisible(l); });
+    if(!D.lots.length){ $("lotsTable").innerHTML='<p class="empty">Aucun lot pour l\'instant. '+(D.canWrite?'Commencez par « Annoncer une récolte » : chaque lot garde le lien avec sa parcelle, jusqu\'au client.':'')+'</p>'; return; }
+    var h='<table><tr><th>Lot</th><th>Parcelle</th><th>Produit</th><th>Centre</th><th>Client</th><th class="r">Annoncé</th><th class="r">Reçu</th><th class="r">Livré</th><th class="r">Perte</th><th class="r">Délai</th><th>Étape</th></tr>';
+    list.forEach(function(l){ var p=by.parcel[l.parcel_id], c=by.site[l.centre_id], cl=by.site[l.client_id];
+      h+='<tr class="click" data-lot="'+esc(l.id)+'"><td>'+esc(l.code)+'</td><td>'+esc(p?p.owner+" · "+p.name:"—")+'</td><td>'+esc(l.crop)+'</td><td>'+esc(c?c.name:"—")+'</td><td>'+esc(cl?cl.name:"—")+'</td><td class="r">'+fmt(l.kg_expected)+'</td><td class="r">'+(l.kg_harvested!=null?fmt(l.kg_harvested,1):"—")+'</td><td class="r">'+(l.kg_delivered!=null?fmt(l.kg_delivered,1):"—")+'</td><td class="r">'+(l.loss_kg!=null?fmt(l.loss_kg,1):"—")+'</td><td class="r">'+(l.hours!=null?fmt(l.hours)+" h":"—")+'</td><td>'+stepPill(l)+'</td></tr>'; });
+    $("lotsTable").innerHTML=h+'</table>';
+    $("lotsTable").querySelectorAll("[data-lot]").forEach(function(r){ r.addEventListener("click",function(){ select({ kind:"lot", id:r.getAttribute("data-lot") }); $("board").scrollIntoView({ behavior:"smooth", block:"start" }); }); });
+  }
+
+  // ------------------------------------------------------------------ Contrôles
+  ["parcels","collect","deliv","centres","shops"].forEach(function(k){ $("L-"+k).addEventListener("change",function(e){ state.layers[k]=e.target.checked; draw(); }); });
+  document.querySelectorAll('input[name=mode]').forEach(function(r){ r.addEventListener("change",function(e){ state.mode=e.target.value; draw(); }); });
+  $("lotFilter").addEventListener("change",function(e){ state.filter=e.target.value; lotsTable(); });
+  $("btnForecast").addEventListener("click",function(){ select({ kind:"forecast" }); $("board").scrollIntoView({ behavior:"smooth", block:"start" }); });
+  $("btnSite").addEventListener("click",function(){ state.placing=null; select({ kind:"new-site", id:"new" }); $("board").scrollIntoView({ behavior:"smooth", block:"start" }); });
+  var rt=null; window.addEventListener("resize",function(){ if(!D) return; clearTimeout(rt); rt=setTimeout(function(){ project(); draw(); },150); });
+  load().catch(function(){ $("lead").textContent="Connexion impossible. Vérifiez le réseau."; });
+})();
+</script>
+</body>
+</html>

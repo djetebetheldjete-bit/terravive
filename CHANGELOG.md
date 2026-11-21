@@ -1,5 +1,14 @@
 # Journal des versions — Terravive
 
+## v8.12 — 21 novembre 2026 : Distribution, de la parcelle au client (projet ASTRIDE)
+- **Nouvelle page `/distribution`** (lien « Distribution » dans le menu du tableau de bord, pour les mêmes acteurs que le Stock : administrateur, animateurs, cultivateurs certifiés, lecteurs désignés). Elle suit chaque récolte de la parcelle jusqu'au client, à l'échelle de la coopérative.
+- **La carte** (sur le modèle de la carte ASTRIDE) : parcelles des membres à leur vraie position, colorées par état satellite ou par NDVI ; centres de groupage ; points de vente ; collecte (parcelle → centre) et livraisons (centre → client, épaisseur selon les kg, pointillés pour « en route »). Couches activables, filtres par état et par centre, détail au toucher, flux reliés mis en avant. Thèmes nature, clair, sombre et terre ; adaptée au téléphone.
+- **Les lots** : annonce de récolte (parcelle, produit, kg, date, centre) → réception au centre (poids pesé, qualité A/B/C, heure de récolte) → départ en tournée (point de vente, véhicule) → livraison (kg acceptés). Code de lot L-0001… La perte (reçu − accepté) et le délai récolte → livraison sont calculés par le serveur ; les étapes ne peuvent pas être sautées ni datées dans le futur.
+- **Indicateurs du pilote** : récolte annoncée, parcelles à surveiller, taux de pertes (cible < 15 %), livrés en moins de 48 h (cible 80 %), écart entre prévision et récolte (cible < 15 %), stock et remplissage de chaque centre. Vides tant qu'il n'y a rien à mesurer : **aucune donnée d'exemple**.
+- **Analyse satellite gardée par parcelle** : quand le planteur lance une analyse NDVI sur une parcelle enregistrée, la dernière mesure est conservée (`POST /api/parcels/ndvi`) et sert à l'état « OK / Surveillance / Alerte » sur la carte.
+- **Base Supabase : à exécuter une fois** le bloc « v8.12 » à la fin de `schema.sql` (tables `trv_parcel_ndvi`, `trv_dist_sites`, `trv_dist_lots`).
+- Logique dans `lib/distribution.js` (8 tests unitaires) ; 6 tests de bout en bout (accès, parcelles réelles, sites, parcours complet d'un lot, suppressions interdites, cloisonnement entre coopératives). Service worker v30.
+
 ## v8.11 — 21 novembre 2026 : rattachement à l'animateur une seule fois
 - **Le planteur est rattaché à un animateur une seule fois** : dès l'inscription (téléphone ou e-mail). S'il n'existe encore aucun animateur, il est rattaché dès qu'un animateur rejoint Terravive (comme l'annonce la vue planteur). Ensuite, plus jamais d'office : avant, un planteur qui quittait sa coopérative y était remis à sa prochaine visite, il ne pouvait donc pas vraiment la quitter. Il peut toujours en rejoindre une avec un code.
 - Un compte administrateur n'est plus rattaché comme simple membre, même connecté sans le code administrateur.

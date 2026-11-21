@@ -331,3 +331,59 @@ create table if not exists trv_quality_logs (
 );
 create index if not exists trv_quality_logs_idx
   on trv_quality_logs (created_at desc);
+
+-- ================================================================
+-- v8.12 — Distribution (projet ASTRIDE) : de la parcelle au client.
+-- Exécutez ce bloc sur une base existante : il ne touche pas aux autres tables.
+-- ================================================================
+-- Dernière analyse NDVI d'une parcelle (envoyée par le tableau de bord).
+create table if not exists trv_parcel_ndvi (
+  parcel_id text primary key,
+  user_id text,
+  ndvi numeric,
+  pct_faible numeric,
+  pct_moyen numeric,
+  measured_at timestamptz default now()
+);
+-- Centres de groupage et points de vente d'une coopérative.
+create table if not exists trv_dist_sites (
+  id text primary key,
+  coop_id text,
+  kind text,                  -- 'centre' | 'vente'
+  name text,
+  canal text,                 -- points de vente : grossistes | restauration | commerces | directe
+  capacity_kg numeric,        -- centres
+  cold boolean default false, -- centres : chambre froide
+  lat numeric,
+  lon numeric,
+  created_by text,
+  created_at timestamptz default now()
+);
+create index if not exists trv_dist_sites_coop_idx on trv_dist_sites (coop_id);
+-- Lots : prévision → réception au centre → tournée → livraison.
+create table if not exists trv_dist_lots (
+  id text primary key,
+  coop_id text,
+  code text,                  -- L-0001…
+  parcel_id text,
+  owner_id text,              -- planteur propriétaire de la parcelle
+  crop text,
+  kg_expected numeric,
+  expected_on date,
+  centre_id text,
+  kg_harvested numeric,
+  harvested_at timestamptz,
+  quality text,               -- A | B | C
+  client_id text,
+  vehicle text,
+  departed_at timestamptz,
+  kg_delivered numeric,
+  delivered_at timestamptz,
+  created_by text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+create index if not exists trv_dist_lots_coop_idx on trv_dist_lots (coop_id, created_at desc);
+alter table trv_parcel_ndvi enable row level security;
+alter table trv_dist_sites enable row level security;
+alter table trv_dist_lots enable row level security;

@@ -31,6 +31,14 @@ Même principe que la plateforme Bâtisseur, appliqué à l'agriculture et au d�
   Alerte d'arrosage et de cuve vide dans « Dernières mesures ».
 - Guide complet : [`docs/SOL-ET-STATION.md`](docs/SOL-ET-STATION.md). Tests : `npm test`.
 
+## Distribution : de la parcelle au client (v8.12, projet ASTRIDE)
+
+- Page **`/distribution`** pour les animateurs (et rôles du Stock) : carte des parcelles de la coopérative,
+  des centres de groupage et des points de vente, avec les flux de collecte et de livraison.
+- Chaque récolte devient un **lot** : annoncé → reçu au centre → en route → livré. Pertes, délais et
+  écart de prévision sont calculés à partir des saisies, jamais inventés.
+- Supabase : exécutez le bloc « v8.12 » à la fin de `schema.sql`.
+
 ## Installation locale
 
 ```bash
