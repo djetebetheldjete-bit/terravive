@@ -1,24 +1,18 @@
-# Terravive v8.9 — Vue planteur
+# Terravive — à lire
 
-## Ce qui a été ajouté
-Une interface simplifiée dédiée au planteur/cultivateur, à l'adresse **`/planteur`**, séparée de
-l'espace technique complet. Elle montre ses parcelles et, pour chacune, **ce qu'il y a à faire
-aujourd'hui** — à partir des vraies tâches déjà calculées par l'application (fiche de culture +
-date de semis). Rien n'est inventé.
+Le code en place dans ce dépôt est la version à jour (voir `CHANGELOG.md`, dernière entrée).
+Il n'y a plus de dossier « fichiers à recopier » : chaque modification est faite directement
+dans le dépôt, et un `git push` déclenche le redéploiement Render habituel.
 
-## Fichiers (dans `fichiers-modifies/`, mêmes chemins que le dépôt)
-- `public/planteur.html` — **nouveau** : la page.
-- `server.js` — 2 lignes : route `/planteur` + page fermée aux comptes « client ».
-- `public/sw.js` — service worker v29 (ajoute `/planteur` au cache hors-ligne).
-- `public/tableau.html` — lien « Vue planteur » dans les raccourcis.
-- `test/test-http.js` — 2 tests de bout en bout.
-- `CHANGELOG.md` — note de version.
+## Vérifier avant de mettre en ligne
+```bash
+npm test
+```
+Toutes les suites doivent afficher « SUCCÈS ». Les mêmes tests tournent automatiquement sur
+GitHub à chaque envoi (onglet « Actions »).
 
-## Pour mettre en ligne (GitHub → Render)
-Remplacez ces 6 fichiers dans votre dépôt par ceux de `fichiers-modifies/`, en gardant les
-chemins. Un `git commit` + `git push` déclenche le redéploiement Render habituel. Aucune
-modification de base de données n'est nécessaire.
-
-## Vérifié
-- `npm test` : 75 tests réussis (dont la nouvelle page et les contrôles d'accès).
-- Rendu visuel conforme (couleurs, logo, icônes, ton) — voir les 3 aperçus joints.
+## Repères
+- Vue planteur : `/planteur` (connexion par téléphone + code PIN).
+- Espace complet : `/tableau`. Coopérative : `/cooperative`. Tutoriels : `/formation`.
+- Captures d'écran : `docs/captures/`.
+- Guides : `docs/SOL-ET-STATION.md`, `docs/MOBILE.md`, `docs/stock/`.

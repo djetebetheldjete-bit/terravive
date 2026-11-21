@@ -70,13 +70,22 @@ function validEmail(s) { return typeof s === "string" && s.length <= 200 && /^[^
 // --- Planteurs : connexion par téléphone + code PIN (sans e-mail). Le numéro sert d'identifiant interne. ---
 function normPhone(s) { return String(s || "").replace(/[^\d]/g, ""); }
 function planteurEmail(phone) { return normPhone(phone) + "@planteur.terravive"; }
-function isPlanteurPhone(u) { return !!(u && u.email && String(u.email).endsWith("@planteur.terravive")); }
+function isPlanteurPhone(u) { return !!(u && u.email && isPlanteurEmail(u.email)); }
+function isPlanteurEmail(e) { return normEmail(e).endsWith("@planteur.terravive"); }
 function escapeHtml(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function newId() { return crypto.randomBytes(12).toString("hex"); }
 
 // Limitation de débit (protège le coût d'API)
 const RL = {};
 function rateOk(key, limit, windowMs) { const now = Date.now(); const arr = (RL[key] || []).filter((t) => now - t < windowMs); arr.push(now); RL[key] = arr; return arr.length <= limit; }
+// Compte les événements récents sans en ajouter (utile pour ne compter que les échecs).
+function rateCount(key, windowMs) { const now = Date.now(); return (RL[key] || []).filter((t) => now - t < windowMs).length; }
+function rateHit(key) { (RL[key] = RL[key] || []).push(Date.now()); }
+// Nettoyage périodique : sans lui, chaque adresse IP ou e-mail essayé resterait en mémoire indéfiniment.
+const RL_MAX_AGE = 24 * 60 * 60 * 1000;
+setInterval(() => { const now = Date.now(); for (const k of Object.keys(RL)) { const arr = RL[k].filter((t) => now - t < RL_MAX_AGE); if (arr.length) RL[k] = arr; else delete RL[k]; } }, 10 * 60 * 1000).unref();
+// Code PIN des planteurs (4 à 8 chiffres) : au-delà de 20 échecs en 24 h, le numéro est bloqué pour la journée.
+const PIN_FAIL_LIMIT = 20, PIN_FAIL_WINDOW = 24 * 60 * 60 * 1000;
 function clientIp(req) { return String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || (req.socket && req.socket.remoteAddress) || "x"; }
 
 // ---------- Accès Supabase (REST, sans dépendance) ----------
@@ -167,6 +176,11 @@ function publicUser(u) { return u ? { id: u.id, email: isPlanteurPhone(u) ? null
 async function setUserAnimator(userId, val) {
   if (USE_DB) { try { await sb(`/trv_users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ animator: !!val }) }); } catch (e) { console.error("setUserAnimator:", e.message); } return; }
   const s = loadStore(); if (s.users[userId]) { s.users[userId].animator = !!val; saveStore(s); }
+}
+// Rattachement automatique à un animateur : fait une seule fois par compte (voir autoAssignAnimator).
+async function setUserCoopAutoDone(userId) {
+  if (USE_DB) { try { await sb(`/trv_users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ coop_auto_done: true }) }); } catch (e) { console.error("setUserCoopAutoDone (exécutez schema.sql) :", e.message); } return; }
+  const s = loadStore(); if (s.users[userId]) { s.users[userId].coop_auto_done = true; saveStore(s); }
 }
 async function setUserCertified(userId, val) {
   if (USE_DB) { try { await sb(`/trv_users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ certified: !!val }) }); } catch (e) { console.error("setUserCertified:", e.message); } return; }
@@ -1029,15 +1043,20 @@ async function handleRegister(req, res) {
       const pemail = planteurEmail(phone);
       if (await findUserByEmail(pemail)) return sendJson(res, 409, { error: "Un compte existe déjà avec ce numéro. Connectez-vous." });
       const puser = await createUser({ email: pemail, name: p.name, password: pin, region: p.region, profile: "cultivateur" });
+      await autoAssignAnimator(puser);
       const ptoken = await createSession(puser.id); setSessionCookie(res, ptoken);
       return sendJson(res, 200, { user: publicUser(puser) });
     }
     const email = normEmail(p.email);
     if (!validEmail(email)) return sendJson(res, 400, { error: "Adresse e-mail invalide." });
+    // Ce domaine est réservé aux comptes planteur (téléphone + PIN) : sans ce refus, on pourrait
+    // « réserver » le numéro d'un planteur avant lui en s'inscrivant par e-mail.
+    if (isPlanteurEmail(email)) return sendJson(res, 400, { error: "Adresse e-mail invalide." });
     if (typeof p.password !== "string" || p.password.length < 6) return sendJson(res, 400, { error: "Le mot de passe doit contenir au moins 6 caractères." });
     if (!rateOk("register-ip:" + clientIp(req), 10, 60 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de créations de compte depuis cette connexion. Réessayez plus tard." });
     if (await findUserByEmail(email)) return sendJson(res, 409, { error: "Un compte existe déjà avec cette adresse. Connectez-vous." });
     const user = await createUser({ email, name: p.name, password: p.password, region: p.region, profile: p.profile });
+    await autoAssignAnimator(user);
     const token = await createSession(user.id); setSessionCookie(res, token);
     sendJson(res, 200, { user: publicUser(user) });
   } catch (e) { sendJson(res, 500, { error: e.message || "Erreur serveur." }); }
@@ -1048,14 +1067,20 @@ async function handleLogin(req, res) {
     // Connexion PLANTEUR : téléphone + code PIN.
     if (p.as === "planteur" || p.phone) {
       const phone = normPhone(p.phone);
+      if (phone.length < 8 || phone.length > 15) return sendJson(res, 400, { error: "Numéro de téléphone invalide." });
       if (!rateOk("login-ip:" + clientIp(req), 30, 10 * 60 * 1000) || !rateOk("login-phone:" + phone, 10, 10 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de tentatives de connexion. Réessayez dans quelques minutes." });
+      // Un PIN de 4 chiffres n'a que 10 000 possibilités : on plafonne aussi les échecs sur 24 h.
+      if (rateCount("pin-fail:" + phone, PIN_FAIL_WINDOW) >= PIN_FAIL_LIMIT) return sendJson(res, 429, { error: "Trop de codes PIN erronés pour ce numéro. Réessayez demain ou demandez l'aide de votre animateur." });
       const puser = await findUserByEmail(planteurEmail(phone));
       const pin = String(p.pin || p.password || "");
-      if (!puser || !verifyPassword(pin, puser.pass)) return sendJson(res, 401, { error: "Numéro ou code PIN incorrect." });
+      if (!puser || !verifyPassword(pin, puser.pass)) { rateHit("pin-fail:" + phone); return sendJson(res, 401, { error: "Numéro ou code PIN incorrect." }); }
       const ptoken = await createSession(puser.id); setSessionCookie(res, ptoken);
       return sendJson(res, 200, { user: publicUser(puser) });
     }
     // Anti-force brute : nombre de tentatives limité par adresse IP et par e-mail.
+    // Un compte planteur ne se connecte que par téléphone + PIN : passer par l'e-mail interne
+    // contournerait les compteurs propres au numéro.
+    if (isPlanteurEmail(p.email)) return sendJson(res, 401, { error: "E-mail ou mot de passe incorrect." });
     if (!rateOk("login-ip:" + clientIp(req), 30, 10 * 60 * 1000) || !rateOk("login:" + normEmail(p.email).slice(0, 200), 10, 10 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de tentatives de connexion. Réessayez dans quelques minutes." });
     const user = await findUserByEmail(p.email);
     if (!user || !verifyPassword(p.password, user.pass)) return sendJson(res, 401, { error: "E-mail ou mot de passe incorrect." });
@@ -1638,12 +1663,13 @@ async function handleStationSketch(req, res) {
 // --- Coopérative ---
 async function coopPublic(coop) { return coop ? { id: coop.id, name: coop.name, region: coop.region || null, code: coop.code, created_at: coop.created_at } : null; }
 // ---- Rattachement automatique planteur -> animateur (1er animateur inscrit, par région) ----
-async function listAllUsersLite() {
-  if (USE_DB) { try { return (await sb(`/trv_users?select=id,email,name,region,animator,certified,created_at&order=created_at.asc`)) || []; } catch (e) { return []; } }
-  return Object.values(loadStore().users);
+async function listAnimatorsLite() {
+  // Seuls les animateurs sont lus (et non toute la table des comptes, qui grossit avec les inscriptions).
+  if (USE_DB) { try { return (await sb(`/trv_users?animator=eq.true&select=id,email,name,region,animator,certified,created_at&order=created_at.asc`)) || []; } catch (e) { return []; } }
+  return Object.values(loadStore().users).filter((u) => !!u.animator);
 }
 async function firstAnimator(region) {
-  const anims = (await listAllUsersLite()).filter((u) => !!u.animator)
+  const anims = (await listAnimatorsLite()).filter((u) => !!u.animator)
     .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
   if (!anims.length) return null;
   if (region) { const r = normKey(region); const hit = anims.find((u) => normKey(u.region || "") === r); if (hit) return hit; }
@@ -1660,14 +1686,18 @@ async function defaultAnimatorCoop(region) {
   await addMembership({ id: newId(), coop_id: coop.id, user_id: anim.id, role: "animateur", joined_at: new Date().toISOString() });
   return coop;
 }
+// Une seule fois par compte : à l'inscription, ou dès qu'un animateur existe si aucun n'existait alors.
+// Une fois le planteur rattaché (ou s'il a déjà une coopérative, ou s'il la quitte), on ne le rattache plus
+// jamais d'office : quitter sa coopérative est donc définitif.
 async function autoAssignAnimator(user) {
   try {
-    if (!user || isAnimator(user) || isAdmin(user)) return;
+    if (!user || user.coop_auto_done || isAnimator(user) || isAdminEmail(user)) return;
     if (userProfile(user) !== "cultivateur") return;
-    if (await getMembership(user.id)) return;
+    if (await getMembership(user.id)) { await setUserCoopAutoDone(user.id); return; }
     const coop = await defaultAnimatorCoop(user.region);
-    if (!coop) return;
+    if (!coop) return; // aucun animateur pour l'instant : nouvel essai plus tard
     await addMembership({ id: newId(), coop_id: coop.id, user_id: user.id, role: "membre", joined_at: new Date().toISOString() });
+    await setUserCoopAutoDone(user.id);
   } catch (e) { console.error("autoAssignAnimator:", e.message); }
 }
 async function handleCoopMe(req, res) {
@@ -1678,7 +1708,7 @@ async function handleCoopMe(req, res) {
   const coop = await getCoopById(m.coop_id);
   if (!coop) { await removeMembership(user.id); return sendJson(res, 200, { coop: null, animator: isAnimator(user) }); }
   const members = await listCoopMembers(coop.id);
-  let animateur = null, animateurContact = null; try { const a = members.find((x) => x.role === "animateur"); if (a) { const au = await getUserById(a.user_id); if (au) { animateur = au.name || au.email; animateurContact = { name: au.name || null, email: au.email || null, region: au.region || null }; } } } catch (e) {}
+  let animateur = null, animateurContact = null; try { const a = members.find((x) => x.role === "animateur"); if (a) { const au = await getUserById(a.user_id); if (au) { animateur = au.name || au.email; animateurContact = { name: au.name || null, email: isPlanteurPhone(au) ? null : (au.email || null), region: au.region || null }; } } } catch (e) {}
   sendJson(res, 200, { coop: await coopPublic(coop), role: m.role, membersCount: members.length, animateur, animateurContact, isAnimateur: m.role === "animateur", animator: isAnimator(user) });
 }
 async function handleCoopCreate(req, res) {
@@ -1708,6 +1738,7 @@ async function handleCoopLeave(req, res) {
   const members = await listCoopMembers(m.coop_id);
   if (m.role === "animateur" && members.length > 1) return sendJson(res, 400, { error: "En tant qu'animateur, vous ne pouvez pas quitter tant qu'il reste des membres. Transférez d'abord ou retirez les membres." });
   await removeMembership(user.id);
+  await setUserCoopAutoDone(user.id); // ne pas le remettre d'office dans une coopérative
   if (members.length <= 1) { try { if (USE_DB) await sb(`/trv_coops?id=eq.${encodeURIComponent(m.coop_id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); else { const s = loadStore(); delete s.coops[m.coop_id]; saveStore(s); } } catch (e) {} }
   sendJson(res, 200, { ok: true });
 }
