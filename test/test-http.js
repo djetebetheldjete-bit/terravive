@@ -38,7 +38,7 @@ async function main() {
       assert.strictEqual(r.json.ok, true);
       assert.strictEqual(r.json.db, "local", "ATTENTION : le serveur de test est branché sur une vraie base");
     });
-    for (const url of ["/", "/app", "/tableau", "/planteur", "/conseiller", "/cooperative", "/diagnostic", "/stock", "/boutique", "/quality", "/arduino", "/comprendre"]) {
+    for (const url of ["/", "/app", "/connexion", "/tableau", "/planteur", "/conseiller", "/cooperative", "/diagnostic", "/stock", "/boutique", "/quality", "/arduino", "/comprendre"]) {
       await t.test("la page " + url + " s'affiche", async () => {
         const r = await req("GET", url);
         assert.strictEqual(r.status, 200, "statut " + r.status);
@@ -296,6 +296,13 @@ async function main() {
     t.section("Planteur : connexion par téléphone et code PIN");
     const plReg = (phone, pin, ip, extra) => req("POST", "/api/auth/register", { json: Object.assign({ as: "planteur", phone, pin, name: "Planteur" }, extra || {}), ip });
     const plLog = (phone, pin, ip) => req("POST", "/api/auth/login", { json: { as: "planteur", phone, pin }, ip });
+    await t.test("la page de connexion planteur utilise le téléphone et le code PIN", async () => {
+      const html = (await req("GET", "/connexion")).text;
+      for (const s of ['"/api/auth/login"', '"/api/auth/register"', 'as:"planteur"', 'id="phone"', 'id="pin"', "/app?login=1"]) assert.ok(html.includes(s), "la page doit contenir " + s);
+      assert.ok(/prefers-reduced-motion/.test(html), "les animations doivent respecter « réduire les animations »");
+      const pl = (await req("GET", "/planteur")).text;
+      assert.ok(pl.includes('location.href="/connexion"'), "un planteur déconnecté est renvoyé vers /connexion");
+    });
     await t.test("inscription : numéro et PIN vérifiés, aucun e-mail exposé", async () => {
       assert.strictEqual((await plReg("123", "1234", "10.2.0.1")).status, 400, "numéro trop court");
       assert.strictEqual((await plReg("07 01 02 03 04", "12", "10.2.0.1")).status, 400, "PIN trop court");

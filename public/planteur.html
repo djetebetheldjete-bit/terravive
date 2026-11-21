@@ -8,7 +8,9 @@
 <meta name="theme-color" content="#2E7D46">
 <link rel="icon" type="image/png" href="/favicon-32.png">
 <link rel="manifest" href="/manifest.webmanifest">
-<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("trv-theme")||"nature");}catch(e){}</script>
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("trv-theme")||"nature");}catch(e){}
+// Arrivée depuis la connexion : l'écran commence vert (même vert que le cercle de la connexion) puis se lève.
+try{ if(sessionStorage.getItem("trv-arrive")==="1"){ sessionStorage.removeItem("trv-arrive"); if(!matchMedia("(prefers-reduced-motion: reduce)").matches) document.documentElement.classList.add("arriving"); } }catch(e){}</script>
 <style>
   :root{ --leaf:#2E7D46; --deep:#1B5E34; --sun:#E0A93B; --ink:#14261A; --soft:#5b6b5f; --faint:#8a9a8d;
     --bg:#eef4ec; --surface:#ffffff; --surface2:#f5f9f3; --line:#dde7dc; --good:#2E8B6F; --bad:#c0392b;
@@ -69,6 +71,28 @@
   .scr{display:none}.scr.on{display:block}
   .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(18px);background:var(--ink);color:var(--surface);padding:11px 17px;border-radius:11px;font-size:.88rem;font-weight:600;opacity:0;transition:.25s;pointer-events:none;max-width:90%;z-index:50}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .load{text-align:center;color:var(--soft);padding:40px 10px}
+  /* ---------- Mouvement (court, ease-out pour ce qui entre, ease-in-out pour ce qui bouge déjà) ---------- */
+  :root{ --out:cubic-bezier(.165,.84,.44,1); --inout:cubic-bezier(.645,.045,.355,1); --sky:#174D2B; }
+  :root[data-theme="clair"]{ --sky:#276749; } :root[data-theme="sombre"]{ --sky:#0c2316; } :root[data-theme="terre"]{ --sky:#4a3b1a; }
+  /* Rideau d'arrivée : il reprend le vert de la connexion, puis remonte en découvrant l'espace. */
+  .arrive{ display:none; position:fixed; inset:0 0 auto 0; height:100vh; z-index:100; background:var(--sky); pointer-events:none; }
+  .arrive svg{ position:absolute; left:0; top:calc(100% - 1px); width:100%; height:64px; }
+  .arrive path{ fill:var(--sky); }
+  html.arriving .arrive{ display:block; }
+  html.arriving .arrive.up{ transform:translateY(calc(-100% - 70px)); transition:transform .6s var(--inout); }
+  /* Les blocs arrivent un par un (parcelles, tâches), sans masquer longtemps le contenu. */
+  .pin{ animation:pIn .32s var(--out) both; animation-delay:calc(var(--i, 0) * 45ms + var(--d, 0ms)); }
+  html.arriving .pin{ --d:380ms; }
+  @keyframes pIn{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
+  /* Changement d'écran : court fondu. */
+  .scr.on{ animation:scrIn .22s var(--out); }
+  @keyframes scrIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+  /* « C'est fait » : la coche se dessine, la carte passe à l'état fait en douceur. */
+  .task{ transition:opacity .25s ease; }
+  .drawcheck path{ stroke-dasharray:22; stroke-dashoffset:22; animation:ck .3s var(--out) forwards; }
+  @keyframes ck{ to{ stroke-dashoffset:0; } }
+  .badge.todo .n{ display:inline-block; animation:pIn .3s var(--out) both; }
+  @media (prefers-reduced-motion:reduce){ .pin, .scr.on, .drawcheck path, .badge.todo .n{ animation:none; stroke-dashoffset:0; } .task{ transition:none; } }
 </style>
   <link rel="stylesheet" href="/anim.css">
   <script src="/anim.js" defer></script>
@@ -76,6 +100,7 @@
   <script src="/help.js" defer></script>
 </head>
 <body>
+<div class="arrive" id="arrive" aria-hidden="true"><svg viewBox="0 0 400 64" preserveAspectRatio="none"><path d="M0,0 H400 V6 C318,64 150,70 0,28 Z"/></svg></div>
 <div class="top">
   <a class="brand" href="/planteur" id="topBrand"><span class="emblem"><img src="/logo.png" alt="Terravive"></span>Terravive</a>
   <span class="ttl" id="topTtl" style="display:none"></span>
@@ -174,7 +199,7 @@ var tt;function toast(m){if(!m)return;var t=$("toast");t.textContent=m;t.classLi
 
 async function boot(){
   try{ var r=await fetch("/api/auth/me"); var d=await r.json(); me=d.user; }catch(e){}
-  if(!me){ location.href="/app"; return; }
+  if(!me){ location.href="/connexion"; return; }
   if(me.profile==="client"){ location.href="/boutique"; return; }
   $("topAv").textContent=initials(me.name);$("pAv").textContent=initials(me.name);
   $("pName").textContent=me.name||"—";$("pMail").textContent=me.phone||me.email||"";
@@ -212,9 +237,9 @@ function renderParcels(){
   $("parcelList").innerHTML=PARCELS.map(function(p){
     var t=TODAY[p.id], n=todoCount(t), badge;
     if(t&&!t.crop) badge='<span class="badge none">Culture à renseigner</span>';
-    else if(n>0) badge='<span class="badge todo">'+n+(n>1?' choses':' chose')+' à faire</span>';
+    else if(n>0) badge='<span class="badge todo"><span class="n">'+n+'</span>'+(n>1?' choses':' chose')+' à faire</span>';
     else badge='<span class="badge ok">'+ic("check",13)+' À jour</span>';
-    return '<button class="pcard" onclick="openParcel(\''+esc(p.id)+'\')"><span class="ptile">'+ic("sprout",24)+'</span><span><span class="nm">'+esc(p.name)+'</span>'+(t&&t.crop?'<br><span class="lu">'+esc(t.crop)+'</span>':'')+'<br>'+badge+'</span><span class="arr">→</span></button>';
+    return '<button class="pcard pin" style="--i:'+PARCELS.indexOf(p)+'" onclick="openParcel(\''+esc(p.id)+'\')"><span class="ptile">'+ic("sprout",24)+'</span><span><span class="nm">'+esc(p.name)+'</span>'+(t&&t.crop?'<br><span class="lu">'+esc(t.crop)+'</span>':'')+'<br>'+badge+'</span><span class="arr">→</span></button>';
   }).join("");
 }
 function openParcel(id){
@@ -235,7 +260,7 @@ function taskCard(x,parcelId,i){
   TASK_SAY[parcelId+":"+i]=[x.faire,x.detail,x.quand].filter(Boolean).join(". ");
   var canSay=!!(window.trvCanSpeak&&trvCanSpeak());
   var listenBtn=canSay?'<button class="btn listen" type="button" onclick="sayTaskAt(\''+esc(parcelId)+'\','+i+',this)">'+ic("speaker",16)+' Écouter</button>':'';
-  return '<div class="card task'+(done?' done':'')+'" data-k="'+doneKey+'"><div class="t2"><span class="ti">'+ic("leaf",24)+'</span><span><h3>'+esc(x.faire)+'</h3>'+(x.detail?'<div class="dt">'+esc(x.detail)+'</div>':'')+(x.quand?'<div class="qd">'+esc(x.quand)+'</div>':'')+'</span></div>'+listenBtn+'<button class="btn primary" onclick="markDone(this,\''+esc(parcelId)+'\','+i+',\''+esc(x.faire).replace(/'/g,"\\'")+'\')">'+(done?ic("check",16)+' Fait':'C\'est fait')+'</button></div>';
+  return '<div class="card task pin'+(done?' done':'')+'" style="--i:'+i+'" data-k="'+doneKey+'"><div class="t2"><span class="ti">'+ic("leaf",24)+'</span><span><h3>'+esc(x.faire)+'</h3>'+(x.detail?'<div class="dt">'+esc(x.detail)+'</div>':'')+(x.quand?'<div class="qd">'+esc(x.quand)+'</div>':'')+'</span></div>'+listenBtn+'<button class="btn primary" onclick="markDone(this,\''+esc(parcelId)+'\','+i+',\''+esc(x.faire).replace(/'/g,"\\'")+'\')">'+(done?ic("check",16)+' Fait':'C\'est fait')+'</button></div>';
 }
 var TASK_SAY={};
 function sayTaskAt(pid,i,btn){
@@ -270,7 +295,7 @@ async function markDone(btn,parcelId,i,faire){
   btn.disabled=true;
   try{
     var r=await fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({parcel_id:parcelId,kind:"observation",note:"Fait : "+faire})});
-    if(r.ok){ sessionDone[key]=true; var card=btn.closest(".task"); if(card){card.classList.add("done");} btn.innerHTML=ic("check",16)+" Fait"; toast("Bien joué ! C'est noté dans votre carnet."); }
+    if(r.ok){ sessionDone[key]=true; var card=btn.closest(".task"); if(card){card.classList.add("done");} btn.innerHTML=ic("check",16).replace('class="ico"','class="ico drawcheck"')+" Fait"; toast("Bien joué ! C'est noté dans votre carnet."); }
     else { var d={};try{d=await r.json();}catch(e){} toast(d.error||"Impossible d'enregistrer. Réessayez."); btn.disabled=false; }
   }catch(e){ toast("Pas de réseau — réessayez quand la connexion revient."); btn.disabled=false; }
 }
@@ -286,7 +311,12 @@ function openTravail(){
     }).join("");
   }).catch(function(){ $("travailBody").innerHTML='<div class="info">Impossible de charger votre carnet.</div>'; });
 }
-async function logout(){ try{ await fetch("/api/auth/logout",{method:"POST"}); }catch(e){} location.href="/app"; }
+async function logout(){ try{ await fetch("/api/auth/logout",{method:"POST"}); }catch(e){} location.href="/connexion"; }
+// Rideau d'arrivée : il se lève dès que la page est prête (au plus tard après 0,9 s, jamais bloquant).
+if(document.documentElement.classList.contains("arriving")){
+  var lifted=false, lift=function(){ if(lifted) return; lifted=true; var a=$("arrive"); requestAnimationFrame(function(){ a.classList.add("up"); }); setTimeout(function(){ document.documentElement.classList.remove("arriving"); },700); };
+  window.addEventListener("load",lift); setTimeout(lift,900);
+}
 boot();
 </script>
 </body>

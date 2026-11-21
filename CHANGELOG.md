@@ -1,5 +1,12 @@
 # Journal des versions — Terravive
 
+## v8.14 — 21 novembre 2026 : parcours planteur animé (connexion → espace planteur)
+- **Nouvelle page `/connexion`** pour les planteurs : téléphone + code PIN, connexion et création d'espace sur la même page (onglets). Le bouton « Se connecter » de l'accueil y mène ; un lien garde la connexion par e-mail pour les animateurs, clients et administrateurs.
+- **Ouverture** (une fois par session) : sur fond vert, la pousse du logo se dessine trait par trait, le nom apparaît, puis le bandeau vert remonte et sa courbe — une colline — découvre le formulaire, dont les champs arrivent un à un.
+- **Validation** : le bouton se rétracte en pilule de chargement pendant la vérification. Erreur : le formulaire tremble brièvement et le message s'affiche. Succès : la pilule s'ouvre en cercle vert qui couvre l'écran, et l'espace planteur s'ouvre sur le même vert, qui remonte à son tour.
+- **Espace planteur** : les parcelles puis les tâches arrivent une à une, court fondu entre les écrans, la coche se dessine quand on touche « C'est fait ». Un planteur déconnecté est renvoyé vers `/connexion`.
+- Mouvements de 0,2 à 0,7 s, uniquement transform / opacity (fluides sur téléphone modeste) ; rien ne bouge avec « réduire les animations ». 1 test de bout en bout ajouté. Service worker v32.
+
 ## v8.13 — 21 novembre 2026 : animations plus courtes, plus nettes, plus sobres
 Revue des animations selon le guide « Animations on the Web » (Emil Kowalski) :
 - **Une seule apparition par bloc.** Trois moteurs (anim.js, anims.js, mobile.js) faisaient apparaître les mêmes cartes en même temps ; seul anim.js le fait maintenant. anims.js garde les compteurs et le tracé des graphiques.

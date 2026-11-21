@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Terravive — Connexion planteur</title>
+<meta name="description" content="Connexion des planteurs Terravive : votre numéro de téléphone et votre code PIN, sans e-mail.">
+<meta name="theme-color" content="#174D2B">
+<link rel="icon" type="image/png" href="/favicon-32.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("trv-theme")||"nature");}catch(e){}
+// Écran d'ouverture : une fois par session (les visites suivantes arrivent directement sur le formulaire).
+try{ if(!sessionStorage.getItem("trv-splash") && !matchMedia("(prefers-reduced-motion: reduce)").matches) document.documentElement.classList.add("splash"); }catch(e){}</script>
+<style>
+  :root{ --leaf:#2E7D46; --deep:#174D2B; --sky:#174D2B; --sky2:#225f37; --sun:#E0A93B; --ink:#14261A; --soft:#5b6b5f; --faint:#8a9a8d;
+    --bg:#f3f7f1; --surface:#ffffff; --surface2:#f5f9f3; --line:#dde7dc; --bad:#c0392b; --f-display:Georgia,'Times New Roman',serif;
+    --out:cubic-bezier(.165,.84,.44,1); --inout:cubic-bezier(.645,.045,.355,1); --head:236px; }
+  :root[data-theme="clair"]{ --leaf:#2f855a; --deep:#276749; --sky:#276749; --sky2:#2f7a54; --bg:#f3f5f7; --surface2:#f7f9fb; --line:#e6e9ec; --ink:#1a2430; --soft:#5a6675; }
+  :root[data-theme="sombre"]{ --leaf:#5bbf84; --deep:#8fd6a9; --sky:#0c2316; --sky2:#13331f; --bg:#0e1712; --surface:#15241b; --surface2:#1a2c21; --line:#223228; --ink:#e7f1ea; --soft:#a6b7ad; --faint:#7c8d83; color-scheme:dark; }
+  :root[data-theme="terre"]{ --leaf:#7a6a3a; --deep:#5c4a22; --sky:#4a3b1a; --sky2:#5e4b24; --bg:#f4efe3; --surface:#fffdf8; --surface2:#f7f1e5; --line:#e6ddcb; --ink:#2a2416; --soft:#6b6150; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ min-height:100%; }
+  body{ font-family:"Segoe UI",system-ui,Arial,sans-serif; color:var(--ink); background:var(--bg); line-height:1.5; overflow-x:hidden; }
+
+  /* ---------- Le ciel (bandeau vert) et sa colline ----------
+     Au repos, on ne voit que le haut du ciel (--head) et la courbe de la colline.
+     Pendant l'ouverture, il couvre tout l'écran puis remonte : la colline découvre le formulaire. */
+  .sky{ position:fixed; left:0; right:0; top:0; height:100vh; height:100dvh; z-index:5; color:#fff;
+    background:radial-gradient(120% 80% at 80% 100%, var(--sky2), var(--sky) 60%);
+    transform:translateY(calc(var(--head) - 100vh)); transform:translateY(calc(var(--head) - 100dvh)); }
+  .hill{ position:absolute; left:0; top:calc(100% - 1px); width:100%; height:64px; display:block; }
+  .hill path{ fill:var(--sky); }
+  .mark{ position:absolute; left:0; right:0; bottom:30px; text-align:center; }
+  .mark svg{ width:58px; height:58px; display:block; margin:0 auto 8px; }
+  .mark svg .ring{ fill:none; stroke:rgba(255,255,255,.22); stroke-width:1.4; }
+  .mark svg .st{ fill:none; stroke:#fff; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  .mark svg .lf{ fill:var(--sun); opacity:.95; }
+  .word{ font-family:var(--f-display); font-size:1.7rem; font-weight:700; letter-spacing:.01em; }
+  .tag{ font-size:.85rem; opacity:.75; margin-top:2px; }
+
+  /* Ouverture (une fois par session) : le ciel couvre l'écran, le logo se dessine au centre. */
+  html.splash .sky{ transform:none; }
+  html.splash .mark{ transform:translateY(calc(88px - 50vh)); }
+  html.splash .mark .st{ stroke-dasharray:40; stroke-dashoffset:40; animation:draw .7s var(--inout) .15s forwards; }
+  html.splash .mark .st.b{ animation-delay:.35s; } html.splash .mark .st.c{ animation-delay:.5s; }
+  html.splash .mark .lf{ opacity:0; transform-origin:12px 12px; animation:pop .35s var(--out) .85s forwards; }
+  html.splash .word, html.splash .tag{ opacity:0; transform:translateY(6px); animation:show .4s var(--out) .75s forwards; }
+  html.splash .tag{ animation-delay:.85s; }
+  html.splash .sheet > *{ animation:none; opacity:0; }
+  /* Lever du rideau : le ciel et le logo bougent ensemble (même durée, même courbe). */
+  html.lift .sky, html.lift .mark{ transition:transform .7s var(--inout); }
+  @keyframes draw{ to{ stroke-dashoffset:0; } }
+  @keyframes pop{ from{ opacity:0; transform:scale(.6); } to{ opacity:.95; transform:none; } }
+  @keyframes show{ to{ opacity:1; transform:none; } }
+  /* Entrée du formulaire : seul l'état de départ est animé (fill « backwards »), si bien qu'une autre
+     animation posée ensuite (la secousse d'erreur) ne peut jamais laisser un bloc invisible. */
+  @keyframes rise{ from{ opacity:0; transform:translateY(8px); } }
+
+  /* ---------- Le formulaire ---------- */
+  .sheet{ position:relative; z-index:1; max-width:430px; margin:0 auto; padding:calc(var(--head) + 76px) 20px 40px; }
+  .sheet > *{ animation:rise .36s var(--out) backwards; animation-delay:calc(var(--i, 0) * 45ms + var(--d, 0ms)); }
+  html.lift .sheet > *{ --d:330ms; }
+  h1{ font-family:var(--f-display); color:var(--ink); font-size:1.55rem; line-height:1.2; }
+  .lead{ color:var(--soft); font-size:.95rem; margin:4px 0 18px; }
+
+  .seg{ position:relative; display:grid; grid-template-columns:1fr 1fr; background:var(--surface2); border:1px solid var(--line); border-radius:12px; padding:4px; margin-bottom:16px; }
+  .seg button{ position:relative; z-index:1; border:0; background:none; font:600 .92rem inherit; font-family:inherit; color:var(--soft); padding:9px 6px; border-radius:9px; cursor:pointer; transition:color .2s ease; }
+  .seg button[aria-pressed="true"]{ color:#fff; }
+  .seg .pill{ position:absolute; z-index:0; top:4px; bottom:4px; left:4px; width:calc(50% - 4px); border-radius:9px; background:var(--leaf); transition:transform .26s var(--inout); }
+  .seg.reg .pill{ transform:translateX(100%); }
+
+  .extra{ display:grid; grid-template-rows:0fr; transition:grid-template-rows .26s var(--inout); }
+  .extra > div{ overflow:hidden; min-height:0; }
+  .extra.open{ grid-template-rows:1fr; }
+  .extra .in{ opacity:0; transition:opacity .2s ease; }
+  .extra.open .in{ opacity:1; transition-delay:.08s; }
+
+  label{ display:block; font-size:.82rem; font-weight:600; color:var(--soft); margin:0 0 5px; }
+  .field{ margin-bottom:13px; }
+  input{ width:100%; font:inherit; font-size:1.05rem; color:var(--ink); background:var(--surface); border:1.5px solid var(--line); border-radius:12px; padding:13px 14px; outline:none; transition:border-color .15s ease, box-shadow .15s ease; }
+  input:focus{ border-color:var(--leaf); box-shadow:0 0 0 4px color-mix(in srgb, var(--leaf) 16%, transparent); }
+  input.pin{ letter-spacing:.5em; font-size:1.25rem; }
+  .err{ color:var(--bad); font-size:.88rem; min-height:1.3em; margin:2px 0 8px; }
+
+  /* Bouton qui se rétracte en pilule pendant la vérification */
+  .go{ display:block; position:relative; margin:4px auto 0; width:100%; height:54px; border:0; border-radius:14px; background:var(--leaf); color:#fff; font:700 1.05rem inherit; font-family:inherit; cursor:pointer;
+    transition:width .28s var(--inout), border-radius .28s var(--inout), transform .12s var(--out); }
+  .go:active{ transform:scale(.97); }
+  .go .lbl{ transition:opacity .12s ease; white-space:nowrap; }
+  .go .spin{ position:absolute; left:50%; top:50%; width:22px; height:22px; margin:-11px 0 0 -11px; border-radius:50%; border:2.5px solid rgba(255,255,255,.35); border-top-color:#fff; opacity:0; transition:opacity .12s ease; }
+  .go.busy{ width:54px; border-radius:27px; cursor:default; }
+  .go.busy .lbl{ opacity:0; } .go.busy .spin{ opacity:1; animation:spin .7s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .shake{ animation:shake .32s var(--out); }
+  @keyframes shake{ 20%{ transform:translateX(-6px); } 40%{ transform:translateX(6px); } 60%{ transform:translateX(-4px); } 80%{ transform:translateX(3px); } }
+
+  /* Succès : la pilule s'ouvre en un cercle vert qui couvre l'écran, puis l'espace planteur s'ouvre. */
+  .burst{ position:fixed; z-index:50; width:54px; height:54px; border-radius:50%; background:var(--sky); transform:scale(1); transition:transform .5s var(--inout); pointer-events:none; }
+
+  .alt{ text-align:center; margin-top:20px; font-size:.9rem; color:var(--soft); }
+  .alt a{ color:var(--leaf); font-weight:600; text-decoration:none; }
+  .note{ text-align:center; color:var(--faint); font-size:.8rem; margin-top:10px; }
+
+  @media (min-width:700px){ :root{ --head:250px; } }
+  @media (prefers-reduced-motion:reduce){
+    .sky, .mark, .sheet > *, .pill, .extra, .extra .in, .go, .go .lbl, .go .spin, .burst{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="sky" aria-hidden="true">
+    <div class="mark">
+      <svg viewBox="0 0 24 24"><circle class="ring" cx="12" cy="12" r="11"/><path class="lf" d="M12 10.4c0-2.9 2-4.8 5.8-4.8 0 3.3-2.1 4.8-5.8 4.8z"/><path class="st a" d="M12 20.5v-8.6"/><path class="st b" d="M12 12.6c0-3.3-2.2-5.3-6.2-5.3 0 3.7 2.3 5.3 6.2 5.3z"/><path class="st c" d="M7.5 20.5h9"/></svg>
+      <div class="word">Terravive</div>
+      <div class="tag">Vos parcelles, au quotidien</div>
+    </div>
+    <svg class="hill" viewBox="0 0 400 64" preserveAspectRatio="none"><path d="M0,0 H400 V6 C318,64 150,70 0,28 Z"/></svg>
+  </div>
+
+  <main class="sheet">
+    <h1 id="ttl" style="--i:0">Content de vous revoir</h1>
+    <p class="lead" id="lead" style="--i:1">Entrez votre numéro de téléphone et votre code PIN.</p>
+    <div class="seg" id="seg" style="--i:2" role="group" aria-label="Choisir">
+      <span class="pill" aria-hidden="true"></span>
+      <button type="button" id="tLog" aria-pressed="true">Se connecter</button>
+      <button type="button" id="tReg" aria-pressed="false">Créer mon espace</button>
+    </div>
+    <form id="f" novalidate style="--i:3">
+      <div class="extra" id="extra"><div><div class="in">
+        <div class="field"><label for="name">Votre nom</label><input id="name" maxlength="80" autocomplete="name" placeholder="ex. Koné Adama"></div>
+        <div class="field"><label for="region">Votre région (facultatif)</label><input id="region" maxlength="80" placeholder="ex. San-Pédro"></div>
+      </div></div></div>
+      <div class="field"><label for="phone">Numéro de téléphone</label><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="07 00 00 00 00" required></div>
+      <div class="field"><label for="pin">Code PIN</label><input id="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="current-password" placeholder="••••" required></div>
+      <div class="err" id="err" role="alert"></div>
+      <button class="go" id="go" type="submit"><span class="lbl" id="goLbl">Se connecter</span><span class="spin" aria-hidden="true"></span></button>
+    </form>
+    <p class="alt" style="--i:4">Animateur, client ou administrateur ? <a href="/app?login=1">Connexion par e-mail</a></p>
+    <p class="note" style="--i:5">Le code PIN se choisit à l'inscription : 4 à 8 chiffres.</p>
+  </main>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(id){ return document.getElementById(id); }, root=document.documentElement;
+  var reduce=false; try{ reduce=matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){}
+  var mode="login";
+
+  // Déjà connecté : directement vers son espace.
+  fetch("/api/auth/me").then(function(r){ return r.json(); }).then(function(d){
+    var u=d&&d.user; if(!u) return;
+    location.replace(u.profile==="client" ? "/boutique" : (u.phone ? "/planteur" : "/tableau"));
+  }).catch(function(){});
+
+  // Ouverture : le logo se dessine (~1,1 s), puis le ciel remonte et découvre le formulaire.
+  if(root.classList.contains("splash")){
+    try{ sessionStorage.setItem("trv-splash","1"); }catch(e){}
+    setTimeout(function(){
+      root.classList.add("lift");
+      // force le navigateur à partir de l'état « plein écran » avant la transition
+      void document.body.offsetWidth;
+      root.classList.remove("splash");
+    }, 1150);
+  }
+
+  function setMode(m){
+    mode=m; var reg=m==="register";
+    $("seg").classList.toggle("reg",reg); $("tLog").setAttribute("aria-pressed",String(!reg)); $("tReg").setAttribute("aria-pressed",String(reg));
+    $("extra").classList.toggle("open",reg);
+    $("ttl").textContent=reg?"Créez votre espace":"Content de vous revoir";
+    $("lead").textContent=reg?"Votre numéro de téléphone sert d'identifiant. Choisissez un code PIN facile à retenir.":"Entrez votre numéro de téléphone et votre code PIN.";
+    $("goLbl").textContent=reg?"Créer mon espace":"Se connecter";
+    $("pin").setAttribute("autocomplete",reg?"new-password":"current-password");
+    $("err").textContent="";
+  }
+  $("tLog").addEventListener("click",function(){ setMode("login"); });
+  $("tReg").addEventListener("click",function(){ setMode("register"); });
+
+  function fail(msg){
+    var go=$("go"); go.classList.remove("busy"); go.disabled=false;
+    $("err").textContent=msg;
+    var f=$("f"); f.classList.remove("shake"); void f.offsetWidth; if(!reduce) f.classList.add("shake");
+  }
+  // La pilule s'ouvre en cercle et couvre l'écran ; l'espace planteur prend le relais (même vert).
+  function success(dest){
+    try{ sessionStorage.setItem("trv-arrive","1"); }catch(e){}
+    if(reduce){ location.href=dest; return; }
+    var r=$("go").getBoundingClientRect(), b=document.createElement("div"); b.className="burst";
+    b.style.left=r.left+"px"; b.style.top=r.top+"px"; document.body.appendChild(b);
+    var cx=r.left+r.width/2, cy=r.top+r.height/2, w=innerWidth, h=innerHeight;
+    var far=Math.max(Math.hypot(cx,cy),Math.hypot(w-cx,cy),Math.hypot(cx,h-cy),Math.hypot(w-cx,h-cy));
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ b.style.transform="scale("+Math.ceil(far/27+1)+")"; }); });
+    setTimeout(function(){ location.href=dest; }, 480);
+  }
+
+  $("f").addEventListener("submit",async function(e){
+    e.preventDefault();
+    var phone=$("phone").value.trim(), pin=$("pin").value.trim(), go=$("go");
+    $("err").textContent="";
+    if(phone.replace(/\D/g,"").length<8) return fail("Entrez votre numéro de téléphone (au moins 8 chiffres).");
+    if(!/^\d{4,8}$/.test(pin)) return fail("Le code PIN comporte 4 à 8 chiffres.");
+    go.disabled=true; go.classList.add("busy");
+    var t0=Date.now();
+    var body = mode==="register" ? { as:"planteur", phone:phone, pin:pin, name:$("name").value.trim(), region:$("region").value.trim() } : { as:"planteur", phone:phone, pin:pin };
+    try{
+      var r=await fetch(mode==="register"?"/api/auth/register":"/api/auth/login",{ method:"POST", headers:{ "content-type":"application/json" }, body:JSON.stringify(body) });
+      var d={}; try{ d=await r.json(); }catch(x){}
+      // laisse la pilule visible un instant, même si le serveur répond très vite
+      var wait=Math.max(0, 450-(Date.now()-t0));
+      setTimeout(function(){
+        if(!r.ok) return fail(d.error||"Connexion impossible. Réessayez.");
+        success(d.user && d.user.profile==="client" ? "/boutique" : "/planteur");
+      }, reduce?0:wait);
+    }catch(x){ fail("Pas de réseau. Réessayez quand la connexion revient."); }
+  });
+})();
+</script>
+</body>
+</html>

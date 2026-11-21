@@ -2367,6 +2367,7 @@ function serveStatic(req, res) {
   if (urlPath === "/boutique") urlPath = "/boutique.html";
   if (urlPath === "/comprendre") urlPath = "/comprendre.html";
   if (urlPath === "/planteur" || urlPath === "/cultivateur") urlPath = "/planteur.html";
+  if (urlPath === "/connexion") urlPath = "/connexion.html";
   if (urlPath === "/conseiller" || urlPath === "/chat") urlPath = "/conseiller.html";
   if (urlPath === "/cooperative" || urlPath === "/coop") urlPath = "/cooperative.html";
   if (urlPath === "/formation") urlPath = "/formation.html";
