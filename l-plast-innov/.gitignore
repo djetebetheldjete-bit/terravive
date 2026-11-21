@@ -22,6 +22,7 @@ backend/datasets/
 node_modules/
 frontend/dist/
 frontend/.vite/
+*.tsbuildinfo
 
 # Flutter / mobile
 mobile/.dart_tool/
