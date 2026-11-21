@@ -292,6 +292,40 @@ async function main() {
       assert.ok(!list.json.totals.germination.qty, "les pourcentages ne s'additionnent pas");
     });
 
+    // ------------------------------------------- Planteur : téléphone + PIN
+    t.section("Planteur : connexion par téléphone et code PIN");
+    const plReg = (phone, pin, ip, extra) => req("POST", "/api/auth/register", { json: Object.assign({ as: "planteur", phone, pin, name: "Planteur" }, extra || {}), ip });
+    const plLog = (phone, pin, ip) => req("POST", "/api/auth/login", { json: { as: "planteur", phone, pin }, ip });
+    await t.test("inscription : numéro et PIN vérifiés, aucun e-mail exposé", async () => {
+      assert.strictEqual((await plReg("123", "1234", "10.2.0.1")).status, 400, "numéro trop court");
+      assert.strictEqual((await plReg("07 01 02 03 04", "12", "10.2.0.1")).status, 400, "PIN trop court");
+      assert.strictEqual((await plReg("07 01 02 03 04", "abcd", "10.2.0.1")).status, 400, "PIN non numérique");
+      const r = await plReg("07 01 02 03 04", "4821", "10.2.0.1", { region: "San-Pédro" });
+      assert.strictEqual(r.status, 200);
+      assert.strictEqual(r.json.user.email, null, "l'adresse interne ne doit pas être renvoyée");
+      assert.strictEqual(r.json.user.phone, "0701020304");
+      assert.strictEqual((await plReg("0701020304", "9999", "10.2.0.1")).status, 409, "numéro déjà inscrit");
+    });
+    await t.test("connexion : le format du numéro n'importe pas, un mauvais PIN est refusé", async () => {
+      assert.strictEqual((await plLog("07-01-02-03-04", "4821", "10.2.0.2")).status, 200);
+      assert.strictEqual((await plLog("0701020304", "0000", "10.2.0.2")).status, 401);
+      assert.strictEqual((await plLog("", "4821", "10.2.0.2")).status, 400);
+    });
+    await t.test("le domaine interne des planteurs ne peut pas servir à s'inscrire ou se connecter par e-mail", async () => {
+      assert.strictEqual((await register("0799999999@planteur.terravive", "secret123", "10.2.0.3")).status, 400, "squat d'un numéro par e-mail");
+      assert.strictEqual((await plReg("0799999999", "1111", "10.2.0.3")).status, 200, "le vrai planteur doit pouvoir s'inscrire");
+      assert.strictEqual((await login("0799999999@planteur.terravive", "1111", "10.2.0.3")).status, 401, "contournement des compteurs du numéro");
+    });
+    await t.test("PIN : les essais répétés bloquent le numéro, même en changeant de connexion", async () => {
+      await plReg("0788888888", "2468", "10.2.0.4");
+      let blocked = false;
+      for (let i = 0; i < 25 && !blocked; i++) {
+        const r = await plLog("0788888888", String(1000 + i), "10.2.1." + i);
+        if (r.status === 429) blocked = true; else assert.strictEqual(r.status, 401, "essai " + (i + 1) + " → " + r.status);
+      }
+      assert.ok(blocked, "le numéro devait être bloqué");
+    });
+
     // -------------------------------------------------- Limites anti-abus
     t.section("Limites anti-abus");
     await t.test("après 10 essais de mot de passe sur un compte, la connexion est bloquée (429)", async () => {

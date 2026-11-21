@@ -1,5 +1,15 @@
 # Journal des versions — Terravive
 
+## v8.10 — 21 novembre 2026 : connexion planteur sécurisée, dépôt remis au propre
+Rattrapage des nouveautés livrées depuis la v8.9, puis corrections :
+- **Déjà en ligne, désormais documenté** : connexion des planteurs par **numéro de téléphone + code PIN** (4 à 8 chiffres, sans e-mail) ; **rattachement automatique** d'un planteur au premier animateur inscrit de sa région (carte « Votre animateur technique » dans `/planteur`) ; **visite guidée** et mini-démos (`help.js`), animations partagées (`anim.js`) ; page **Tutoriels vidéo** (`/formation`) ; bouton « Écouter » par tâche dans la vue planteur.
+- **Sécurité — numéro d'un planteur « réservable »** : on pouvait s'inscrire par e-mail avec l'adresse interne `<numéro>@planteur.terravive` et empêcher le vrai planteur de créer son compte. Ce domaine est maintenant refusé à l'inscription et à la connexion par e-mail (qui permettait aussi de contourner les compteurs du numéro).
+- **Sécurité — code PIN** : un PIN de 4 chiffres n'a que 10 000 possibilités ; en plus de la limite de 10 essais par 10 minutes, un numéro est bloqué pour la journée après 20 codes erronés en 24 h. Un numéro vide ou invalide est refusé (400) à la connexion.
+- **Mémoire du serveur** : les compteurs anti-abus (par adresse IP, e-mail, numéro) étaient gardés indéfiniment ; ils sont nettoyés toutes les 10 minutes.
+- **Coopérative** : le rattachement automatique ne lit plus toute la table des comptes, seulement les animateurs ; l'adresse interne d'un animateur planteur n'est plus montrée comme e-mail de contact.
+- **Dépôt** : suppression du dossier `fichiers-modifies/` (copies **plus anciennes** que le code en place — les recopier aurait effacé la connexion par téléphone), du doublon `.env - Copie.example` et de l'ancien `accueil.html` à la racine (seul `public/accueil.html` est servi). Captures d'écran rangées dans `docs/captures/`.
+- 4 tests de bout en bout ajoutés (inscription et connexion du planteur, domaine réservé, blocage du PIN) : 82 tests réussis.
+
 ## v8.9 — 17 novembre 2026 : vue planteur (interface simplifiée du cultivateur)
 - **Nouvelle page `/planteur`** : une interface dédiée au planteur / cultivateur, séparée de l'espace technique complet. Pensée pour le téléphone et la lecture rapide sur le terrain : grandes cartes, ton « vous », un seul geste par tâche.
 - **Vos parcelles** : la liste des parcelles du cultivateur (plusieurs parcelles gérées), chacune avec sa culture et un repère clair — « 2 choses à faire », « À jour », ou « Culture à renseigner ».
