@@ -82,12 +82,12 @@
 
 /* ---------- 4. Feuille « Plus » (bottom sheet) ---------- */
 @media (max-width: 860px) {
-  body.m-on .m-backdrop { display: block; position: fixed; inset: 0; z-index: 940; background: rgba(10, 24, 16, .5); opacity: 0; pointer-events: none; transition: opacity .28s; }
+  body.m-on .m-backdrop { display: block; position: fixed; inset: 0; z-index: 940; background: rgba(10, 24, 16, .5); opacity: 0; pointer-events: none; transition: opacity .28s var(--m-ease); }
   body.m-on .m-backdrop.on { opacity: 1; pointer-events: auto; }
   body.m-on .m-sheet {
     display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 950; max-height: 86vh; overflow-y: auto; overscroll-behavior: contain;
     background: var(--surface, #fff); color: var(--ink); border-radius: 22px 22px 0 0; padding: 8px 16px calc(18px + env(safe-area-inset-bottom, 0px));
-    box-shadow: 0 -14px 40px rgba(0,0,0,.22); transform: translateY(105%); transition: transform .34s var(--m-ease); will-change: transform;
+    box-shadow: 0 -14px 40px rgba(0,0,0,.22); transform: translateY(105%); transition: transform .28s var(--m-ease); will-change: transform;
   }
   body.m-on .m-sheet.on { transform: translateY(0); }
   .m-sheet.m-drag { transition: none; }
@@ -97,7 +97,7 @@
   .m-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 84px; padding: 12px 6px; text-align: center; text-decoration: none; color: var(--ink);
     background: var(--surface2, #f5f9f3); border: 1px solid var(--line); border-radius: var(--m-r); font: 600 12.5px/1.2 "Segoe UI", system-ui, sans-serif; cursor: pointer;
     opacity: 0; transform: translateY(14px); transition: transform .15s, background .2s; }
-  .m-sheet.on .m-tile { animation: m-pop .38s var(--m-ease) forwards; animation-delay: calc(var(--i, 0) * 45ms + 120ms); }
+  .m-sheet.on .m-tile { animation: m-pop .24s var(--m-ease) forwards; animation-delay: calc(var(--i, 0) * 25ms + 60ms); }
   .m-tile:active { transform: scale(.95) !important; }
   .m-tile svg { width: 24px; height: 24px; fill: none; stroke: var(--leaf, #2e7d46); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .m-acct { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: var(--m-r); background: var(--surface2); }
@@ -172,8 +172,7 @@
   body.m-on .hero .lead { font-size: 1.02rem !important; line-height: 1.55; }
   body.m-on .hero .kicker { font-size: .72rem; letter-spacing: .12em; }
   body.m-on .hero .btn, body.m-on .hero .cta a { width: 100%; justify-content: center; }
-  body.m-on .m-reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s var(--m-ease), transform .6s var(--m-ease); transition-delay: calc(var(--i, 0) * 70ms); }
-  body.m-on .m-reveal.m-in { opacity: 1; transform: none; }
+  /* .m-reveal (accueil) ne masque plus rien : l'apparition est faite une seule fois par anim.js. */
 }
 
 /* ---------- 10. Tableau de bord (page /tableau) ---------- */
@@ -244,12 +243,7 @@
 
 /* ---------- 14. Entrée douce des blocs (vivant, sans gêner) ---------- */
 @media (max-width: 860px) and (prefers-reduced-motion: no-preference) {
-  body.m-on main > *, body.m-on .main > *, body.m-on .wrap > * { animation: m-rise .5s var(--m-ease) both; }
-  body.m-on main > *:nth-child(2), body.m-on .main > *:nth-child(2), body.m-on .wrap > *:nth-child(2) { animation-delay: .06s; }
-  body.m-on main > *:nth-child(3), body.m-on .main > *:nth-child(3) { animation-delay: .12s; }
-  body.m-on main > *:nth-child(n+4), body.m-on .main > *:nth-child(n+4) { animation-delay: .18s; }
-  body.m-on .kpis > * { animation: m-rise .5s var(--m-ease) both; }
-  body.m-on .kpis > *:nth-child(2) { animation-delay: .05s; } body.m-on .kpis > *:nth-child(3) { animation-delay: .1s; } body.m-on .kpis > *:nth-child(4) { animation-delay: .15s; }
+  /* Apparition des blocs : assurée par anim.js (une seule apparition, y compris sur téléphone). */
 }
 @keyframes m-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 

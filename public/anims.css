@@ -11,61 +11,50 @@
    Les couleurs viennent des variables existantes, rien codé en dur.
    ============================================================ */
 
-/* ---------- 1. Apparition au défilement ---------- */
-.tv-reveal { opacity: 0; transform: translateY(20px); will-change: opacity, transform;
-  transition: opacity .7s cubic-bezier(.2, .75, .25, 1), transform .7s cubic-bezier(.2, .75, .25, 1);
-  transition-delay: var(--tv-d, 0ms); }
-.tv-reveal.tv-in { opacity: 1; transform: none; }
+/* ---------- 1. Apparition au défilement ----------
+   Assurée par anim.css / anim.js (un seul moteur). Ce fichier ne masque plus rien : avant, une même
+   carte recevait deux apparitions superposées (et une troisième sur téléphone). */
 
 /* ---------- 2. Entrée de la page d'accueil (héro) ---------- */
 .tv-hero-anim .hero > div > .kicker,
 .tv-hero-anim .hero > div > h1,
 .tv-hero-anim .hero > div > .lead,
-.tv-hero-anim .hero > div > .cta { opacity: 0; transform: translateY(16px); animation: tvRise .8s cubic-bezier(.2, .75, .25, 1) forwards; }
-.tv-hero-anim .hero > div > .kicker { animation-delay: .05s; }
-.tv-hero-anim .hero > div > h1 { animation-delay: .16s; }
-.tv-hero-anim .hero > div > .lead { animation-delay: .30s; }
-.tv-hero-anim .hero > div > .cta { animation-delay: .44s; }
+.tv-hero-anim .hero > div > .cta { opacity: 0; transform: translateY(10px); animation: tvRise .5s cubic-bezier(.165, .84, .44, 1) forwards; }
+.tv-hero-anim .hero > div > .kicker { animation-delay: .03s; }
+.tv-hero-anim .hero > div > h1 { animation-delay: .09s; }
+.tv-hero-anim .hero > div > .lead { animation-delay: .15s; }
+.tv-hero-anim .hero > div > .cta { animation-delay: .21s; }
 @keyframes tvRise { to { opacity: 1; transform: none; } }
 
 /* héroart : encadré « De votre parcelle à votre récolte » — légère profondeur + étapes qui s'enchaînent */
-.tv-hero-anim .heroart { opacity: 0; transform: translateY(16px) scale(.985); animation: tvRise .85s cubic-bezier(.2, .75, .25, 1) .25s forwards; }
-.tv-hero-anim .heroart .step { opacity: 0; transform: translateX(10px); animation: tvStep .6s ease forwards; }
-.tv-hero-anim .heroart .step:nth-child(2) { animation-delay: .5s; }
-.tv-hero-anim .heroart .step:nth-child(3) { animation-delay: .62s; }
-.tv-hero-anim .heroart .step:nth-child(4) { animation-delay: .74s; }
-.tv-hero-anim .heroart .step:nth-child(5) { animation-delay: .86s; }
+.tv-hero-anim .heroart { opacity: 0; transform: translateY(10px) scale(.985); animation: tvRise .5s cubic-bezier(.165, .84, .44, 1) .12s forwards; }
+.tv-hero-anim .heroart .step { opacity: 0; transform: translateX(8px); animation: tvStep .35s cubic-bezier(.165, .84, .44, 1) forwards; }
+.tv-hero-anim .heroart .step:nth-child(2) { animation-delay: .28s; }
+.tv-hero-anim .heroart .step:nth-child(3) { animation-delay: .34s; }
+.tv-hero-anim .heroart .step:nth-child(4) { animation-delay: .40s; }
+.tv-hero-anim .heroart .step:nth-child(5) { animation-delay: .46s; }
 @keyframes tvStep { to { opacity: 1; transform: none; } }
 /* la pastille numérotée se « remplit » */
-.tv-hero-anim .heroart .step .n { transition: transform .3s ease; }
-.tv-hero-anim .heroart .step:hover .n { transform: scale(1.12) rotate(-6deg); }
+.tv-hero-anim .heroart .step .n { transition: transform .2s ease; }
+@media (hover: hover) and (pointer: fine) { .tv-hero-anim .heroart .step:hover .n { transform: scale(1.08); } }
 
-/* ---------- 3. Survol des cartes, tuiles, boutons ---------- */
-.card, .tile { transition: transform .25s cubic-bezier(.2, .75, .25, 1), box-shadow .25s ease, border-color .25s ease; }
-@media (hover: hover) {
-  .card:hover, .tile:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(20, 50, 30, .13); }
-  :root[data-theme="sombre"] .card:hover, :root[data-theme="sombre"] .tile:hover { box-shadow: 0 14px 34px rgba(0, 0, 0, .4); }
-  /* la petite icône de la tuile s'anime au survol de la carte */
-  .tile:hover .ic, .card:hover .iconbadge { transform: scale(1.08) rotate(-4deg); }
-}
-.tile .ic, .card .iconbadge { transition: transform .35s cubic-bezier(.2, .75, .25, 1); }
+/* ---------- 3. Survol ----------
+   Les cartes et tuiles d'information ne bougent plus au survol (vues des dizaines de fois par jour,
+   et beaucoup contiennent un formulaire). Survol des cartes cliquables : voir anim.css.
+   Boutons : seulement un changement de teinte au survol ; la pression (scale .97) est dans anim.css. */
+@media (hover: hover) and (pointer: fine) { .btn:hover { filter: brightness(1.05); } }
+:root[data-theme="sombre"] .btn:hover { filter: brightness(1.12); }
 
-/* bouton : pression + lueur douce */
-.btn { transition: transform .15s ease, box-shadow .2s ease, filter .2s ease; }
-@media (hover: hover) { .btn:hover { transform: translateY(-2px); } }
-.btn:active { transform: translateY(0) scale(.98); }
-
-/* lien du menu latéral / onglet : glissement de l'accent */
-.menu a, .nav { transition: background .2s ease, color .2s ease, transform .15s ease; }
-.menu a:active, .nav:active { transform: scale(.985); }
+/* lien du menu latéral / onglet : changement de couleur seulement */
+.menu a, .nav { transition: background-color .15s ease, color .15s ease; }
 
 /* ---------- 4. Compteurs animés ---------- */
 .tv-count { font-variant-numeric: tabular-nums; }
 
 /* ---------- 5. Tracé des graphiques (SVG) ---------- */
-.tv-draw { stroke-dasharray: var(--tv-len, 1200); stroke-dashoffset: var(--tv-len, 1200); animation: tvDraw 1.4s ease forwards; }
+.tv-draw { stroke-dasharray: var(--tv-len, 1200); stroke-dashoffset: var(--tv-len, 1200); animation: tvDraw .8s cubic-bezier(.645, .045, .355, 1) forwards; }
 @keyframes tvDraw { to { stroke-dashoffset: 0; } }
-.tv-fade-in { opacity: 0; animation: tvFade .9s ease .5s forwards; }
+.tv-fade-in { opacity: 0; animation: tvFade .3s ease-out .4s forwards; }
 @keyframes tvFade { to { opacity: 1; } }
 
 /* ---------- 6. Pastille « en direct » qui bat (statut capteur / rafraîchissement) ---------- */
@@ -81,11 +70,11 @@
 
 /* ---------- 8. Respect du confort (mouvement réduit) ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .tv-reveal, .tv-hero-anim .hero > div > *, .tv-hero-anim .heroart, .tv-hero-anim .heroart .step { opacity: 1 !important; transform: none !important; animation: none !important; }
+  .tv-hero-anim .hero > div > *, .tv-hero-anim .heroart, .tv-hero-anim .heroart .step { opacity: 1 !important; transform: none !important; animation: none !important; }
   .tv-draw { stroke-dashoffset: 0 !important; animation: none !important; }
   .tv-fade-in { opacity: 1 !important; animation: none !important; }
   .tv-pulse::after, .tv-skel::after { animation: none !important; }
-  .card, .tile, .btn { transition: none !important; }
+  .btn { transition: none !important; }
 }
 
 /* ============================================================
@@ -96,11 +85,11 @@
 .fold .fold-ti { flex: 1 1 auto; min-width: 0; }
 .fold > h2.ct:hover { color: var(--leaf, #2E7D46); }
 .fold > h2.ct:focus-visible { outline: 3px solid var(--leaf, #2E7D46); outline-offset: 3px; border-radius: 6px; }
-.fold .fold-ar { flex: 0 0 auto; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--leaf, #2E7D46); transition: transform .32s cubic-bezier(.3, .8, .3, 1), background .2s ease; }
+.fold .fold-ar { flex: 0 0 auto; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--leaf, #2E7D46); transition: transform .26s cubic-bezier(.645, .045, .355, 1), background-color .15s ease; }
 .fold .fold-ar svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .fold.open .fold-ar { transform: rotate(180deg); }
 .fold > h2.ct:hover .fold-ar { background: color-mix(in srgb, var(--leaf, #2E7D46) 15%, transparent); }
-.fold-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .34s cubic-bezier(.3, .8, .3, 1); }
+.fold-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .26s cubic-bezier(.645, .045, .355, 1); }
 .fold.open > .fold-body { grid-template-rows: 1fr; }
 .fold-inner { overflow: hidden; min-height: 0; }
 .fold:not(.open) > h2.ct { margin-bottom: 0; }

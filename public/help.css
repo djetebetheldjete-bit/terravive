@@ -27,7 +27,7 @@
   background:rgba(10,22,14,.6); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
 .trv-help-bg.show{ display:flex; }
 .trv-help{ background:#fff; border-radius:20px; width:100%; max-width:360px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.4);
-  animation:trvPop .4s cubic-bezier(.2,.9,.25,1) both; }
+  animation:trvPop .24s cubic-bezier(.165,.84,.44,1) both; }
 .trv-help-stage{ height:260px; background:linear-gradient(160deg,#eef6ee,#e2efe4); position:relative; overflow:hidden; }
 .trv-help-cap{ padding:15px 18px 18px; }
 .trv-help-cap h4{ font-family:var(--f-display,Georgia,serif); color:var(--deep,#1B5E34); margin:0 0 5px; font-size:1.08rem; }

@@ -1,5 +1,14 @@
 # Journal des versions — Terravive
 
+## v8.13 — 21 novembre 2026 : animations plus courtes, plus nettes, plus sobres
+Revue des animations selon le guide « Animations on the Web » (Emil Kowalski) :
+- **Une seule apparition par bloc.** Trois moteurs (anim.js, anims.js, mobile.js) faisaient apparaître les mêmes cartes en même temps ; seul anim.js le fait maintenant. anims.js garde les compteurs et le tracé des graphiques.
+- **Durées raccourcies** : apparition 620-700 ms → 360 ms (déplacement 18-22 px → 8 px), fenêtres 420 ms → 220 ms, compteurs 1,1-1,5 s → 0,7 s, menu du téléphone 340 ms → 280 ms, onde des boutons 600 ms → 450 ms. Courbes « ease-out » pour ce qui entre, « ease-in-out » pour ce qui bouge déjà.
+- **Survol** : seules les cartes cliquables se soulèvent (2 px). Les cartes de formulaire et d'information ne bougent plus, les boutons ne « sautent » plus au survol (simple changement de teinte, pression conservée). Aucun effet de survol sur écran tactile.
+- **Compteurs** : lors du rafraîchissement automatique (toutes les 60 s), le chiffre passe de l'ancienne valeur à la nouvelle au lieu de repartir de zéro.
+- **« Réduire les animations »** (réglage du téléphone ou de l'ordinateur) coupe désormais tout mouvement sur toutes les pages, y compris les boucles.
+- Page Distribution : retour visuel à la pression et court fondu quand le panneau de détail change. Service worker v31.
+
 ## v8.12 — 21 novembre 2026 : Distribution, de la parcelle au client (projet ASTRIDE)
 - **Nouvelle page `/distribution`** (lien « Distribution » dans le menu du tableau de bord, pour les mêmes acteurs que le Stock : administrateur, animateurs, cultivateurs certifiés, lecteurs désignés). Elle suit chaque récolte de la parcelle jusqu'au client, à l'échelle de la coopérative.
 - **La carte** (sur le modèle de la carte ASTRIDE) : parcelles des membres à leur vraie position, colorées par état satellite ou par NDVI ; centres de groupage ; points de vente ; collecte (parcelle → centre) et livraisons (centre → client, épaisseur selon les kg, pointillés pour « en route »). Couches activables, filtres par état et par centre, détail au toucher, flux reliés mis en avant. Thèmes nature, clair, sombre et terre ; adaptée au téléphone.
