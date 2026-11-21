@@ -1,0 +1,30 @@
+# --- Cœur API ---
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+pydantic-settings==2.6.1
+python-multipart==0.0.17
+
+# --- Base de données ---
+SQLAlchemy==2.0.36
+alembic==1.14.0
+# PostgreSQL (prod). Non requis en mode simulation SQLite.
+psycopg2-binary==2.9.10
+GeoAlchemy2==0.16.0
+
+# --- Sécurité / Auth ---
+bcrypt==4.2.1
+python-jose[cryptography]==3.3.0
+email-validator==2.2.0
+
+# --- Divers ---
+python-dateutil==2.9.0.post0
+
+# --- Tests ---
+pytest==8.3.4
+httpx==0.28.1
+
+# --- IA (installer séparément, lourd) : voir app/ai/README.md ---
+# ultralytics==8.3.0
+# opencv-python-headless==4.10.0.84
+# torch

@@ -1,0 +1,27 @@
+# Configuration des classes YOLO pour L-PLAST-INNOV.
+# Les indices (0..N) correspondent aux étiquettes des fichiers d'annotation.
+# Les `code` DOIVENT correspondre aux WasteCategory.code de la base de données.
+#
+# Chemins des jeux de données (à créer et peupler avec des images ANNOTÉES réelles).
+path: datasets/balmer
+train: train/images
+val: val/images
+test: test/images
+
+# Nombre de classes
+nc: 8
+
+# Noms des classes (ordre = indice)
+names:
+  0: plastic_bottle      # Bouteille plastique
+  1: plastic_bag         # Sachet plastique
+  2: food_packaging      # Emballage alimentaire
+  3: plastic_cap         # Bouchon plastique
+  4: plastic_fragment    # Fragment plastique
+  5: other_plastic       # Autre déchet plastique
+  6: non_plastic         # Déchet non plastique
+  7: unidentified        # Objet non identifié
+
+# Pour ajouter une catégorie : incrémenter `nc`, ajouter une ligne à `names`,
+# créer la WasteCategory correspondante via POST /api/v1/categories,
+# puis ré-annoter / ré-entraîner.

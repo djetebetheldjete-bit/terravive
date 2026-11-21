@@ -1,0 +1,47 @@
+# Déploiement local complet : PostgreSQL/PostGIS + backend FastAPI.
+# Lancement :  docker compose up --build
+# (depuis le dossier l-plast-innov/)
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: lplast_db
+    environment:
+      POSTGRES_USER: lplast
+      POSTGRES_PASSWORD: lplast
+      POSTGRES_DB: l_plast_innov
+    ports:
+      - "5432:5432"
+    volumes:
+      - lplast_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lplast -d l_plast_innov"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: lplast_backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      SIMULATION_MODE: "true"   # passez à "false" pour couper les routes de démo
+      DATABASE_URL: "postgresql+psycopg2://lplast:lplast@db:5432/l_plast_innov"
+      SECRET_KEY: "CHANGEZ-MOI-en-production"
+      FIRST_ADMIN_EMAIL: "admin@l-plast-innov.ci"
+      FIRST_ADMIN_PASSWORD: "ChangeMoi123!"
+      STATS_TIMEZONE: "Africa/Abidjan"
+      CORS_ORIGINS: "http://localhost:5173"
+    ports:
+      - "8000:8000"
+    # Applique les migrations puis amorce les référentiels, puis démarre l'API.
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.seed &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  lplast_pgdata:

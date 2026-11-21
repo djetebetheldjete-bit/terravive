@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Bases locales / démo
+*.db
+*.sqlite3
+
+# Secrets (ne JAMAIS committer)
+.env
+backend/.env
+
+# IA : modèles et jeux de données lourds
+backend/runs/
+backend/datasets/
+*.pt
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Flutter / mobile
+mobile/.dart_tool/
+mobile/build/
+
+# Divers
+.DS_Store
+*.log
