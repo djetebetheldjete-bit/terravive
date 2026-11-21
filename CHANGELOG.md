@@ -1,5 +1,14 @@
 # Journal des versions — Terravive
 
+## v8.15 — 21 novembre 2026 : espace planteur vivant
+- **Paysage en fond** : collines, pousses qui se balancent au vent, nuages qui passent ; le soleil suit l'heure réelle (bas le matin, haut à midi, orangé le soir, lune la nuit). Très pâle, derrière le contenu.
+- **Bandeau d'accueil** (même vert et même colline que la connexion) : « Bonjour », la date, et la météo réelle de la première parcelle (Open-Meteo, à sa position), avec une icône animée (rayons qui tournent, gouttes qui tombent). Sur ordinateur : prévisions des 3 prochains jours. Sans parcelle, pas de météo plutôt qu'une météo inventée.
+- **Résumé chiffré** : parcelles, choses à faire cette semaine, travaux notés en 7 jours — les nombres défilent à l'arrivée.
+- **Premier pas** (compte sans parcelle) : une graine tombe, la pousse sort et se balance ; 3 étapes et le bouton « Dessiner ma première parcelle ».
+- **Aujourd'hui** : bandeau de la parcelle avec « Jour N depuis le semis » et une barre « Fait aujourd'hui » qui se remplit à chaque « C'est fait ». **Votre travail** : chronologie dont la ligne se trace. **Profil** : les lignes arrivent une à une.
+- **Ordinateur** : bandeau pleine largeur et deux colonnes (parcelles et résumé ; animateur et prévisions) au lieu d'une colonne étroite au milieu.
+- Tout en SVG et CSS (transform, opacity) ; rien ne bouge avec « réduire les animations ». Service worker v33.
+
 ## v8.14 — 21 novembre 2026 : parcours planteur animé (connexion → espace planteur)
 - **Nouvelle page `/connexion`** pour les planteurs : téléphone + code PIN, connexion et création d'espace sur la même page (onglets). Le bouton « Se connecter » de l'accueil y mène ; un lien garde la connexion par e-mail pour les animateurs, clients et administrateurs.
 - **Ouverture** (une fois par session) : sur fond vert, la pousse du logo se dessine trait par trait, le nom apparaît, puis le bandeau vert remonte et sa courbe — une colline — découvre le formulaire, dont les champs arrivent un à un.

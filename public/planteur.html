@@ -93,6 +93,117 @@ try{ if(sessionStorage.getItem("trv-arrive")==="1"){ sessionStorage.removeItem("
   @keyframes ck{ to{ stroke-dashoffset:0; } }
   .badge.todo .n{ display:inline-block; animation:pIn .3s var(--out) both; }
   @media (prefers-reduced-motion:reduce){ .pin, .scr.on, .drawcheck path, .badge.todo .n{ animation:none; stroke-dashoffset:0; } .task{ transition:none; } }
+  /* ================= Espace planteur vivant (v8.15) =================
+     Paysage en fond, bandeau d'accueil, résumé chiffré, premier pas, chronologie.
+     Tout en SVG + CSS (transform / opacity), discret, coupé par « réduire les animations ». */
+  .wrap{ position:relative; z-index:1; }
+  /* --- Paysage : collines, pousses au vent, soleil ou lune selon l'heure --- */
+  .land{ position:fixed; left:0; right:0; bottom:calc(60px + env(safe-area-inset-bottom,0px)); height:190px; z-index:0; pointer-events:none; opacity:.9; }
+  .land svg{ width:100%; height:100%; display:block; position:relative; }
+  /* Soleil / lune : placés en % de la largeur, donc visibles sur téléphone comme sur ordinateur. */
+  .orb{ position:absolute; width:46px; height:46px; margin:0 0 -23px -23px; border-radius:50%; }
+  .orb.sun{ background:color-mix(in srgb,var(--sun) 60%,var(--bg)); box-shadow:0 0 0 14px color-mix(in srgb,var(--sun) 16%,transparent), 0 0 0 30px color-mix(in srgb,var(--sun) 8%,transparent); animation:breathe 6s ease-in-out infinite alternate; }
+  .orb.sun.eve{ background:color-mix(in srgb,#e07a3b 60%,var(--bg)); box-shadow:0 0 0 14px color-mix(in srgb,#e07a3b 16%,transparent), 0 0 0 30px color-mix(in srgb,#e07a3b 8%,transparent); }
+  .orb.moon{ width:34px; height:34px; background:transparent; box-shadow:9px -6px 0 0 color-mix(in srgb,#cfd8d2 75%,var(--bg)); }
+  .land .h1{ fill:color-mix(in srgb,var(--leaf) 9%,var(--bg)); } .land .h2{ fill:color-mix(in srgb,var(--leaf) 15%,var(--bg)); } .land .h3{ fill:color-mix(in srgb,var(--leaf) 22%,var(--bg)); }
+  .land .sp path{ fill:none; stroke:color-mix(in srgb,var(--leaf) 55%,var(--bg)); stroke-width:2.2; stroke-linecap:round; }
+  .land .sp .lv{ fill:color-mix(in srgb,var(--leaf) 45%,var(--bg)); stroke:none; }
+  .land .sp{ transform-box:fill-box; transform-origin:50% 100%; animation:sway var(--t,5s) ease-in-out var(--dl,0s) infinite alternate; }
+  @keyframes sway{ from{ transform:rotate(-5deg); } to{ transform:rotate(5deg); } }
+  @keyframes breathe{ from{ transform:scale(.92); } to{ transform:scale(1.08); } }
+  .land .cloud{ fill:color-mix(in srgb,#ffffff 70%,var(--bg)); opacity:.8; animation:drift 80s linear infinite; }
+  @keyframes drift{ from{ transform:translateX(-160px); } to{ transform:translateX(1360px); } }
+  :root[data-theme="sombre"] .land .cloud{ opacity:.12; }
+
+  /* --- Bandeau d'accueil (même vert et même colline que la connexion) --- */
+  .hero{ position:relative; margin:-16px -16px 48px; padding:18px 18px 22px; color:#fff; background:radial-gradient(120% 90% at 85% 110%, color-mix(in srgb,var(--sky) 70%,#3f8f5a), var(--sky) 65%); }
+  .hero .hill{ position:absolute; left:0; top:calc(100% - 1px); width:100%; height:40px; display:block; }
+  .hero .hill path{ fill:var(--sky); }
+  .hero-in{ display:flex; align-items:flex-start; gap:14px; }
+  .hello{ font-family:var(--f-display); font-size:1.35rem; font-weight:700; line-height:1.2; }
+  .hdate{ font-size:.86rem; opacity:.8; margin-top:3px; text-transform:capitalize; }
+  .wx{ margin-left:auto; text-align:right; min-width:92px; }
+  .wx .wt{ font-size:1.6rem; font-weight:700; line-height:1; display:flex; align-items:center; gap:6px; justify-content:flex-end; }
+  .wx .wl{ font-size:.78rem; opacity:.85; margin-top:3px; } .wx .wp{ font-size:.72rem; opacity:.7; }
+  .wxi{ width:38px; height:38px; flex:none; overflow:visible; }
+  .wxi .rays{ transform-box:fill-box; transform-origin:center; animation:spin 24s linear infinite; }
+  .wxi .cl{ animation:float 6s ease-in-out infinite alternate; }
+  .wxi .drop{ animation:fall 1.1s linear infinite; } .wxi .drop:nth-of-type(2){ animation-delay:.35s; } .wxi .drop:nth-of-type(3){ animation-delay:.7s; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  @keyframes float{ from{ transform:translateX(-1.5px); } to{ transform:translateX(1.5px); } }
+  @keyframes fall{ from{ transform:translateY(-3px); opacity:0; } 30%{ opacity:1; } to{ transform:translateY(6px); opacity:0; } }
+  .hero .pin{ animation-name:pIn; }
+
+  /* --- Résumé chiffré (les nombres défilent à l'arrivée) --- */
+  .stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin:-34px 0 16px; position:relative; z-index:2; }
+  .stat{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:11px 10px; box-shadow:0 6px 18px rgba(20,38,26,.08); text-align:center; }
+  .stat b{ display:block; font-family:var(--f-display); font-size:1.55rem; color:var(--deep); line-height:1.1; font-variant-numeric:tabular-nums; }
+  .stat span{ font-size:.72rem; color:var(--soft); line-height:1.2; display:block; margin-top:2px; }
+
+  /* --- Premier pas (compte sans parcelle) --- */
+  .first{ text-align:center; padding:6px 4px 4px; }
+  .seed{ width:170px; height:120px; display:block; margin:0 auto 6px; overflow:visible; }
+  .seed .soil{ fill:color-mix(in srgb,#8a6a3a 35%,var(--bg)); } .seed .row{ fill:none; stroke:color-mix(in srgb,#8a6a3a 55%,var(--bg)); stroke-width:2; stroke-linecap:round; }
+  .seed .grain{ fill:#a77b3f; animation:drop .7s var(--inout) .2s both; }
+  .seed .stem, .seed .lf{ fill:none; stroke:var(--leaf); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+  .seed .stem{ stroke-dasharray:60; stroke-dashoffset:60; animation:grow .8s var(--out) .85s forwards; }
+  .seed .lf{ fill:color-mix(in srgb,var(--leaf) 30%,transparent); stroke-dasharray:70; stroke-dashoffset:70; animation:grow .7s var(--out) 1.45s forwards; }
+  .seed .lf.b{ animation-delay:1.65s; }
+  .seed .plant{ transform-box:fill-box; transform-origin:50% 100%; animation:sway 4.5s ease-in-out 2.4s infinite alternate; }
+  .seed .sunb{ fill:var(--sun); opacity:.85; } .seed .sunr{ stroke:var(--sun); stroke-width:2; stroke-linecap:round; transform-box:fill-box; transform-origin:center; animation:spin 30s linear infinite; }
+  @keyframes drop{ from{ transform:translateY(-60px); opacity:0; } 60%{ opacity:1; } to{ transform:none; opacity:1; } }
+  @keyframes grow{ to{ stroke-dashoffset:0; } }
+  .first h2{ font-family:var(--f-display); color:var(--deep); font-size:1.2rem; margin:4px 0 4px; }
+  .first p{ color:var(--soft); font-size:.9rem; margin-bottom:14px; }
+  .steps3{ display:grid; gap:9px; text-align:left; margin:0 0 14px; }
+  .step3{ display:flex; gap:12px; align-items:center; background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:12px; }
+  .step3 .no{ width:32px; height:32px; border-radius:50%; background:var(--leaf); color:#fff; display:grid; place-items:center; font-weight:700; flex:none; }
+  .step3 b{ display:block; color:var(--ink); font-size:.95rem; } .step3 span{ color:var(--soft); font-size:.82rem; }
+
+  /* --- Aujourd'hui : bandeau de la parcelle et progression du jour --- */
+  .phead{ position:relative; margin:10px 0 14px; padding:14px 16px; border-radius:16px; color:#fff; background:radial-gradient(130% 120% at 90% 100%, color-mix(in srgb,var(--sky) 70%,#3f8f5a), var(--sky) 70%); overflow:hidden; }
+  .phead .sec, .phead .sub{ color:#fff; } .phead .sub{ opacity:.85; margin:0; }
+  .phead .dayn[hidden]{ display:none; }
+  .phead .dayn{ display:inline-block; margin-top:8px; background:rgba(255,255,255,.16); border-radius:999px; padding:3px 10px; font-size:.78rem; font-weight:600; }
+  .phead .deco{ position:absolute; right:-6px; bottom:-8px; width:86px; height:86px; opacity:.25; }
+  .phead .deco path{ fill:none; stroke:#fff; stroke-width:1.6; stroke-linecap:round; }
+  .prog{ margin:0 0 12px; } .prog .pl{ display:flex; justify-content:space-between; font-size:.82rem; color:var(--soft); margin-bottom:4px; }
+  .prog .pb{ height:8px; border-radius:99px; background:var(--surface2); border:1px solid var(--line); overflow:hidden; }
+  .prog .pb span{ display:block; height:100%; width:100%; background:var(--leaf); border-radius:99px; transform-origin:left; transform:scaleX(var(--p,0)); transition:transform .5s var(--inout); }
+
+  /* --- Votre travail : chronologie qui se trace --- */
+  .tl{ position:relative; padding-left:22px; }
+  .tl::before{ content:""; position:absolute; left:7px; top:6px; bottom:6px; width:2px; background:color-mix(in srgb,var(--leaf) 30%,var(--line)); transform-origin:top; animation:tlLine .6s var(--out) both; }
+  @keyframes tlLine{ from{ transform:scaleY(0); } }
+  .tl .logline{ position:relative; border-bottom:none; padding:9px 0; }
+  .tl .logline::before{ content:""; position:absolute; left:-20px; top:50%; width:10px; height:10px; margin-top:-5px; border-radius:50%; background:var(--surface); border:2.5px solid var(--leaf); }
+
+  /* --- Profil --- */
+  .avring{ position:relative; } .avring::after{ content:""; position:absolute; inset:-4px; border-radius:50%; border:2px solid var(--leaf); opacity:.5; animation:ring 2.4s var(--out) .3s 2; }
+  @keyframes ring{ from{ transform:scale(.9); opacity:.6; } to{ transform:scale(1.25); opacity:0; } }
+
+  /* --- Ordinateur : deux colonnes, l'écran n'est plus un mince ruban au milieu --- */
+  @media (min-width:900px){
+    html, body{ overflow-x:hidden; }
+    .wrap{ max-width:1040px; padding:16px 24px; }
+    .hero{ margin:-16px calc(50% - 50vw) 52px; padding:28px 0 30px; }
+    .hero-in{ max-width:992px; margin:0 auto; padding:0 4px; }
+    .hero .hill{ height:56px; }
+    .homegrid{ display:grid; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); gap:22px; align-items:start; }
+    .stats{ margin-top:-38px; }
+    .colside{ position:sticky; top:76px; }
+    .scr[data-s="today"], .scr[data-s="travail"], .scr[data-s="profil"]{ max-width:640px; margin:0 auto; }
+    .land{ height:230px; }
+  }
+  .fc{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .fc div{ background:var(--surface2); border:1px solid var(--line); border-radius:12px; padding:9px 6px; text-align:center; font-size:.8rem; color:var(--soft); }
+  .fc b{ display:block; color:var(--ink); font-size:.95rem; } .fc .wxi{ width:28px; height:28px; display:block; margin:3px auto; }
+  .fc .wxi .sunc{ fill:var(--sun); } .fc .wxi .rays line{ stroke:var(--sun); } .fc .wxi .cl path{ fill:color-mix(in srgb,var(--soft) 35%,var(--surface)); } .fc .wxi .drop{ stroke:#3b82c4; }
+
+  @media (prefers-reduced-motion:reduce){
+    .land *, .orb, .wxi *, .seed *, .tl::before, .avring::after, .prog .pb span{ animation:none !important; transition:none !important; }
+    .seed .stem, .seed .lf{ stroke-dashoffset:0; } .seed .grain{ opacity:1; transform:none; }
+  }
 </style>
   <link rel="stylesheet" href="/anim.css">
   <script src="/anim.js" defer></script>
@@ -100,6 +211,7 @@ try{ if(sessionStorage.getItem("trv-arrive")==="1"){ sessionStorage.removeItem("
   <script src="/help.js" defer></script>
 </head>
 <body>
+<div class="land" aria-hidden="true"><div class="orb" id="orb"></div><svg id="landSvg" viewBox="0 0 1200 200" preserveAspectRatio="xMidYMax slice"></svg></div>
 <div class="arrive" id="arrive" aria-hidden="true"><svg viewBox="0 0 400 64" preserveAspectRatio="none"><path d="M0,0 H400 V6 C318,64 150,70 0,28 Z"/></svg></div>
 <div class="top">
   <a class="brand" href="/planteur" id="topBrand"><span class="emblem"><img src="/logo.png" alt="Terravive"></span>Terravive</a>
@@ -111,17 +223,35 @@ try{ if(sessionStorage.getItem("trv-arrive")==="1"){ sessionStorage.removeItem("
 <div class="wrap">
   <!-- ACCUEIL : VOS PARCELLES -->
   <section class="scr on" data-s="home">
-    <h1 class="sec" id="hiName">Vos parcelles</h1>
-    <div class="sub">Touchez une parcelle pour voir ce qu'il y a à faire.</div>
-    <div id="animateurCard"></div>
-    <div id="parcelList" data-tour="1" data-tour-title="Vos parcelles" data-tour-text="Touchez une parcelle pour voir ce qu'il y a à faire aujourd'hui."><div class="load">Chargement…</div></div>
+    <div class="hero">
+      <div class="hero-in">
+        <div><h1 class="hello pin" id="hiName">Bonjour</h1><div class="hdate pin" style="--i:1" id="hDate"></div></div>
+        <div class="wx pin" style="--i:2" id="wx" aria-live="polite"></div>
+      </div>
+      <svg class="hill" viewBox="0 0 400 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0,0 H400 V4 C318,40 150,44 0,18 Z"/></svg>
+    </div>
+    <div class="homegrid">
+      <div class="colmain">
+        <div class="stats" id="stats"></div>
+        <h2 class="sec" id="secParcels">Vos parcelles</h2>
+        <div class="sub" id="subParcels">Touchez une parcelle pour voir ce qu'il y a à faire.</div>
+        <div id="parcelList" data-tour="1" data-tour-title="Vos parcelles" data-tour-text="Touchez une parcelle pour voir ce qu'il y a à faire aujourd'hui."><div class="load">Chargement…</div></div>
+      </div>
+      <aside class="colside">
+        <div id="animateurCard"></div>
+        <div id="fcCard"></div>
+      </aside>
+    </div>
   </section>
 
   <!-- AUJOURD'HUI (par parcelle) -->
   <section class="scr" data-s="today">
     <button class="back" onclick="go('home')">← Vos parcelles</button>
-    <div class="sec" id="tNom" style="margin-top:8px"></div>
-    <div class="sub" id="tCrop"></div>
+    <div class="phead pin"><svg class="deco" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5v-8.6"/><path d="M12 12.6c0-3.3-2.2-5.3-6.2-5.3 0 3.7 2.3 5.3 6.2 5.3z"/><path d="M12 10.4c0-2.9 2-4.8 5.8-4.8 0 3.3-2.1 4.8-5.8 4.8z"/></svg>
+      <div class="sec" id="tNom"></div>
+      <div class="sub" id="tCrop"></div>
+      <span class="dayn" id="tDay" hidden></span>
+    </div>
     <button class="listen" id="tListen" onclick="listen()" style="display:none"></button>
     <div id="todayBody"></div>
     <a class="btn sun" href="/diagnostic">Signaler un problème (photo)</a>
@@ -139,11 +269,11 @@ try{ if(sessionStorage.getItem("trv-arrive")==="1"){ sessionStorage.removeItem("
   <!-- PROFIL -->
   <section class="scr" data-s="profil">
     <div class="sec">Votre profil</div>
-    <div class="card" style="display:flex;align-items:center;gap:13px"><span class="av" id="pAv" style="width:50px;height:50px;font-size:1.2rem">?</span><div><div style="font-family:var(--f-display);font-size:1.1rem;color:var(--ink)" id="pName">—</div><div class="rm" style="color:var(--soft);font-size:.84rem" id="pMail"></div></div></div>
-    <a class="row" href="/cooperative" style="text-decoration:none"><span class="ri" id="icCoop"></span><div><div class="rt">Ma coopérative</div><div class="rm">Voir ma coopérative et mon animateur</div></div><span class="ra">→</span></a>
-    <a class="row" href="/tableau" style="text-decoration:none"><span class="ri" id="icFull"></span><div><div class="rt">Espace complet</div><div class="rm">Tableau de bord, bilan, carnet détaillé</div></div><span class="ra">→</span></a>
-    <a class="row" style="text-decoration:none;cursor:pointer" onclick="trvTour.start()"><span class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div><div class="rt">Revoir la visite guidée</div><div class="rm">Les bases de l'application, pas à pas</div></div><span class="ra">→</span></a>
-    <a class="row" style="text-decoration:none;cursor:pointer" data-help="tache-faite"><span class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></span><div><div class="rt">Comment marquer une tâche ?</div><div class="rm">Voir une courte démonstration</div></div><span class="ra">→</span></a>
+    <div class="card" style="display:flex;align-items:center;gap:13px"><span class="av avring" id="pAv" style="width:50px;height:50px;font-size:1.2rem">?</span><div><div style="font-family:var(--f-display);font-size:1.1rem;color:var(--ink)" id="pName">—</div><div class="rm" style="color:var(--soft);font-size:.84rem" id="pMail"></div></div></div>
+    <a class="row pin" href="/cooperative" style="--i:1;text-decoration:none"><span class="ri" id="icCoop"></span><div><div class="rt">Ma coopérative</div><div class="rm">Voir ma coopérative et mon animateur</div></div><span class="ra">→</span></a>
+    <a class="row pin" href="/tableau" style="--i:2;text-decoration:none"><span class="ri" id="icFull"></span><div><div class="rt">Espace complet</div><div class="rm">Tableau de bord, bilan, carnet détaillé</div></div><span class="ra">→</span></a>
+    <a class="row pin" style="--i:3;text-decoration:none;cursor:pointer" onclick="trvTour.start()"><span class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div><div class="rt">Revoir la visite guidée</div><div class="rm">Les bases de l'application, pas à pas</div></div><span class="ra">→</span></a>
+    <a class="row pin" style="--i:4;text-decoration:none;cursor:pointer" data-help="tache-faite"><span class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></span><div><div class="rt">Comment marquer une tâche ?</div><div class="rm">Voir une courte démonstration</div></div><span class="ra">→</span></a>
     <button class="btn" style="margin-top:16px;color:var(--bad)" onclick="logout()">Se déconnecter</button>
   </section>
 </div>
@@ -180,6 +310,97 @@ var $=function(id){return document.getElementById(id);},el=function(s){return do
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
 function initials(n){n=String(n||"").trim();if(!n)return"?";var p=n.split(/\s+/);return((p[0]||"")[0]||"")+(p.length>1?(p[p.length-1][0]||""):"")||"?";}
 var me=null, PARCELS=[], TODAY={}, cur=null;
+// ================= Espace vivant (v8.15) =================
+var REDUCE=false; try{ REDUCE=matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){}
+// Paysage : collines, pousses au vent ; soleil (matin, midi, soir) ou lune selon l'heure réelle.
+function drawLand(){
+  var svg=$("landSvg"); if(!svg) return;
+  var now=new Date(), h=now.getHours()+now.getMinutes()/60, day=h>=6&&h<18.5;
+  var t=Math.max(0,Math.min(1,(h-6)/12.5)), orb=$("orb");
+  // course du soleil : de gauche (matin) à droite (soir), plus haut à midi
+  orb.className="orb "+(day?("sun"+(h>=16.5?" eve":"")):"moon");
+  orb.style.left=(day?(12+t*76):82)+"%"; orb.style.bottom=(day?(70+Math.sin(Math.PI*t)*80):130)+"px";
+  var sky="";
+  var clouds = day ? '<g class="cloud"><path d="M40 70a14 14 0 0 1 26-6 11 11 0 0 1 18 9H32a9 9 0 0 1 8-3z"/></g><g class="cloud" style="animation-duration:120s;animation-delay:-60s"><path d="M200 40a12 12 0 0 1 22-5 9 9 0 0 1 15 8h-44a8 8 0 0 1 7-3z"/></g>' : '';
+  var sp=""; var xs=[70,150,240,330,420,520,610,700,790,880,980,1070,1150];
+  xs.forEach(function(x,i){ var y=176-Math.sin((x/1200)*Math.PI*2)*6, s=.8+((i*37)%5)/10;
+    sp+='<g class="sp" style="--t:'+(4+((i*13)%5)/2)+'s;--dl:-'+((i*7)%5)+'s"><g transform="translate('+x+' '+y.toFixed(0)+') scale('+s+')"><path d="M0 0v-22"/><path class="lv" d="M0-12c-9 0-13-6-13-12 8 0 13 5 13 12z"/><path class="lv" d="M0-17c8 0 12-5 12-11-7 0-12 4-12 11z"/></g></g>'; });
+  svg.innerHTML=sky+clouds
+    +'<path class="h1" d="M0 120 C220 70 420 110 640 92 S1020 60 1200 96 V200 H0Z"/>'
+    +'<path class="h2" d="M0 150 C180 118 380 150 600 132 S980 112 1200 138 V200 H0Z"/>'
+    +sp+'<path class="h3" d="M0 178 C240 160 480 186 720 172 S1040 162 1200 176 V200 H0Z"/>';
+}
+// Météo : seulement pour une position réelle (le centre de la première parcelle), jamais inventée.
+function zoneCenter(z){
+  if(!z) return null;
+  if(z.bbox&&z.bbox.length===4) return { lat:(z.bbox[1]+z.bbox[3])/2, lon:(z.bbox[0]+z.bbox[2])/2 };
+  if(z.polygon&&z.polygon.length){ var a=0,b=0; z.polygon.forEach(function(p){ a+=p[1]; b+=p[0]; }); return { lat:a/z.polygon.length, lon:b/z.polygon.length }; }
+  return null;
+}
+function wxKind(c){ if(c==null) return "cloud"; if(c<=1) return "sun"; if(c<=2) return "part"; if(c===45||c===48||c===3) return "cloud"; if(c>=95) return "storm"; if((c>=51&&c<=67)||(c>=80&&c<=82)) return "rain"; return "cloud"; }
+function wxLabel(c){ return { sun:"Ensoleillé", part:"Éclaircies", cloud:"Nuageux", rain:"Pluie", storm:"Orage" }[wxKind(c)]; }
+function wxIcon(c,cls){
+  var k=wxKind(c), sun='<g class="rays">'+[0,45,90,135,180,225,270,315].map(function(a){ return '<line x1="20" y1="3" x2="20" y2="7.5" transform="rotate('+a+' 20 20)" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>'; }).join("")+'</g><circle class="sunc" cx="20" cy="20" r="7.5" fill="#FFD36A"/>';
+  var cloud='<g class="cl"><path d="M12 30h17a6.5 6.5 0 0 0 0-13 9 9 0 0 0-17 2 5.5 5.5 0 0 0 0 11z" fill="rgba(255,255,255,.92)"/></g>';
+  var drops='<line class="drop" x1="15" y1="33" x2="13.5" y2="37" stroke="#bfe0ff" stroke-width="2" stroke-linecap="round"/><line class="drop" x1="21" y1="33" x2="19.5" y2="37" stroke="#bfe0ff" stroke-width="2" stroke-linecap="round"/><line class="drop" x1="27" y1="33" x2="25.5" y2="37" stroke="#bfe0ff" stroke-width="2" stroke-linecap="round"/>';
+  var body = k==="sun" ? sun : k==="part" ? '<g transform="translate(6 -5) scale(.8)">'+sun+'</g>'+cloud : k==="rain" ? cloud+drops : k==="storm" ? cloud+'<path d="M21 31l-3 5h4l-2 5" fill="none" stroke="#FFD36A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' : cloud;
+  return '<svg class="wxi '+(cls||"")+'" viewBox="0 0 40 40" aria-hidden="true">'+body+'</svg>';
+}
+async function loadWeather(){
+  var p=PARCELS.filter(function(x){ return zoneCenter(x.zone); })[0];
+  if(!p){ $("wx").innerHTML=""; return; }
+  var c=zoneCenter(p.zone);
+  try{
+    var r=await fetch("/api/weather?lat="+c.lat.toFixed(4)+"&lon="+c.lon.toFixed(4)); if(!r.ok) return;
+    var w=(await r.json()).weather; if(!w||!w.current) return;
+    var d0=(w.daily||[])[0];
+    $("wx").innerHTML='<div class="wt">'+wxIcon(w.current.code)+w.current.temp+'°</div><div class="wl">'+wxLabel(w.current.code)+'</div>'+(d0&&d0.rainP!=null?'<div class="wp">pluie '+d0.rainP+' % · '+esc(p.name)+'</div>':'<div class="wp">'+esc(p.name)+'</div>');
+    var days=(w.daily||[]).slice(1,4);
+    if(days.length) $("fcCard").innerHTML='<div class="card pin" style="--i:2"><div style="font-weight:700;color:var(--ink);margin-bottom:9px">Les prochains jours · '+esc(p.name)+'</div><div class="fc">'+days.map(function(d){ return '<div>'+new Date(d.date+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"short"})+wxIcon(d.code)+'<b>'+d.tmax+'° / '+d.tmin+'°</b>'+(d.rainP!=null?'pluie '+d.rainP+' %':'')+'</div>'; }).join("")+'</div><div style="font-size:.72rem;color:var(--faint);margin-top:8px">Prévisions Open-Meteo pour la position de la parcelle.</div></div>';
+  }catch(e){}
+}
+// Résumé : les nombres défilent de 0 à leur valeur (0,7 s, ease-out), une seule fois par visite.
+function countTo(el,n){
+  if(REDUCE||!n){ el.textContent=n; return; }
+  var t0=null; function step(ts){ if(!t0) t0=ts; var k=Math.min(1,(ts-t0)/700), e=1-Math.pow(1-k,3); el.textContent=Math.round(n*e); if(k<1) requestAnimationFrame(step); }
+  requestAnimationFrame(step);
+}
+function renderStats(week){
+  var todo=0; PARCELS.forEach(function(p){ var n=todoCount(TODAY[p.id]); if(n) todo+=n; });
+  var tiles=[[PARCELS.length,PARCELS.length>1?"parcelles":"parcelle"],[todo,"à faire cette semaine"],[week,"travaux notés en 7 jours"]];
+  $("stats").innerHTML=tiles.map(function(t,i){ return '<div class="stat pin" style="--i:'+i+'"><b data-n="'+(t[0]==null?"":t[0])+'">'+(t[0]==null?"—":"0")+'</b><span>'+t[1]+'</span></div>'; }).join("");
+  $("stats").querySelectorAll("b[data-n]").forEach(function(b){ var n=b.getAttribute("data-n"); if(n!=="") setTimeout(function(){ countTo(b,+n); }, document.documentElement.classList.contains("arriving")?450:120); });
+}
+async function weekCount(){
+  var since=Date.now()-7*864e5, n=0;
+  await Promise.all(PARCELS.slice(0,8).map(async function(p){
+    try{ var r=await fetch("/api/fieldlog?parcel="+encodeURIComponent(p.id)); if(!r.ok) return; var d=await r.json();
+      (d.entries||[]).forEach(function(e){ var t=Date.parse(e.date||e.created_at); if(t>=since) n++; }); }catch(e){}
+  }));
+  return n;
+}
+// Premier pas : compte sans parcelle — la graine tombe, la pousse sort, puis 3 étapes simples.
+function firstSteps(){
+  $("secParcels").style.display="none"; $("subParcels").style.display="none";
+  return '<div class="card first pin">'
+   +'<svg class="seed" viewBox="0 0 170 120" aria-hidden="true"><g class="sunr"><line x1="140" y1="6" x2="140" y2="11"/><line x1="140" y1="37" x2="140" y2="42"/><line x1="122" y1="24" x2="127" y2="24"/><line x1="153" y1="24" x2="158" y2="24"/></g><circle class="sunb" cx="140" cy="24" r="9"/>'
+   +'<path class="soil" d="M5 98c40-8 120-8 160 0v22H5z"/><path class="row" d="M22 108h30M70 110h30M118 108h30"/>'
+   +'<g class="plant"><path class="stem" d="M85 98V62"/><path class="lf" d="M85 74c-12 0-20-8-20-18 11 0 20 7 20 18z"/><path class="lf b" d="M85 66c11 0 18-7 18-16-10 0-18 6-18 16z"/></g>'
+   +'<ellipse class="grain" cx="85" cy="97" rx="4" ry="3"/></svg>'
+   +'<h2>Commençons par votre première parcelle</h2><p>En trois étapes, Terravive vous dit chaque jour quoi faire sur votre champ.</p>'
+   +'<div class="steps3">'
+   +'<div class="step3 pin" style="--i:1"><span class="no">1</span><div><b>Dessinez votre parcelle</b><span>Sur la carte satellite de l\'espace complet.</span></div></div>'
+   +'<div class="step3 pin" style="--i:2"><span class="no">2</span><div><b>Indiquez votre culture</b><span>Et la date de semis, dans « Sol &amp; racines ».</span></div></div>'
+   +'<div class="step3 pin" style="--i:3"><span class="no">3</span><div><b>Recevez vos tâches</b><span>Ici, chaque jour, avec la lecture à voix haute.</span></div></div>'
+   +'</div><a class="btn primary" href="/tableau">'+ic("sprout",20)+' Dessiner ma première parcelle</a></div>';
+}
+// Aujourd'hui : progression des tâches faites dans la journée.
+function updateProg(){
+  var box=$("tProg"); if(!box||!cur) return;
+  var cards=$("todayBody").querySelectorAll(".task"), n=cards.length, d=$("todayBody").querySelectorAll(".task.done").length;
+  box.querySelector(".pv").textContent=d+" / "+n; box.querySelector(".pb span").style.setProperty("--p", n? d/n : 0);
+}
+
 
 // Navigation (icônes de la barre)
 $("navHome").innerHTML=ic("sprout",23)+"Parcelles";
@@ -203,7 +424,8 @@ async function boot(){
   if(me.profile==="client"){ location.href="/boutique"; return; }
   $("topAv").textContent=initials(me.name);$("pAv").textContent=initials(me.name);
   $("pName").textContent=me.name||"—";$("pMail").textContent=me.phone||me.email||"";
-  $("hiName").textContent="Bonjour, "+(String(me.name||"").split(" ")[0]||"")+" — vos parcelles";
+  $("hiName").textContent="Bonjour, "+(String(me.name||"").split(" ")[0]||"");
+  $("hDate").textContent=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
   loadParcels();
   loadAnimateur();
 }
@@ -225,12 +447,15 @@ async function loadAnimateur(){
 async function loadParcels(){
   try{ var r=await fetch("/api/parcels"); var d=await r.json(); PARCELS=(d.parcels||[]); }
   catch(e){ $("parcelList").innerHTML='<div class="info">Impossible de charger vos parcelles. Vérifiez votre connexion.</div>'; return; }
-  if(!PARCELS.length){ $("parcelList").innerHTML='<div class="info"><b>Aucune parcelle enregistrée.</b> Dans l\'espace complet, dessinez votre parcelle sur la carte, puis revenez ici. <a href="/tableau">Ouvrir l\'espace complet →</a></div>'; return; }
+  if(!PARCELS.length){ $("parcelList").innerHTML=firstSteps(); renderStats(0); return; }
+  loadWeather();
   // Charge « aujourd'hui » de chaque parcelle en parallèle (tâches réelles de la fiche)
   await Promise.all(PARCELS.map(async function(p){
     try{ var r=await fetch("/api/today?parcel="+encodeURIComponent(p.id)); TODAY[p.id]=r.ok?await r.json():null; }catch(e){ TODAY[p.id]=null; }
   }));
   renderParcels();
+  renderStats(null);
+  weekCount().then(function(n){ var b=$("stats").querySelectorAll("b")[2]; if(b){ b.setAttribute("data-n",n); countTo(b,n); } });
 }
 function todoCount(t){ if(!t||!t.tasks)return null; var k=t.tasks; if(k.day==null) return (k.start&&k.start.length)||0; return (k.now&&k.now.length)||0; }
 function renderParcels(){
@@ -247,6 +472,8 @@ function openParcel(id){
   var t=TODAY[id]||{};
   $("tNom").textContent=cur.name;
   $("tCrop").textContent=t.crop?(t.crop.charAt(0).toUpperCase()+t.crop.slice(1))+(t.sown_at?" · semé le "+fdate(t.sown_at):""):"";
+  var dn=t.sown_at?Math.floor((Date.now()-Date.parse(String(t.sown_at).slice(0,10)+"T00:00:00"))/864e5):null;
+  $("tDay").hidden=!(dn!=null&&dn>=0); if(dn!=null&&dn>=0) $("tDay").textContent="Jour "+dn+" depuis le semis";
   $("ficheBtn").href=t.plan?("/app?plan="+encodeURIComponent(t.plan.id)):"/app";
   // Écouter
   var lb=$("tListen");
@@ -282,12 +509,13 @@ function renderTodayBody(t){
   var dstr=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
   h+='<div class="day">Aujourd\'hui</div><div class="date">'+dstr+'</div>';
   var main = (k.day==null) ? (k.start||[]) : (k.now||[]);
-  if(main.length){ h+=main.map(function(x,i){return taskCard(x,pid,i);}).join(""); }
+  if(main.length){ h+='<div class="prog" id="tProg"><div class="pl"><span>Fait aujourd\'hui</span><span class="pv">0 / '+main.length+'</span></div><div class="pb"><span></span></div></div>'; h+=main.map(function(x,i){return taskCard(x,pid,i);}).join(""); }
   else { h+='<div class="empty"><div class="ic">'+ic("check",30)+'</div><div style="font-family:var(--f-display);font-size:1.1rem;color:var(--ink)">Rien de prévu cette semaine</div><div>Surveillez votre culture et revenez demain.</div></div>'; }
   if(k.next&&k.next.length){ h+='<div class="nextw">La semaine prochaine</div>'+k.next.map(function(x){return '<div class="card" style="padding:13px"><h3 style="font-family:var(--f-display);font-size:1rem">'+esc(x.faire)+'</h3>'+(x.detail?'<div class="dt" style="color:var(--soft);font-size:.86rem;margin-top:3px">'+esc(x.detail)+'</div>':'')+'</div>';}).join(""); }
   if(main.length){ var waText="Terravive — "+cur.name+" ("+dstr+")\n"+main.map(function(x,n){return (n+1)+". "+x.faire+(x.quand?" ("+x.quand+")":"");}).join("\n"); h+='<a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(waText)+'">'+ic("send",18)+' Partager mes tâches sur WhatsApp</a>'; }
   h+='<button class="btn" onclick="openTravail()">'+ic("notebook",20)+' Votre travail noté</button>';
   $("todayBody").innerHTML=h;
+  updateProg();
 }
 async function markDone(btn,parcelId,i,faire){
   var key="done:"+parcelId+":"+i;
@@ -295,7 +523,7 @@ async function markDone(btn,parcelId,i,faire){
   btn.disabled=true;
   try{
     var r=await fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({parcel_id:parcelId,kind:"observation",note:"Fait : "+faire})});
-    if(r.ok){ sessionDone[key]=true; var card=btn.closest(".task"); if(card){card.classList.add("done");} btn.innerHTML=ic("check",16).replace('class="ico"','class="ico drawcheck"')+" Fait"; toast("Bien joué ! C'est noté dans votre carnet."); }
+    if(r.ok){ sessionDone[key]=true; var card=btn.closest(".task"); if(card){card.classList.add("done");} btn.innerHTML=ic("check",16).replace('class="ico"','class="ico drawcheck"')+" Fait"; updateProg(); toast("Bien joué ! C'est noté dans votre carnet."); }
     else { var d={};try{d=await r.json();}catch(e){} toast(d.error||"Impossible d'enregistrer. Réessayez."); btn.disabled=false; }
   }catch(e){ toast("Pas de réseau — réessayez quand la connexion revient."); btn.disabled=false; }
 }
@@ -306,9 +534,9 @@ function openTravail(){
   fetch("/api/fieldlog?parcel="+encodeURIComponent(cur.id)).then(function(r){return r.json();}).then(function(d){
     var ents=(d.entries||[]).slice(0,20);
     if(!ents.length){ $("travailBody").innerHTML='<div class="empty"><div class="ic">'+ic("notebook",30)+'</div><div>Rien de noté pour l\'instant. Cochez « C\'est fait » sur une tâche pour commencer.</div></div>'; return; }
-    $("travailBody").innerHTML=ents.map(function(e){
-      return '<div class="logline"><span class="ld">'+esc(fdate(e.date))+'</span>'+ic("leaf",18)+'<span>'+esc([e.note,(e.qty!=null?e.qty+" "+(e.unit||""):"")].filter(Boolean).join(" · ")||e.kind)+'</span></div>';
-    }).join("");
+    $("travailBody").innerHTML='<div class="tl">'+ents.map(function(e,i){
+      return '<div class="logline pin" style="--i:'+Math.min(i,10)+'"><span class="ld">'+esc(fdate(e.date))+'</span>'+ic("leaf",18)+'<span>'+esc([e.note,(e.qty!=null?e.qty+" "+(e.unit||""):"")].filter(Boolean).join(" · ")||e.kind)+'</span></div>';
+    }).join("")+'</div>';
   }).catch(function(){ $("travailBody").innerHTML='<div class="info">Impossible de charger votre carnet.</div>'; });
 }
 async function logout(){ try{ await fetch("/api/auth/logout",{method:"POST"}); }catch(e){} location.href="/connexion"; }
@@ -317,6 +545,7 @@ if(document.documentElement.classList.contains("arriving")){
   var lifted=false, lift=function(){ if(lifted) return; lifted=true; var a=$("arrive"); requestAnimationFrame(function(){ a.classList.add("up"); }); setTimeout(function(){ document.documentElement.classList.remove("arriving"); },700); };
   window.addEventListener("load",lift); setTimeout(lift,900);
 }
+drawLand(); setInterval(drawLand, 10*60*1000);
 boot();
 </script>
 </body>
