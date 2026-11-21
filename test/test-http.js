@@ -316,6 +316,30 @@ async function main() {
       assert.strictEqual((await plReg("0799999999", "1111", "10.2.0.3")).status, 200, "le vrai planteur doit pouvoir s'inscrire");
       assert.strictEqual((await login("0799999999@planteur.terravive", "1111", "10.2.0.3")).status, 401, "contournement des compteurs du numéro");
     });
+    await t.test("animateur : rattachement automatique une seule fois (inscription), quitter est définitif", async () => {
+      const early = await plReg("0766666666", "1357", "10.2.0.5", { region: "San-Pédro" });
+      const earlyCookie = cookieOf(early);
+      assert.strictEqual((await req("GET", "/api/coop/me", { cookie: earlyCookie })).json.coop, null, "aucun animateur encore : pas de rattachement");
+      // Un animateur rejoint Terravive (statut accordé par l'administrateur).
+      assert.strictEqual((await register("anim@test.ci", "secret123", "10.2.0.5", { region: "San-Pédro", name: "Awa Animatrice" })).status, 200);
+      const adm = await login(ADMIN, "admin-secret", "10.2.0.5", { as: "admin", code: ADMIN_CODE });
+      assert.strictEqual((await req("POST", "/api/admin/animator", { cookie: cookieOf(adm), json: { email: "anim@test.ci" } })).status, 200);
+      // Le planteur inscrit avant l'animateur est rattaché dès que l'animateur existe.
+      const me1 = await req("GET", "/api/coop/me", { cookie: earlyCookie });
+      assert.strictEqual(me1.json.animateur, "Awa Animatrice", "le planteur en attente devait être rattaché");
+      // Un nouveau planteur est rattaché dès l'inscription.
+      const late = await plReg("0755555555", "2468", "10.2.0.6", { region: "San-Pédro" });
+      const lateCookie = cookieOf(late);
+      const me2 = await req("GET", "/api/coop/me", { cookie: lateCookie });
+      assert.strictEqual(me2.json.role, "membre");
+      assert.strictEqual(me2.json.animateur, "Awa Animatrice");
+      // Il quitte sa coopérative : il n'y est plus remis d'office.
+      assert.strictEqual((await req("POST", "/api/coop/leave", { cookie: lateCookie, json: {} })).status, 200);
+      for (let i = 0; i < 2; i++) assert.strictEqual((await req("GET", "/api/coop/me", { cookie: lateCookie })).json.coop, null, "le planteur a été remis d'office dans la coopérative");
+      // Il peut toujours en rejoindre une avec le code de son animateur.
+      const join = await req("POST", "/api/coop/join", { cookie: lateCookie, json: { code: me2.json.coop.code } });
+      assert.strictEqual(join.status, 200, join.text);
+    });
     await t.test("PIN : les essais répétés bloquent le numéro, même en changeant de connexion", async () => {
       await plReg("0788888888", "2468", "10.2.0.4");
       let blocked = false;

@@ -177,6 +177,11 @@ async function setUserAnimator(userId, val) {
   if (USE_DB) { try { await sb(`/trv_users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ animator: !!val }) }); } catch (e) { console.error("setUserAnimator:", e.message); } return; }
   const s = loadStore(); if (s.users[userId]) { s.users[userId].animator = !!val; saveStore(s); }
 }
+// Rattachement automatique à un animateur : fait une seule fois par compte (voir autoAssignAnimator).
+async function setUserCoopAutoDone(userId) {
+  if (USE_DB) { try { await sb(`/trv_users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ coop_auto_done: true }) }); } catch (e) { console.error("setUserCoopAutoDone (exécutez schema.sql) :", e.message); } return; }
+  const s = loadStore(); if (s.users[userId]) { s.users[userId].coop_auto_done = true; saveStore(s); }
+}
 async function setUserCertified(userId, val) {
   if (USE_DB) { try { await sb(`/trv_users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ certified: !!val }) }); } catch (e) { console.error("setUserCertified:", e.message); } return; }
   const s = loadStore(); if (s.users[userId]) { s.users[userId].certified = !!val; saveStore(s); }
@@ -1038,6 +1043,7 @@ async function handleRegister(req, res) {
       const pemail = planteurEmail(phone);
       if (await findUserByEmail(pemail)) return sendJson(res, 409, { error: "Un compte existe déjà avec ce numéro. Connectez-vous." });
       const puser = await createUser({ email: pemail, name: p.name, password: pin, region: p.region, profile: "cultivateur" });
+      await autoAssignAnimator(puser);
       const ptoken = await createSession(puser.id); setSessionCookie(res, ptoken);
       return sendJson(res, 200, { user: publicUser(puser) });
     }
@@ -1050,6 +1056,7 @@ async function handleRegister(req, res) {
     if (!rateOk("register-ip:" + clientIp(req), 10, 60 * 60 * 1000)) return sendJson(res, 429, { error: "Trop de créations de compte depuis cette connexion. Réessayez plus tard." });
     if (await findUserByEmail(email)) return sendJson(res, 409, { error: "Un compte existe déjà avec cette adresse. Connectez-vous." });
     const user = await createUser({ email, name: p.name, password: p.password, region: p.region, profile: p.profile });
+    await autoAssignAnimator(user);
     const token = await createSession(user.id); setSessionCookie(res, token);
     sendJson(res, 200, { user: publicUser(user) });
   } catch (e) { sendJson(res, 500, { error: e.message || "Erreur serveur." }); }
@@ -1679,14 +1686,18 @@ async function defaultAnimatorCoop(region) {
   await addMembership({ id: newId(), coop_id: coop.id, user_id: anim.id, role: "animateur", joined_at: new Date().toISOString() });
   return coop;
 }
+// Une seule fois par compte : à l'inscription, ou dès qu'un animateur existe si aucun n'existait alors.
+// Une fois le planteur rattaché (ou s'il a déjà une coopérative, ou s'il la quitte), on ne le rattache plus
+// jamais d'office : quitter sa coopérative est donc définitif.
 async function autoAssignAnimator(user) {
   try {
-    if (!user || isAnimator(user) || isAdmin(user)) return;
+    if (!user || user.coop_auto_done || isAnimator(user) || isAdminEmail(user)) return;
     if (userProfile(user) !== "cultivateur") return;
-    if (await getMembership(user.id)) return;
+    if (await getMembership(user.id)) { await setUserCoopAutoDone(user.id); return; }
     const coop = await defaultAnimatorCoop(user.region);
-    if (!coop) return;
+    if (!coop) return; // aucun animateur pour l'instant : nouvel essai plus tard
     await addMembership({ id: newId(), coop_id: coop.id, user_id: user.id, role: "membre", joined_at: new Date().toISOString() });
+    await setUserCoopAutoDone(user.id);
   } catch (e) { console.error("autoAssignAnimator:", e.message); }
 }
 async function handleCoopMe(req, res) {
@@ -1727,6 +1738,7 @@ async function handleCoopLeave(req, res) {
   const members = await listCoopMembers(m.coop_id);
   if (m.role === "animateur" && members.length > 1) return sendJson(res, 400, { error: "En tant qu'animateur, vous ne pouvez pas quitter tant qu'il reste des membres. Transférez d'abord ou retirez les membres." });
   await removeMembership(user.id);
+  await setUserCoopAutoDone(user.id); // ne pas le remettre d'office dans une coopérative
   if (members.length <= 1) { try { if (USE_DB) await sb(`/trv_coops?id=eq.${encodeURIComponent(m.coop_id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); else { const s = loadStore(); delete s.coops[m.coop_id]; saveStore(s); } } catch (e) {} }
   sendJson(res, 200, { ok: true });
 }

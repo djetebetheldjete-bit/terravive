@@ -1,5 +1,13 @@
 # Journal des versions — Terravive
 
+## v8.11 — 21 novembre 2026 : rattachement à l'animateur une seule fois
+- **Le planteur est rattaché à un animateur une seule fois** : dès l'inscription (téléphone ou e-mail). S'il n'existe encore aucun animateur, il est rattaché dès qu'un animateur rejoint Terravive (comme l'annonce la vue planteur). Ensuite, plus jamais d'office : avant, un planteur qui quittait sa coopérative y était remis à sa prochaine visite, il ne pouvait donc pas vraiment la quitter. Il peut toujours en rejoindre une avec un code.
+- Un compte administrateur n'est plus rattaché comme simple membre, même connecté sans le code administrateur.
+- **Base Supabase : à exécuter une fois** dans le SQL Editor :
+  `alter table trv_users add column if not exists coop_auto_done boolean default false;`
+  (déjà inclus dans `schema.sql`). Sans cette colonne, l'application fonctionne mais garde l'ancien comportement et l'écrit dans les journaux.
+- 1 test de bout en bout ajouté (83 réussis).
+
 ## v8.10 — 21 novembre 2026 : connexion planteur sécurisée, dépôt remis au propre
 Rattrapage des nouveautés livrées depuis la v8.9, puis corrections :
 - **Déjà en ligne, désormais documenté** : connexion des planteurs par **numéro de téléphone + code PIN** (4 à 8 chiffres, sans e-mail) ; **rattachement automatique** d'un planteur au premier animateur inscrit de sa région (carte « Votre animateur technique » dans `/planteur`) ; **visite guidée** et mini-démos (`help.js`), animations partagées (`anim.js`) ; page **Tutoriels vidéo** (`/formation`) ; bouton « Écouter » par tâche dans la vue planteur.

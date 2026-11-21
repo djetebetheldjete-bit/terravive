@@ -18,6 +18,7 @@ create table if not exists trv_users (
 alter table trv_users add column if not exists animator boolean default false;
 alter table trv_users add column if not exists certified boolean default false;   -- cultivateur certifié (gère son stock)
 alter table trv_users add column if not exists profile text default 'cultivateur'; -- 'client' | 'cultivateur'
+alter table trv_users add column if not exists coop_auto_done boolean default false; -- rattachement automatique à un animateur déjà fait (v8.11)
 
 -- Sessions de connexion (jeton aléatoire)
 create table if not exists trv_sessions (
