@@ -387,3 +387,44 @@ create index if not exists trv_dist_lots_coop_idx on trv_dist_lots (coop_id, cre
 alter table trv_parcel_ndvi enable row level security;
 alter table trv_dist_sites enable row level security;
 alter table trv_dist_lots enable row level security;
+
+-- ================================================================
+-- v8.17 — Intelligence agricole : Vertea intégré, climat de la parcelle, fiche parcelle, économie.
+-- Exécutez ce bloc sur une base existante : il ne touche pas aux données en place.
+-- ================================================================
+-- Historique des analyses satellite d'une parcelle (comparaison dans le temps, alertes).
+create table if not exists trv_sat_obs (
+  id text primary key,
+  parcel_id text,
+  user_id text,
+  kind text,                  -- 'ndvi' | 'anomalie'
+  summary text,               -- JSON : valeur, % faible, images, nuages, période, niveau
+  created_at timestamptz default now()
+);
+create index if not exists trv_sat_obs_parcel_idx on trv_sat_obs (parcel_id, kind, created_at desc);
+-- Climat d'un point (~35 ans, par source) : calculé une fois, gardé 90 jours.
+create table if not exists trv_climate_cache (
+  key text primary key,       -- source:lat:lon:années
+  result text,                -- JSON : indices, tendances, contrôle qualité, normales mensuelles
+  created_at timestamptz default now()
+);
+-- Fiche parcelle unifiée.
+create table if not exists trv_parcel_fiche (
+  parcel_id text primary key,
+  user_id text,
+  variety text,
+  mode text,                  -- agroecologie | bio | conservation | raisonnee
+  stage text,
+  stage_at date,
+  campaign text,
+  irrigation text,
+  mechanization text,
+  budget text,
+  expected_yield_kg numeric,
+  updated_at timestamptz default now()
+);
+-- Carnet : montant en FCFA (coût d'une intervention, ou somme reçue pour une vente).
+alter table trv_field_log add column if not exists amount_fcfa numeric;
+alter table trv_sat_obs enable row level security;
+alter table trv_climate_cache enable row level security;
+alter table trv_parcel_fiche enable row level security;

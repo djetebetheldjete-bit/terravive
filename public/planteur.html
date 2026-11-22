@@ -142,6 +142,11 @@ try{ if(sessionStorage.getItem("trv-arrive")==="1"){ sessionStorage.removeItem("
   .onb li b{ display:block; font-size:.92rem; color:var(--ink); } .onb li.done b{ color:var(--soft); text-decoration:line-through; text-decoration-color:color-mix(in srgb,var(--soft) 50%,transparent); }
   .onb li span{ display:block; font-size:.8rem; color:var(--soft); }
   .onb .go2{ display:inline-flex; align-items:center; gap:6px; margin-top:8px; padding:8px 13px; border-radius:9px; background:var(--leaf); color:#fff; font-weight:600; font-size:.86rem; text-decoration:none; }
+  .alrt{ display:flex; gap:10px; padding:10px 0; border-top:1px solid var(--line); }
+  .alrt:first-of-type{ border-top:0; }
+  .alrt .dot{ width:9px; height:9px; border-radius:50%; margin-top:6px; flex:none; background:var(--faint); }
+  .alrt.lv-inspect .dot{ background:var(--bad); } .alrt.lv-watch .dot{ background:var(--sun); }
+  .alrt b{ display:block; font-size:.88rem; color:var(--ink); } .alrt span{ display:block; font-size:.8rem; color:var(--soft); } .alrt small{ font-size:.7rem; color:var(--faint); }
   .empty-p{ text-align:center; padding:26px 18px; }
   .empty-p .ei{ width:52px; height:52px; border-radius:14px; margin:0 auto 12px; display:grid; place-items:center; background:color-mix(in srgb,var(--leaf) 10%,var(--surface)); color:var(--leaf); }
   .empty-p h2{ font-family:"Segoe UI",system-ui,sans-serif; font-size:1.05rem; font-weight:700; color:var(--ink); }
@@ -225,6 +230,7 @@ try{ if(sessionStorage.getItem("trv-arrive")==="1"){ sessionStorage.removeItem("
         <div id="parcelList" data-tour="1" data-tour-title="Vos parcelles" data-tour-text="Touchez une parcelle pour voir ce qu'il y a à faire aujourd'hui."><div class="load">Chargement…</div></div>
       </div>
       <aside class="colside">
+        <div id="alertCard"></div>
         <div id="onbCard"></div>
         <div id="animateurCard"></div>
         <div id="fcCard"></div>
@@ -372,6 +378,15 @@ function emptyParcels(){
   $("subParcels").style.display="none";
   return '<div class="panel empty-p pin"><div class="ei">'+ic("sprout",26)+'</div><h2>Aucune parcelle pour l\'instant</h2><p>Dessinez votre première parcelle sur la carte satellite : Terravive vous indiquera ensuite, chaque jour, ce qu\'il y a à faire.</p><a class="btn primary" href="/tableau">'+ic("sprout",18)+' Dessiner ma première parcelle</a></div>';
 }
+// À surveiller : alertes réelles (satellite, prévisions, carnet). Rien à signaler → rien d'affiché.
+async function loadAlerts(){
+  try{ var r=await fetch("/api/alerts"); if(!r.ok) return; var d=await r.json(); var a=(d.alerts||[]).filter(function(x){ return x.level!=="info" || PARCELS.length; }).slice(0,5);
+    if(!a.length){ $("alertCard").innerHTML=""; return; }
+    var n=a.filter(function(x){ return x.level==="inspect"; }).length;
+    $("alertCard").innerHTML='<div class="panel pin" style="--i:0"><div class="phd"><span class="pi">'+ic("incident",18)+'</span><h3>À surveiller</h3><span class="tag'+(n?'':' ok')+'">'+a.length+'</span></div>'
+      +a.map(function(x){ return '<div class="alrt lv-'+x.level+'"><i class="dot"></i><div><b>'+esc(x.title)+(PARCELS.length>1?' · '+esc(x.parcel):'')+'</b><span>'+esc(x.text)+'</span><small>Source : '+esc(x.source)+'</small></div></div>'; }).join("")+'</div>';
+  }catch(e){}
+}
 // Aujourd'hui : progression des tâches faites dans la journée.
 function updateProg(){
   var box=$("tProg"); if(!box||!cur) return;
@@ -434,6 +449,7 @@ async function loadParcels(){
   renderParcels();
   renderStats(null);
   renderOnboarding();
+  loadAlerts();
   weekCount().then(function(n){ var b=$("stats").querySelectorAll("b")[2]; if(b){ b.setAttribute("data-n",n); countTo(b,n); } });
 }
 function todoCount(t){ if(!t||!t.tasks)return null; var k=t.tasks; if(k.day==null) return (k.start&&k.start.length)||0; return (k.now&&k.now.length)||0; }
@@ -496,15 +512,33 @@ function renderTodayBody(t){
   $("todayBody").innerHTML=h;
   updateProg();
 }
+// ---------- File d'attente hors ligne (partagée avec le tableau de bord : même clé) ----------
+// Chaque saisie porte un identifiant choisi par le téléphone : renvoyée deux fois, elle n'est gardée qu'une fois.
+var QKEY="trv-log-queue";
+function newClientId(){ try{ var a=new Uint8Array(12); crypto.getRandomValues(a); return Array.from(a).map(function(x){ return x.toString(16).padStart(2,"0"); }).join(""); }catch(e){ var s=""; for(var i=0;i<24;i++) s+="0123456789abcdef"[Math.floor(Math.random()*16)]; return s; } }
+function qGet(){ try{ var a=JSON.parse(localStorage.getItem(QKEY)||"[]"); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function qSet(a){ try{ localStorage.setItem(QKEY,JSON.stringify(a)); }catch(e){} }
+var qBusy=false;
+async function flushQueue(){
+  if(qBusy||navigator.onLine===false) return; var a=qGet(); if(!a.length) return; qBusy=true; var keep=[], sent=0;
+  for(var i=0;i<a.length;i++){ try{ var r=await fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(a[i].p)}); if(r.ok) sent++; else if(r.status!==400&&r.status!==404) keep.push(a[i]); }catch(e){ keep.push(a[i]); } }
+  qSet(keep.concat(qGet().slice(a.length))); qBusy=false;
+  if(sent) toast(sent+(sent>1?" saisies envoyées":" saisie envoyée")+" — le réseau est revenu ✓");
+}
+window.addEventListener("online", flushQueue); setTimeout(flushQueue, 1500);
 async function markDone(btn,parcelId,i,faire){
   var key="done:"+parcelId+":"+i;
   if(sessionDone[key]){ return; }
   btn.disabled=true;
+  var payload={ client_id:newClientId(), parcel_id:parcelId, date:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10), kind:"observation", note:"Fait : "+faire };
+  var queued=function(){ qSet(qGet().concat([{ p:payload, t:Date.now() }])); sessionDone[key]=true; var card=btn.closest(".task"); if(card){card.classList.add("done");} btn.innerHTML=ic("check",16)+" Fait"; updateProg(); toast("Pas de réseau : c'est gardé sur le téléphone, envoi automatique au retour du réseau."); };
+  if(navigator.onLine===false){ queued(); return; }
   try{
-    var r=await fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({parcel_id:parcelId,kind:"observation",note:"Fait : "+faire})});
+    var r=await fetch("/api/fieldlog",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
     if(r.ok){ sessionDone[key]=true; var card=btn.closest(".task"); if(card){card.classList.add("done");} btn.innerHTML=ic("check",16).replace('class="ico"','class="ico drawcheck"')+" Fait"; updateProg(); toast("Bien joué ! C'est noté dans votre carnet."); }
+    else if(r.status>=500){ queued(); }
     else { var d={};try{d=await r.json();}catch(e){} toast(d.error||"Impossible d'enregistrer. Réessayez."); btn.disabled=false; }
-  }catch(e){ toast("Pas de réseau — réessayez quand la connexion revient."); btn.disabled=false; }
+  }catch(e){ queued(); }
 }
 function listen(){ var t=cur?TODAY[cur.id]:null; if(t&&t.speech&&window.trvSpeak){ if(window.trvSpeaking&&trvSpeaking()){trvStop();return;} trvSpeak(t.speech,null,"fr"); toast("Lecture à voix haute…"); } }
 function openTravail(){

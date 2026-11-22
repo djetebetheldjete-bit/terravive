@@ -1,5 +1,16 @@
 # Journal des versions — Terravive
 
+## v8.17 — 22 novembre 2026 : intelligence agricole (OBSERVER → ANALYSER → RECOMMANDER → AGIR → MESURER)
+- **Vertea intégré à Terravive** : le moteur satellite (Python, Google Earth Engine) entre dans le dépôt (`vertea/`) et dans `render.yaml`. Le navigateur ne l'appelle plus directement : le serveur Terravive relaie (`/api/sat/*`) avec un jeton partagé (`VERTEA_TOKEN`), limite l'usage et garde chaque analyse dans l'historique de la parcelle. Chaque NDVI affiche période, date de la dernière image, nombre d'images, nuages, fiabilité, et la comparaison avec l'analyse précédente (« baisse nette : observation de terrain recommandée »). Jamais présenté comme une maladie.
+- **Climat de la parcelle** (bouton « Climat ») : ~35 ans de données journalières, **deux sources** calculées de la même façon et comparées — CHIRPS + ERA5-Land via Earth Engine (Vertea, nouvelle route `/climat`) et ERA5 via les archives Open-Meteo. Contrôle qualité (pluie négative, maximum < minimum, valeurs aberrantes), indices de référence internationaux (jours secs consécutifs, jours humides, pluies ≥ 50 mm, pluie maximale en 1 et 5 jours, jours > 35 °C, nuits > 23 °C…), tendances (pente de Sen + test de Mann-Kendall à 5 %), pluie moyenne par mois. Chaque indicateur répond à une question et dit quoi décider. Résultats gardés 90 jours.
+- **Fiche parcelle unifiée** (bouton « Fiche ») : variété, mode de conduite, stade, campagne, irrigation, équipement, budget, récolte attendue ; taux de complétude ; données manquantes expliquées ; **contrôles de cohérence du carnet** (récolte avant semis, dates futures, arrosage ou rendement improbables, doublons).
+- **Conseiller contextualisé** : on choisit une parcelle ; le conseiller reçoit sa fiche réelle (culture, sol, carnet, satellite, climat, moyens) et doit séparer faits, hypothèses et recommandations, dire ce qui manque, respecter le mode de conduite et ne proposer aucun produit sans diagnostic fiable.
+- **Alertes « À surveiller »** (espace planteur et tableau de bord) : zone à inspecter (satellite), forte pluie ou jours secs annoncés, chaleur à la floraison, saisies à vérifier, fiche incomplète — chacune avec sa source.
+- **Résultat économique** : nouvelle saisie « Vente » (kg et montant reçu) et montant facultatif (FCFA) sur chaque intervention ; le bilan de la parcelle affiche ventes, coûts, marge, prix moyen, marge au m² — uniquement à partir de ce qui est noté.
+- **Hors ligne** : « C'est fait » dans l'espace planteur est gardé sur le téléphone sans réseau et envoyé au retour, sans doublon (même file que le tableau de bord).
+- **Scénario complet testé** : tomate à San-Pédro, 1 000 m², sol sableux, arrosoir, petit budget — du producteur au résultat économique (`test/test-intel.js`, 16 tests, services extérieurs simulés). 10 tests unitaires pour le climat et le satellite.
+- **Base Supabase : à exécuter une fois** le bloc « v8.17 » à la fin de `schema.sql`. Service worker v35.
+
 ## v8.16 — 21 novembre 2026 : espace planteur, version sobre et professionnelle
 Retour d'utilisation sur la v8.15 : « pas professionnel ». Le décor de dessin animé est retiré.
 - **Fond uni** : plus de collines, pousses, nuages ni soleil animés.

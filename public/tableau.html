@@ -485,6 +485,8 @@ html.simple .adv{display:none!important}
         </div>
       </div>
         <div id="soilOut" class="wide section-gap"></div>
+        <div id="ficheOut" class="wide section-gap"></div>
+        <div id="climateOut" class="wide section-gap"></div>
           <div class="card wide section-gap" id="resCard">
             <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;"><h2 class="ct" style="margin:0;"><span data-ico="recycle"></span>Valoriser mes résidus</h2><span class="muted" style="font-size:.82rem;">Tiges, pailles, fumier, cabosses : ce sont des ressources. Choisissez ce que vous avez, Terravive vous indique quoi en faire.</span></div>
             <div class="resgrid">
@@ -501,12 +503,13 @@ html.simple .adv{display:none!important}
             <div id="logBody" style="display:none;">
               <div class="kindlabel muted section-gap" id="kindLabel">Intervention</div>
               <div class="kindpick" id="kindPick" role="radiogroup" aria-labelledby="kindLabel"></div>
-              <select id="logKind" hidden aria-hidden="true" tabindex="-1"><option value="arrosage">Arrosage</option><option value="pluie">Pluie</option><option value="compost">Compost / fumier</option><option value="engrais">Engrais chimique</option><option value="traitement">Traitement</option><option value="semis">Semis / plantation</option><option value="recolte">Récolte</option><option value="perte">Récolte invendable</option><option value="residu">Résidus valorisés</option><option value="germination">Test de germination</option><option value="incident">Incident</option><option value="observation">Observation</option></select>
+              <select id="logKind" hidden aria-hidden="true" tabindex="-1"><option value="arrosage">Arrosage</option><option value="pluie">Pluie</option><option value="compost">Compost / fumier</option><option value="engrais">Engrais chimique</option><option value="traitement">Traitement</option><option value="semis">Semis / plantation</option><option value="recolte">Récolte</option><option value="perte">Récolte invendable</option><option value="residu">Résidus valorisés</option><option value="germination">Test de germination</option><option value="incident">Incident</option><option value="observation">Observation</option><option value="vente">Vente</option></select>
               <div class="maprow logform" style="align-items:flex-end;margin-top:12px;">
                 <label class="muted" style="min-width:160px;flex:1;font-size:.8rem;">Parcelle<select class="sel" id="logParcel" style="width:100%;margin-top:4px;"></select></label>
                 <label class="muted" style="width:150px;font-size:.8rem;">Date<input class="sel" type="date" id="logDate" style="width:100%;margin-top:4px;"></label>
                 <label class="muted" id="logQtyWrap" style="min-width:230px;flex:1;font-size:.8rem;">Quantité <span id="logUnit">(L)</span><span class="qtyrow"><input class="sel" id="logQty" inputmode="decimal" placeholder="ex. 12" style="width:90px;"><select class="sel" id="logMeasure" aria-label="Mesure"></select></span><span class="qtysize" id="logSizeWrap" style="display:none;">1 <span id="logSizeName">arrosoir</span> = <input class="sel" id="logSize" inputmode="decimal" style="width:70px;"> <span id="logSizeUnit">L</span> <span class="muted">(réglez une fois)</span></span><span class="qtyconv" id="logConv"></span></label>
                 <label class="muted" id="logProdWrap" style="width:170px;font-size:.8rem;display:none;">Produit / type<input class="sel" id="logProd" maxlength="60" list="logProdList" placeholder="ex. NPK 15-15-15" style="width:100%;margin-top:4px;"><datalist id="logProdList"></datalist></label>
+                <label class="muted" id="logAmountWrap" style="width:170px;font-size:.8rem;"><span id="logAmountLbl">Coût (FCFA, facultatif)</span><input class="sel" id="logAmount" inputmode="numeric" placeholder="ex. 5000" style="width:100%;margin-top:4px;"></label>
                 <label class="muted" id="logResWrap" style="min-width:190px;flex:1;font-size:.8rem;display:none;">Résidu<select class="sel" id="logResidue" style="width:100%;margin-top:4px;"></select></label>
                 <label class="muted" id="logRouteWrap" style="min-width:170px;flex:1;font-size:.8rem;display:none;">Ce que j'en ai fait<select class="sel" id="logRoute" style="width:100%;margin-top:4px;"></select></label>
                 <div id="logGermWrap" style="display:none;flex:1 1 100%;">
@@ -692,7 +695,8 @@ html.simple .adv{display:none!important}
   }
 
   // ===== Carte de la parcelle (vue satellite) + appels à Vertea =====
-  const VERTEA_BASE = "https://agriscan-z7dc.onrender.com";
+  // Vertea est intégré : le serveur Terravive relaie les analyses (jeton partagé, historique par parcelle).
+  const VERTEA_BASE = "/api/sat";
   let MAP=null, drawGroup=null, zoneActive=null, ndviLayer=null, activeParcelId=null; // activeParcelId : parcelle enregistrée affichée (pour garder son NDVI)
   function savedParcelle(){ try{ const s=localStorage.getItem("trv-parcelle"); const o=s?JSON.parse(s):null; return (o&&(o.bbox||o.polygon))?o:null; }catch(e){ return null; } }
   function ymd(dt){ return dt.toISOString().slice(0,10); }
@@ -702,8 +706,8 @@ html.simple .adv{display:none!important}
 
   // ===== Parcelles enregistrées (limites sauvegardées sur le compte) =====
   // ---------- Carnet de champ ----------
-  const LOG_LABEL={arrosage:"Arrosage",pluie:"Pluie",compost:"Compost / fumier",engrais:"Engrais chimique",traitement:"Traitement",semis:"Semis / plantation",recolte:"Récolte",perte:"Récolte invendable",residu:"Résidus valorisés",germination:"Test de germination",incident:"Incident",observation:"Observation"};
-  const LOG_ICON={arrosage:"water",pluie:"rain",compost:"compost",engrais:"fertilizer",traitement:"treatment",semis:"sowing",recolte:"harvest",perte:"loss",residu:"recycle",germination:"sprout",incident:"incident",observation:"observation"};
+  const LOG_LABEL={arrosage:"Arrosage",pluie:"Pluie",compost:"Compost / fumier",engrais:"Engrais chimique",traitement:"Traitement",semis:"Semis / plantation",recolte:"Récolte",perte:"Récolte invendable",residu:"Résidus valorisés",germination:"Test de germination",incident:"Incident",observation:"Observation",vente:"Vente"};
+  const LOG_ICON={arrosage:"water",pluie:"rain",compost:"compost",engrais:"fertilizer",traitement:"treatment",semis:"sowing",recolte:"harvest",perte:"loss",residu:"recycle",germination:"sprout",incident:"incident",observation:"observation",vente:"harvest"};
   const LOG_HINT={arrosage:"litres",pluie:"mm au pluviomètre",compost:"kg",engrais:"kg + produit",traitement:"litres + produit",semis:"date, variété",recolte:"kg",perte:"kg abîmés, invendus",residu:"kg mis au compost, en paillis…",germination:"compost mûr ou non",incident:"maladie, ravageur…",observation:"note libre"};
   function ico(n){ return window.trvIcon?trvIcon(n):""; }
   function buildKindPick(){
@@ -714,7 +718,7 @@ html.simple .adv{display:none!important}
     btns.forEach((b,i)=>{ b.addEventListener("click",()=>pick(b.dataset.kind)); b.addEventListener("keydown",e=>{ const d={ArrowRight:1,ArrowDown:1,ArrowLeft:-1,ArrowUp:-1}[e.key]; if(!d) return; e.preventDefault(); const j=(i+d+btns.length)%btns.length; pick(btns[j].dataset.kind,true); }); });
     pick($("logKind").value||"arrosage");
   }
-  const LOG_UNIT={arrosage:"L",pluie:"mm",compost:"kg",engrais:"kg",traitement:"L",semis:"",recolte:"kg",perte:"kg",residu:"kg",germination:"%",incident:"",observation:""};
+  const LOG_UNIT={arrosage:"L",pluie:"mm",compost:"kg",engrais:"kg",traitement:"L",semis:"",recolte:"kg",perte:"kg",residu:"kg",germination:"%",incident:"",observation:"",vente:"kg"};
   const NAT={mesure:["Mesuré","noté dans le carnet de champ"],declare:["Déclaré","référence saisie à la main"],satellite:["Estimé satellite","images ou cartes satellitaires"],modele:["Estimé (calcul)","calcul à partir d'autres chiffres et d'hypothèses écrites"],hypothese:["Hypothèse","valeur supposée, à confirmer"],repere:["Repère général","valeur publiée, source citée"]};
   function natTag(n){ const x=NAT[n]; return x?'<span class="nat '+n+'" title="'+esc(x[1])+'">'+esc(x[0])+'</span>':''; }
   function defaultSeason(date){ const d=new Date(String(date||"")+"T12:00:00Z"); if(isNaN(d)) return "Sans saison"; const m=d.getUTCMonth()+1, y=d.getUTCFullYear(); if(m>=3&&m<=7) return y+" · grande saison"; if(m>=8&&m<=11) return y+" · petite saison"; return (m===12?y:y-1)+"-"+(m===12?y+1:y)+" · saison sèche"; }
@@ -1017,12 +1021,16 @@ html.simple .adv{display:none!important}
     $("logQty").addEventListener("input", convPreview);
     $("logSize").addEventListener("change", function(){ const k=sizeKind(), code=$("logMeasure").value, v=numIn(this.value); if(v>0){ const a=mSizes(); a[k+":"+code]=v; try{ localStorage.setItem("trv-units",JSON.stringify(a)); }catch(e){} } convPreview(); });
     $("logSize").addEventListener("input", function(){ convPreview(); $("logMsg").textContent=""; });
-    $("logKind").addEventListener("change", unit); unit();
+    // Montant : coût facultatif d'une intervention, ou somme reçue (obligatoire) pour une vente.
+    function amountField(){ const k=$("logKind").value, w=$("logAmountWrap"); if(!w) return; w.style.display=(k==="pluie"||k==="germination"||k==="residu"||k==="perte")?"none":""; $("logAmountLbl").textContent=k==="vente"?"Montant reçu (FCFA)":"Coût (FCFA, facultatif)"; }
+    $("logKind").addEventListener("change", unit); $("logKind").addEventListener("change", amountField); unit(); amountField();
     $("logAdd").addEventListener("click", async function(){
       const b=this, k=$("logKind").value, m=measured();
       if(m.needSize&&k!=="germination"){ $("logMsg").textContent="Indiquez d'abord le poids d'un(e) "+m.needSize+" de ce résidu (pesez-en une fois), ou saisissez directement des kg."; $("logSize").focus(); return; }
       const note=[m.label, $("logNote").value.trim()].filter(Boolean).join(" · ").slice(0,300);
       const payload={ client_id:newClientId(), parcel_id:$("logParcel").value, date:$("logDate").value, kind:k, qty:m.qty, product:$("logProd").value.trim(), season:$("logSeason").value.trim(), note:note };
+      if($("logAmount")&&$("logAmountWrap").style.display!=="none"&&$("logAmount").value.trim()!=="") payload.amount_fcfa=$("logAmount").value.trim();
+      if(k==="vente"&&!payload.amount_fcfa){ $("logMsg").textContent="Pour une vente, indiquez le montant reçu (FCFA)."; $("logAmount").focus(); return; }
       if(k==="residu"){
         if(!(numIn(m.qty)>0)){ $("logMsg").textContent="Indiquez la quantité de résidus valorisés."; $("logQty").focus(); return; }
         payload.residue=$("logResidue").value; payload.route=$("logRoute").value; payload.product="";
@@ -1033,7 +1041,7 @@ html.simple .adv{display:none!important}
         payload.germ=g; payload.qty=""; payload.note=$("logNote").value.trim().slice(0,200);
       }
       try{ localStorage.setItem("trv-log-season-"+payload.parcel_id,payload.season); }catch(e){}
-      const done=function(msg){ $("logMsg").textContent=msg; $("logQty").value=""; $("logNote").value=""; $("logProd").value=""; if(k==="germination"){ ["gSown","gUp","gRefSown","gRefUp"].forEach(i=>{ $(i).value=""; }); germPreview(); } convPreview(); };
+      const done=function(msg){ $("logMsg").textContent=msg; $("logQty").value=""; $("logNote").value=""; $("logProd").value=""; if($("logAmount")) $("logAmount").value=""; if(k==="germination"){ ["gSown","gUp","gRefSown","gRefUp"].forEach(i=>{ $(i).value=""; }); germPreview(); } convPreview(); };
       const keepOffline=function(){ qAdd(payload); done("Pas de réseau : saisie gardée sur ce téléphone. Elle sera envoyée automatiquement dès que le réseau revient."); };
       if(navigator.onLine===false){ keepOffline(); return; }
       b.disabled=true; $("logMsg").textContent="Enregistrement…";
@@ -1144,6 +1152,21 @@ html.simple .adv{display:none!important}
     if(forPrint) h+='<h4>Légende</h4><div style="font-size:.8rem;">'+Object.keys(NAT).map(k=>natTag(k)+' '+esc(NAT[k][1])).join(" &nbsp; ")+'</div>';
     return h;
   }
+  // Résultat économique de la parcelle : uniquement les ventes et coûts notés dans le carnet.
+  function ecoHtml(e){
+    if(!e) return "";
+    const f=(n)=>Number(n||0).toLocaleString("fr-FR")+" FCFA";
+    let h='<div style="margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:12px"><div style="font-weight:700;color:var(--ink)">Résultat économique '+natTag("mesure")+'</div>';
+    if(e.computable){
+      h+='<div class="vchips" style="margin-top:8px"><div class="vchip"><div class="l">Ventes</div><div class="v">'+f(e.revenue_fcfa)+'</div></div><div class="vchip"><div class="l">Coûts notés</div><div class="v">'+f(e.cost_fcfa)+'</div></div><div class="vchip"><div class="l">Marge</div><div class="v" style="color:'+(e.margin_fcfa>=0?'var(--good,#2E8B6F)':'var(--bad,#c0392b)')+'">'+f(e.margin_fcfa)+'</div></div>'
+        +(e.avg_price_fcfa_kg!=null?'<div class="vchip"><div class="l">Prix moyen</div><div class="v">'+e.avg_price_fcfa_kg+' FCFA/kg</div></div>':'')+(e.margin_per_m2!=null?'<div class="vchip"><div class="l">Marge / m²</div><div class="v">'+e.margin_per_m2+' FCFA</div></div>':'')+'</div>';
+      if(e.costs_by_type.length) h+='<div class="muted" style="font-size:.8rem;margin-top:6px">Coûts : '+e.costs_by_type.map(c=>esc(c.label)+' '+f(c.fcfa)).join(" · ")+'</div>';
+      if(e.unsold_kg) h+='<div class="muted" style="font-size:.8rem">'+e.unsold_kg+' kg récoltés non encore vendus.</div>';
+      h+='<div class="muted" style="font-size:.76rem;margin-top:4px">Calculé uniquement avec ce que vous avez noté : un coût oublié rend la marge trop belle.</div>';
+    } else h+='<div class="muted" style="font-size:.84rem;margin-top:4px">'+esc((e.notes||[]).join(" "))+'</div>';
+    (e.computable?(e.notes||[]):[]).forEach(n=>{ h+='<div class="valert warn" style="margin-top:6px">'+esc(n)+'</div>'; });
+    return h+'</div>';
+  }
   function renderImpact(d){
     const ref=d.ref||{};
     let h='<div class="impact">'+impactHtml(d,false)+pairPicker(d);
@@ -1158,6 +1181,7 @@ html.simple .adv{display:none!important}
       +'<button class="btn" type="button" id="refSave">Enregistrer</button></div><div class="muted" id="refMsg" style="font-size:.82rem;margin-top:4px;"></div></details>';
     h+='<div class="maprow" style="margin-top:10px;"><button class="btn sun" type="button" id="impPrint">'+ico("printer")+'Imprimer le bilan / PDF</button><a class="btn adv" href="/api/impact/csv?parcel='+encodeURIComponent($("logParcel").value)+'">'+ico("download")+'Bilan en tableur (CSV)</a><a class="btn wa" id="impWa" target="_blank" rel="noopener">'+ico("send")+'Envoyer sur WhatsApp</a><button class="btn" type="button" id="impProof">'+ico("proof")+'Fiche de preuve</button></div>';
     h+='<div class="muted" style="font-size:.74rem;margin-top:6px;">Chaque chiffre porte son origine : '+Object.keys(NAT).map(k=>natTag(k)).join(" ")+'. Survolez une étiquette pour l\'explication.</div></div>';
+    h+=ecoHtml(d.economics);
     $("impactBox").innerHTML=h;
     $("impWa").href="https://wa.me/?text="+encodeURIComponent(impactText(d));
     $("impPrint").addEventListener("click", function(){ printDoc("Bilan d'impact — "+(d.report.parcel.name||""), impactHtml(d,true), "Bilan établi à partir du carnet de champ Terravive. Les valeurs « Mesuré » viennent de vos saisies ; les autres sont signalées."); });
@@ -1238,19 +1262,116 @@ html.simple .adv{display:none!important}
   }
   let myParcels=[];
   async function loadParcels(){
-    try{ const r=await fetch("/api/parcels"); const d=await r.json(); if(r.ok){ myParcels=d.parcels||[]; renderParcels(); renderLogParcels(); renderTodayParcels(); } }catch(e){}
+    try{ const r=await fetch("/api/parcels"); const d=await r.json(); if(r.ok){ myParcels=d.parcels||[]; renderParcels(); renderLogParcels(); renderTodayParcels(); loadParcelAlerts(); } }catch(e){}
+  }
+  async function loadParcelAlerts(){
+    const box=$("parcelList"); if(!box||!myParcels.length) return;
+    try{ const r=await fetch("/api/alerts"); if(!r.ok) return; const d=await r.json(); const a=(d.alerts||[]).slice(0,6); if(!a.length) return;
+      const el=document.createElement("div"); el.id="alertsBox"; el.style.cssText="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:var(--surface)";
+      el.innerHTML='<div style="font-weight:700;color:var(--leaf);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">À surveiller</div>'+a.map(function(x){ const c=x.level==="inspect"?"var(--bad,#c0392b)":x.level==="watch"?"var(--sun,#C58A2A)":"var(--faint,#8a988e)"; return '<div style="display:flex;gap:8px;padding:6px 0;border-top:1px solid var(--line)"><span style="width:8px;height:8px;border-radius:50%;background:'+c+';margin-top:6px;flex:none"></span><div style="font-size:.84rem"><b>'+esc(x.title)+' · '+esc(x.parcel)+'</b><div class="muted">'+esc(x.text)+'</div><div class="muted" style="font-size:.72rem">Source : '+esc(x.source)+'</div></div></div>'; }).join("");
+      const old=$("alertsBox"); if(old) old.remove(); box.parentNode.insertBefore(el, box);
+    }catch(e){}
   }
   function renderParcels(){
     const box=$("parcelList"); if(!box) return;
     if(!myParcels.length){ box.innerHTML='<div class="muted" style="font-size:.84rem;">Aucune parcelle enregistrée. Dessinez votre champ puis « Enregistrer la parcelle » pour le retrouver ici.</div>'; return; }
     box.innerHTML='<div style="font-weight:700;color:var(--leaf);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Mes parcelles enregistrées</div>'
       + '<div style="display:flex;flex-direction:column;gap:6px;">'
-      + myParcels.map(function(p){ const when=p.created_at?(" · "+new Date(p.created_at).toLocaleDateString("fr-FR")):""; const kind=p.zone&&p.zone.polygon?"polygone":"rectangle"; return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--surface2);"><span style="flex:1;font-weight:600;min-width:120px;">'+esc(p.name)+'<span class="muted" style="font-weight:400;font-size:.8rem;"> · '+kind+when+'</span></span><button class="btn" type="button" data-view="'+esc(p.id)+'">Voir sur la carte</button><button class="btn" type="button" data-soil="'+esc(p.id)+'" title="Nature du sol, profondeur des racines, arrosage et capteur">Sol &amp; racines'+(p.soil&&p.soil.analyzed?' ✓':'')+'</button><button class="btn" type="button" data-del="'+esc(p.id)+'" title="Supprimer" style="border-color:#c0392b;color:#c0392b;">Supprimer</button></div>'; }).join("")
+      + myParcels.map(function(p){ const when=p.created_at?(" · "+new Date(p.created_at).toLocaleDateString("fr-FR")):""; const kind=p.zone&&p.zone.polygon?"polygone":"rectangle"; return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--surface2);"><span style="flex:1;font-weight:600;min-width:120px;">'+esc(p.name)+'<span class="muted" style="font-weight:400;font-size:.8rem;"> · '+kind+when+'</span></span><button class="btn" type="button" data-view="'+esc(p.id)+'">Voir sur la carte</button><button class="btn" type="button" data-soil="'+esc(p.id)+'" title="Nature du sol, profondeur des racines, arrosage et capteur">Sol &amp; racines'+(p.soil&&p.soil.analyzed?' ✓':'')+'</button><button class="btn" type="button" data-fiche="'+esc(p.id)+'" title="Variété, mode de conduite, stade, moyens ; données manquantes et saisies à vérifier">Fiche</button><button class="btn" type="button" data-clim="'+esc(p.id)+'" title="35 ans de pluie et de températures : sécheresses, fortes pluies, chaleur">Climat</button><button class="btn" type="button" data-del="'+esc(p.id)+'" title="Supprimer" style="border-color:#c0392b;color:#c0392b;">Supprimer</button></div>'; }).join("")
       + '</div>';
     box.querySelectorAll("[data-view]").forEach(function(b){ b.addEventListener("click", function(){ const p=myParcels.find(function(x){return x.id===b.getAttribute("data-view");}); if(p&&p.zone){ viewParcel(p.zone); activeParcelId=p.id; } }); });
     box.querySelectorAll("[data-del]").forEach(function(b){ b.addEventListener("click", function(){ delParcel(b.getAttribute("data-del"), b); }); });
     box.querySelectorAll("[data-soil]").forEach(function(b){ b.addEventListener("click", function(){ openSoil(b.getAttribute("data-soil")); }); });
+    box.querySelectorAll("[data-clim]").forEach(function(b){ b.addEventListener("click", function(){ openClimate(b.getAttribute("data-clim")); }); });
+    box.querySelectorAll("[data-fiche]").forEach(function(b){ b.addEventListener("click", function(){ openFiche(b.getAttribute("data-fiche")); }); });
   }
+  // ===== Fiche de la parcelle : ce que l'on sait, ce qui manque, ce qui est incohérent =====
+  async function openFiche(id){
+    const box=$("ficheOut"); box.innerHTML='<div class="card muted">Chargement de la fiche…</div>';
+    try{ box.scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){}
+    try{ const r=await fetch("/api/parcels/fiche?parcel="+encodeURIComponent(id)); const d=await r.json();
+      if(!r.ok){ box.innerHTML='<div class="card"><div class="valert warn">'+esc(d.error||"Erreur.")+'</div></div>'; return; }
+      renderFiche(id,d); }catch(e){ box.innerHTML='<div class="card"><div class="valert warn">Serveur injoignable.</div></div>'; }
+  }
+  function renderFiche(id,d){
+    const f=d.fiche||{}, o=d.options, sel=(k,lab)=>'<label style="font-size:.8rem" class="muted">'+lab+'<select class="sel" data-fk="'+k+'" style="width:100%;margin-top:3px"><option value="">— non renseigné —</option>'+Object.keys(o[k]).map(v=>'<option value="'+v+'"'+(f[k]===v?' selected':'')+'>'+esc(o[k][v])+'</option>').join("")+'</select></label>';
+    const inp=(k,lab,ph,type)=>'<label style="font-size:.8rem" class="muted">'+lab+'<input class="sel" data-fk="'+k+'" type="'+(type||"text")+'" value="'+esc(f[k]==null?"":f[k])+'" placeholder="'+esc(ph||"")+'" style="width:100%;margin-top:3px"></label>';
+    let h='<div class="card"><h2 class="ct" style="margin:0 0 4px">Fiche de la parcelle · '+esc(d.parcel.name)+'</h2>'
+      +'<div class="muted" style="font-size:.84rem">'+(d.crop?esc(d.crop)+(d.sown_at?' · semée le '+new Date(d.sown_at+"T12:00:00").toLocaleDateString("fr-FR"):''):'Culture non renseignée')+' · '+d.parcel.area_m2+' m²</div>'
+      +'<div style="margin:10px 0 4px;font-size:.84rem;display:flex;justify-content:space-between"><b>Fiche complète à '+d.completeness+' %</b><span class="muted">plus elle est complète, plus les conseils sont précis</span></div>'
+      +'<div style="height:7px;border-radius:9px;background:var(--surface2);overflow:hidden"><div style="height:100%;width:'+d.completeness+'%;background:var(--leaf)"></div></div>';
+    if(d.warnings.length) h+='<div class="valert warn" style="margin-top:10px"><b>À vérifier dans vos saisies :</b><ul style="margin:6px 0 0;padding-left:18px">'+d.warnings.map(w=>'<li>'+esc(w.text)+'</li>').join("")+'</ul></div>';
+    if(d.missing.length) h+='<div style="margin-top:10px;font-size:.86rem"><b>Ce qui manque encore :</b><ul style="margin:4px 0 0;padding-left:18px">'+d.missing.map(m=>'<li><b>'+esc(m.label)+'</b> — <span class="muted">'+esc(m.why)+'</span></li>').join("")+'</ul><div class="muted" style="font-size:.78rem;margin-top:4px">Culture, date de semis et sol se renseignent dans « Sol &amp; racines » ; l\'analyse satellite depuis la carte.</div></div>';
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:12px">'
+      +inp("variety","Variété","ex. Mongal F1")+sel("mode","Mode de conduite")+sel("stage","Stade actuel")+sel("irrigation","Irrigation")
+      +sel("mechanization","Équipement")+sel("budget","Budget")+inp("campaign","Campagne","ex. Grande saison 2026")+inp("expected_yield_kg","Récolte attendue (kg)","","number")+'</div>'
+      +'<div style="display:flex;gap:8px;align-items:center;margin-top:12px"><button class="btn primary" type="button" id="ficheSave">Enregistrer la fiche</button><span class="muted" id="ficheMsg" style="font-size:.84rem"></span></div></div>';
+    const box=$("ficheOut"); box.innerHTML=h;
+    $("ficheSave").addEventListener("click", async function(){
+      const body={ parcel_id:id }; box.querySelectorAll("[data-fk]").forEach(el=>{ body[el.getAttribute("data-fk")]=el.value; });
+      this.disabled=true; $("ficheMsg").textContent="Enregistrement…";
+      try{ const r=await fetch("/api/parcels/fiche",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}); const x=await r.json();
+        if(!r.ok){ $("ficheMsg").textContent=x.error||"Erreur."; this.disabled=false; return; }
+        renderFiche(id,Object.assign({},d,x)); $("ficheMsg").textContent="Fiche enregistrée."; }catch(e){ $("ficheMsg").textContent="Pas de réseau."; this.disabled=false; }
+    });
+  }
+
+  // ===== Climat de ma parcelle : ~35 ans, deux sources (CHIRPS via Earth Engine, ERA5 via Open-Meteo) =====
+  let climData=null, climSrc=null;
+  async function openClimate(id){
+    const box=$("climateOut"); const p=myParcels.find(x=>x.id===id);
+    box.innerHTML='<div class="card"><h2 class="ct" style="margin:0 0 6px">Climat de la parcelle'+(p?' · '+esc(p.name):'')+'</h2><div class="muted">Calcul sur environ 35 ans de données journalières (deux sources). La première fois, cela peut prendre jusqu\'à une minute ; ensuite le résultat est gardé.</div></div>';
+    try{ box.scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){}
+    try{
+      const r=await fetch("/api/parcels/climate?parcel="+encodeURIComponent(id)); const d=await r.json();
+      if(!r.ok){ box.innerHTML='<div class="card"><div class="valert warn">'+esc(d.error||"Erreur.")+'</div></div>'; return; }
+      climData=d; climSrc=(d.sources.chirps&&!d.sources.chirps.error)?"chirps":"era5"; renderClimate();
+    }catch(e){ box.innerHTML='<div class="card"><div class="valert warn">Serveur injoignable. Réessayez plus tard.</div></div>'; }
+  }
+  function spark(series, tr){
+    const ys=Object.keys(series||{}).map(Number).sort((a,b)=>a-b).filter(y=>typeof series[y]==="number"); if(ys.length<3) return "";
+    const vs=ys.map(y=>series[y]), mn=Math.min(...vs), mx=Math.max(...vs), W=220, H=46, sx=(y)=>4+(y-ys[0])/(ys[ys.length-1]-ys[0]||1)*(W-8), sy=(v)=>H-4-(v-mn)/((mx-mn)||1)*(H-8);
+    let line='<polyline fill="none" stroke="var(--leaf)" stroke-width="1.6" points="'+ys.map((y,i)=>sx(y).toFixed(1)+","+sy(vs[i]).toFixed(1)).join(" ")+'"/>';
+    if(tr&&tr.significant){ const mid=ys[Math.floor(ys.length/2)], mv=vs.slice().sort((a,b)=>a-b)[Math.floor(vs.length/2)], s=tr.slope_per_decade/10; line+='<line x1="'+sx(ys[0])+'" y1="'+sy(mv+s*(ys[0]-mid))+'" x2="'+sx(ys[ys.length-1])+'" y2="'+sy(mv+s*(ys[ys.length-1]-mid))+'" stroke="var(--sun)" stroke-width="1.6" stroke-dasharray="4 3"/>'; }
+    return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:46px;display:block;margin-top:6px" aria-hidden="true">'+line+'</svg><div class="muted" style="font-size:.7rem;display:flex;justify-content:space-between"><span>'+ys[0]+'</span><span>'+ys[ys.length-1]+'</span></div>';
+  }
+  function renderClimate(){
+    const d=climData, s=d.sources[climSrc], other=climSrc==="chirps"?"era5":"chirps", o=d.sources[other], box=$("climateOut");
+    const tab=(k,t)=>'<button class="btn'+(climSrc===k?' primary':'')+'" type="button" data-clsrc="'+k+'" style="padding:6px 12px;font-size:.84rem">'+t+(d.sources[k]&&d.sources[k].error?' (indisponible)':'')+'</button>';
+    let h='<div class="card"><h2 class="ct" style="margin:0 0 4px">Climat de la parcelle · '+esc(d.parcel.name)+'</h2>'
+      +'<div class="muted" style="font-size:.84rem">Point '+d.point.lat+'° N, '+Math.abs(d.point.lon)+'° '+(d.point.lon<0?'O':'E')+' · années '+d.years[0]+'–'+d.years[1]+'. Ce sont des statistiques du passé, pas une prévision.</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0">'+tab("chirps","CHIRPS (satellite)")+tab("era5","ERA5 (réanalyse)")+'</div>';
+    if(d.comparison){ const ag=d.comparison.filter(c=>c.agree).length; h+='<div class="valert '+(ag>=d.comparison.length*0.7?'ok':'warn')+'" style="margin-bottom:10px">Les deux sources concordent sur '+ag+' indicateur'+(ag>1?'s':'')+' sur '+d.comparison.length+'. '+(ag<d.comparison.length?'Là où elles divergent, restez prudent et croisez avec ce que vous observez au champ.':'Les résultats sont cohérents.')+'</div>'; }
+    if(!s||s.error){ h+='<div class="valert warn">'+esc((s&&s.error)||"Source indisponible.")+'</div></div>'; box.innerHTML=h; wireClim(); return; }
+    const order=["CDD","CWD","R50mm","Rx1day","SU35","TR23","PRCPTOT","SDII","Rx5day","R95pTOT","TX90p","WSDI","TXx"];
+    const rs=order.map(c=>s.readings.find(r=>r.code===c)).filter(Boolean);
+    const top=rs.filter(r=>r.flag==="defavorable");
+    if(top.length) h+='<div class="valert warn" style="margin-bottom:10px"><b>À retenir :</b> '+top.slice(0,3).map(r=>esc(r.name.charAt(0).toLowerCase()+r.name.slice(1))+' en '+(r.trend&&r.trend.direction==="baisse"?"baisse":"hausse")+' nette').join(' ; ')+'. Voir les conseils ci-dessous.</div>';
+    // 6 indicateurs essentiels visibles ; les autres sous « Voir plus » (la fiche reste lisible).
+    const grid='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px">';
+    h+=grid;
+    rs.forEach((r,ri)=>{ if(ri===6) h+='</div><details style="margin-top:10px"><summary style="cursor:pointer;font-weight:700;color:var(--leaf)">Voir les '+(rs.length-6)+' autres indicateurs</summary>'+grid; const col=r.flag==="defavorable"?"var(--sun)":r.flag==="favorable"?"var(--leaf)":"var(--line)";
+      h+='<div style="border:1px solid var(--line);border-left:4px solid '+col+';border-radius:12px;padding:11px 12px;background:var(--surface)">'
+        +'<div style="font-weight:700;font-size:.9rem;color:var(--ink)">'+esc(r.question)+'</div>'
+        +'<div class="muted" style="font-size:.76rem">'+esc(r.name)+' ('+esc(r.code)+')</div>'
+        +'<div style="font-size:1.3rem;font-weight:700;color:var(--ink);margin-top:4px">'+r.mean+' <span style="font-size:.8rem;font-weight:500" class="muted">'+esc(r.unit)+' / an · de '+r.min+' à '+r.max+'</span></div>'
+        +spark(r.series,r.trend)
+        +'<div style="font-size:.82rem;margin-top:6px">'+esc(r.sentence)+'</div>'
+        +'<div style="font-size:.82rem;margin-top:6px;color:var(--ink)"><b>Pour décider :</b> '+esc(r.action)+'</div></div>'; });
+    h+='</div>'+(rs.length>6?'</details>':'');
+    // Pluie moyenne par mois : repère pour le calendrier de semis
+    const mo=s.monthly||[], mx=Math.max(1,...mo.map(m=>m.rain_mm||0)), M=["J","F","M","A","M","J","J","A","S","O","N","D"];
+    h+='<div style="margin-top:14px;font-weight:700;color:var(--ink)">Pluie moyenne par mois</div><div class="muted" style="font-size:.8rem">Repère pour caler semis et récoltes ; entre parenthèses, nombre moyen de jours de pluie.</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:120px;margin-top:8px">'+mo.map((m,i)=>'<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%"><div style="font-size:.62rem" class="muted">'+Math.round(m.rain_mm||0)+'</div><div title="'+(m.rain_mm||0)+' mm, '+(m.wet_days||0)+' jours de pluie" style="width:100%;background:var(--leaf);opacity:.75;border-radius:3px 3px 0 0;height:'+Math.max(2,Math.round((m.rain_mm||0)/mx*90))+'px"></div><div style="font-size:.7rem">'+M[i]+'</div><div style="font-size:.6rem" class="muted">('+Math.round(m.wet_days||0)+')</div></div>').join("")+'</div>';
+    // Qualité et limites
+    const q=s.qc||{};
+    h+='<div class="muted" style="font-size:.78rem;margin-top:12px;line-height:1.5"><b>Source :</b> '+esc(s.label)+'. '+esc(s.detail||"")+' <b>Période :</b> '+esc(s.period[0])+' → '+esc(s.period[1])+' ('+s.years+' ans ; période de référence des centiles '+s.base[0]+'–'+s.base[1]+'). '
+      +'<b>Contrôle qualité :</b> '+q.days+' jours lus ; '+(q.missing_p||0)+' jours sans pluie connue, '+(q.missing_t||0)+' sans température ; '+((q.negative_rain||0)+(q.tx_below_tn||0)+(q.impossible||0)+(q.outliers||0))+' valeurs écartées (pluie négative, maximum inférieur au minimum, valeurs aberrantes). '
+      +'<b>Tendances :</b> pente de Sen et test de Mann-Kendall au seuil de 5 % ; « pas d\'évolution nette » ne veut pas dire « pas de changement », mais que la variabilité d\'une année à l\'autre domine. <b>Limites :</b> '+esc(s.limits||"")+(s.cached_at?' Calculé le '+new Date(s.cached_at).toLocaleDateString("fr-FR")+'.':'')+'</div></div>';
+    box.innerHTML=h; wireClim();
+  }
+  function wireClim(){ $("climateOut").querySelectorAll("[data-clsrc]").forEach(b=>b.addEventListener("click",()=>{ climSrc=b.getAttribute("data-clsrc"); renderClimate(); })); }
+
   function viewParcel(zone){
     if(!MAP){ return; }
     if(drawGroup) drawGroup.clearLayers();
@@ -1493,8 +1614,12 @@ html.simple .adv{display:none!important}
   // --- Appels au moteur satellite Vertea ---
   function vSetBusy(on, msg){ $("vStatus").textContent=msg||""; ["btnNdvi","btnEau","btnPlant"].forEach(id=>{ const b=$(id); if(b) b.disabled=!!on; }); }
   async function vFetch(path, body){
-    const r = await fetch(VERTEA_BASE+path, { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(body) });
-    return r.json();
+    // parcelle enregistrée affichée : le serveur garde l'observation dans son historique
+    const b = Object.assign({}, body, activeParcelId ? { parcel_id: activeParcelId } : {});
+    const r = await fetch(VERTEA_BASE+path, { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(b) });
+    let j = {}; try{ j = await r.json(); }catch(e){}
+    if(!r.ok && !j.erreur) j.erreur = j.error || "Analyse satellite impossible pour le moment.";
+    return j;
   }
   function alertClass(f, m){ if((f||0)>=25) return "bad"; if((f||0)+(m||0)>=50) return "warn"; return "ok"; }
   async function runNdvi(){
@@ -1504,9 +1629,7 @@ html.simple .adv{display:none!important}
       const d = await vFetch("/ndvi", Object.assign({}, zoneActive, { date_debut: ymd(daysAgo(180)), date_fin: ymd(new Date()) }));
       if(d.erreur){ vSetBusy(false, "Erreur : "+d.erreur); return; }
       // Mémorise pour l'indice de durabilité (pilier environnemental) et le bilan carbone.
-      if(typeof d.ndvi_moyen==="number"){ window.lastNdvi = d.ndvi_moyen;
-        // Parcelle enregistrée : on garde sa dernière mesure (carte de la distribution, parcelles à surveiller).
-        if(activeParcelId){ fetch("/api/parcels/ndvi",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ parcel_id:activeParcelId, ndvi:d.ndvi_moyen, pct_faible:d.pct_faible, pct_moyen:d.pct_moyen })}).catch(function(){}); } }
+      if(typeof d.ndvi_moyen==="number"){ window.lastNdvi = d.ndvi_moyen; }
       if(typeof d.surface_ha==="number"){ window.lastSurfaceHa = d.surface_ha; var _da=document.getElementById("durArea"); if(_da && !_da.value) _da.value = d.surface_ha; }
       saveCtx({ ndvi:d.ndvi_moyen, pctFaible:d.pct_faible, surface:d.surface_ha, culture:($("vCulture").value||"").trim() });
       if(ndviLayer) MAP.removeLayer(ndviLayer);
@@ -1517,8 +1640,11 @@ html.simple .adv{display:none!important}
       const petite = (typeof d.surface_ha==="number" && d.surface_ha>0 && d.surface_ha<0.1);
       let qual = "Analyse Sentinel-2 (~10 m)";
       if(nImg!=null){ qual += " — "+nImg+" image"+(nImg>1?"s":"")+" nette"+(nImg>1?"s":""); }
-      if(d.periode_depuis){ qual += " depuis le "+esc(d.periode_depuis); }
+      if(d.periode_depuis){ qual += " du "+esc(d.periode_depuis)+(d.periode_fin?" au "+esc(d.periode_fin):""); }
+      if(d.date_derniere_image){ qual += " · dernière image : "+esc(d.date_derniere_image); }
+      if(typeof d.couverture_nuageuse_moy==="number"){ qual += " · nuages "+d.couverture_nuageuse_moy+" % en moyenne (masqués pixel par pixel)"; }
       qual += ".";
+      if(d.fiabilite){ qual += " <b>"+esc(d.fiabilite.label)+"</b> — "+esc(d.fiabilite.why); }
       const faibleObs = (nImg!=null && nImg<3) || petite;
       if(faibleObs){
         const raisons=[ (nImg!=null && nImg<3)?"peu d'images nettes (nuages ?)":null, petite?"parcelle proche de la taille d'un pixel":null ].filter(Boolean).join(" ; ");
@@ -1551,9 +1677,11 @@ html.simple .adv{display:none!important}
         +'<div class="vchip"><div class="l">Faible</div><div class="v">'+(d.pct_faible??"—")+'%</div></div>'
         +'</div>'
         +'<div style="font-size:.8rem;color:var(--soft,#5b6b5f);margin:8px 0 2px">'+qual+'</div>'
-        +'<div class="valert '+ac+'">'+txt+hyp+'</div>';
+        +'<div class="valert '+ac+'">'+txt+hyp+'</div>'
+        +(d.interpretation&&activeParcelId?'<div class="valert '+(d.interpretation.level==="inspect"?"bad":d.interpretation.level==="watch"?"warn":"ok")+'" style="margin-top:8px"><b>Par rapport à vos analyses précédentes :</b> '+esc(d.interpretation.text)+'<div style="margin-top:6px;font-size:.8rem;opacity:.85">'+esc(d.interpretation.limits)+'</div></div>':'')
+        +(activeParcelId?'':'<div style="font-size:.8rem;color:var(--soft,#5b6b5f);margin-top:6px">Astuce : enregistrez la parcelle puis relancez l\'analyse depuis « Voir » pour garder l\'historique et comparer dans le temps.</div>');
       vSetBusy(false, "Analyse de santé terminée. La carte NDVI est affichée sur la parcelle.");
-    }catch(e){ vSetBusy(false, "Impossible de joindre Vertea. Le service se réveille peut-être (réessayez dans ~30 s)."); }
+    }catch(e){ vSetBusy(false, "Impossible de joindre le moteur satellite. Il se réveille peut-être (réessayez dans ~30 s)."); }
   }
   async function runIrrigation(){
     if(!zoneActive){ $("vStatus").textContent="Dessinez d'abord votre parcelle."; return; }

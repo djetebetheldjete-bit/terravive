@@ -1,0 +1,10 @@
+cle-service.json
+*.json.json
+.venv/
+__pycache__/
+*.pyc
+test_cle.py
+test_stats.html
+AgriScan_guide_prototype.docx
+.git/
+.idea/

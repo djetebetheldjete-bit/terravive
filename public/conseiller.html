@@ -105,6 +105,11 @@
         </select>
         <span id="langNote" class="faint" style="font-size:.78rem;"></span>
       </div>
+      <div id="parcelPick" style="display:none;margin:0 0 8px;font-size:.86rem">
+        <label for="parcelSel" style="font-weight:600">Parcelle concernée</label>
+        <select id="parcelSel" class="sel" style="margin-left:6px;max-width:100%"><option value="">Aucune (question générale)</option></select>
+        <div class="faint" style="font-size:.78rem;margin-top:3px">Avec une parcelle, le conseiller s'appuie sur sa fiche, votre carnet, l'analyse satellite et le climat — et dit clairement ce qu'il ne sait pas.</div>
+      </div>
       <div class="thread" id="thread"><div class="empty" id="threadEmpty">Votre conversation apparaîtra ici. Posez une question — par écrit ou avec le micro.</div></div>
       <div class="composer">
         <input id="chatInput" aria-label="Votre question au conseiller" placeholder="ex. Mes feuilles de maïs jaunissent, que faire ?" maxlength="500" autocomplete="off" data-tour="1" data-tour-title="Posez votre question" data-tour-text="Écrivez votre question en langage simple, comme à un technicien.">
@@ -200,7 +205,7 @@
       bubble(esc(q),"me"); history.push({role:"user",content:q});
       const typing=document.createElement("div"); typing.className="typing"; typing.textContent="Le conseiller réfléchit…"; thread.appendChild(typing); thread.scrollTop=thread.scrollHeight;
       try{
-        const r=await fetch("/api/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ message:q, history: history.slice(0,-1), crop: userCrop||undefined, lang: curLang() })});
+        const r=await fetch("/api/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ message:q, history: history.slice(0,-1), crop: userCrop||undefined, lang: curLang(), parcel_id: ($("parcelSel")&&$("parcelSel").value)||undefined })});
         typing.remove();
         if(r.status===401){ bubble("Connectez-vous pour poser vos questions (c'est gratuit). Ouvrez la page de connexion ci-dessous.","err"); $("loginNote").style.display="block"; history.pop(); }
         else { const d=await r.json(); if(!r.ok){ bubble(esc(d.error||"La réponse a échoué."),"err"); history.pop(); } else { const el=bubble(renderMd(d.reply),"ai"); addSpeak(el, d.reply); history.push({role:"assistant",content:d.reply}); } }
@@ -239,6 +244,13 @@
     buildSug();
     buildDynamic();   // ajoute une catégorie « Pour vous » selon la parcelle, la culture et la saison
     // Accueil personnalisé si connecté
+    // Parcelles enregistrées : le conseiller peut s'appuyer sur la fiche de l'une d'elles.
+    (async function(){ try{ const r=await fetch("/api/parcels"); if(!r.ok) return; const d=await r.json(); const ps=d.parcels||[]; if(!ps.length) return;
+      const sel=$("parcelSel"); ps.forEach(function(p){ const o=document.createElement("option"); o.value=p.id; o.textContent=p.name+(p.soil&&p.soil.crop?" · "+p.soil.crop:""); sel.appendChild(o); });
+      let last=null; try{ last=localStorage.getItem("trv-chat-parcel"); }catch(e){}
+      sel.value = (last && ps.some(function(p){ return p.id===last; })) ? last : (ps.length===1 ? ps[0].id : "");
+      sel.addEventListener("change",function(){ try{ localStorage.setItem("trv-chat-parcel", sel.value); }catch(e){} });
+      $("parcelPick").style.display="block"; }catch(e){} })();
     (async function(){ try{ const r=await fetch("/api/auth/me"); const d=await r.json(); if(d && d.user && d.user.name){ $("lead").textContent="Bonjour "+d.user.name+" — posez votre question en langage simple, ou choisissez-en une ci-dessous. Réponses courtes, concrètes et durables."; } else { $("loginNote").style.display="block"; } }catch(e){} })();
   </script>
 </body>
