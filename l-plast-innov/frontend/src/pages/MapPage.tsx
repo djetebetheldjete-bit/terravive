@@ -5,13 +5,13 @@ import { api } from "../api/client";
 import { DemoBadge, ErrorNote, Spinner, ZoneBadge } from "../components/ui";
 import type { Camera, Zone } from "../types";
 
-// Correctif des icônes Leaflet par défaut (chemins cassés avec les bundlers).
-const icon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+// Marqueur caméra en HTML (divIcon) : aucune image externe à charger,
+// donc rien ne dépend d'un CDN à l'exécution.
+const cameraIcon = L.divIcon({
+  className: "",
+  html: `<div style="font-size:20px;line-height:20px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.4))">📷</div>`,
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
 });
 
 const COLOR: Record<string, string> = {
@@ -102,7 +102,7 @@ export default function MapPage() {
           {cameras
             .filter((c) => c.lat && c.lon)
             .map((c) => (
-              <Marker key={c.id} position={[c.lat!, c.lon!]} icon={icon}>
+              <Marker key={c.id} position={[c.lat!, c.lon!]} icon={cameraIcon}>
                 <Popup>
                   <div className="text-sm">
                     <div className="font-semibold">📷 {c.name}</div>
