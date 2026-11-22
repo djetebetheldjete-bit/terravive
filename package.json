@@ -5,8 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test-sol.js && node test-stock.js && node test/test-distribution.js && node test/run.js && node test/test-quality.js && node test/test-http.js",
-    "test:http": "node test/test-http.js"
+    "test": "node test-sol.js && node test-stock.js && node test/test-distribution.js && node test/test-climat.js && node test/run.js && node test/test-quality.js && node test/test-http.js && node test/test-intel.js",
+    "test:http": "node test/test-http.js && node test/test-intel.js"
   },
   "engines": {
     "node": ">=18"

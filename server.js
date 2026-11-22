@@ -20,7 +20,15 @@ const FERT = require("./lib/fertil");
 const FICHE = require("./lib/fiche");
 const IMPACT = require("./lib/impact");
 const TODAY = require("./lib/today");
-const DIST = require("./lib/distribution"); // module Distribution (projet ASTRIDE)
+const DIST = require("./lib/distribution");
+const SAT = require("./lib/satellite");
+// Adresse de l'API Claude (modifiable pour un relais d'entreprise ou pour les tests automatiques).
+const ANTHROPIC_BASE = (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com").replace(/\/$/, "");
+const CLIMAT = require("./lib/climat");
+const CLIMCULT = require("./lib/climat-culture"); // climat appliqué à la culture (stades, arrosage, semis)
+const PARCELLE = require("./lib/parcelle");
+const ALERTES = require("./lib/alertes");
+const ECO = require("./lib/economie"); // résultat économique d'une parcelle (ventes et coûts du carnet) // alertes « à surveiller » (satellite, prévisions, carnet) // fiche parcelle unifiée, données manquantes, cohérence du carnet // indices climatiques (contrôle, indices, tendances) // lecture des résultats Vertea (fiabilité, interprétation) // module Distribution (projet ASTRIDE)
 const RESIDUS = require("./lib/residus"); // guide des résidus et test de germination (partagé avec le navigateur)
 
 // ---------- Configuration ----------
@@ -106,7 +114,7 @@ async function sb(pathPart, opts = {}) {
 
 // ---------- Stockage local (repli quand pas de base) ----------
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.parcelSoil) s.parcelSoil = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; if (!s.fieldLog) s.fieldLog = []; if (!s.parcelRef) s.parcelRef = {}; if (!s.parcelPair) s.parcelPair = {}; if (!s.distSites) s.distSites = []; if (!s.distLots) s.distLots = []; if (!s.parcelNdvi) s.parcelNdvi = {}; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, parcelSoil: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [], fieldLog: [], parcelRef: {}, parcelPair: {}, distSites: [], distLots: [], parcelNdvi: {} }; } }
+function loadStore() { try { const s = JSON.parse(fs.readFileSync(STORE_FILE, "utf8")); if (!s.devices) s.devices = {}; if (!s.stations) s.stations = {}; if (!s.readings) s.readings = {}; if (!s.questions) s.questions = []; if (!s.parcels) s.parcels = {}; if (!s.parcelSoil) s.parcelSoil = {}; if (!s.coops) s.coops = {}; if (!s.coopMembers) s.coopMembers = []; if (!s.coopEquip) s.coopEquip = []; if (!s.coopResa) s.coopResa = []; if (!s.coopBuy) s.coopBuy = []; if (!s.coopBuyJoin) s.coopBuyJoin = []; if (!s.animReqs) s.animReqs = []; if (!s.certReqs) s.certReqs = []; if (!s.fieldLog) s.fieldLog = []; if (!s.parcelRef) s.parcelRef = {}; if (!s.parcelPair) s.parcelPair = {}; if (!s.distSites) s.distSites = []; if (!s.distLots) s.distLots = []; if (!s.parcelNdvi) s.parcelNdvi = {}; if (!s.satObs) s.satObs = []; if (!s.climateCache) s.climateCache = {}; if (!s.parcelFiche) s.parcelFiche = {}; return s; } catch (e) { return { users: {}, emails: {}, sessions: {}, plans: {}, devices: {}, stations: {}, readings: {}, questions: [], parcels: {}, parcelSoil: {}, coops: {}, coopMembers: [], coopEquip: [], coopResa: [], coopBuy: [], coopBuyJoin: [], animReqs: [], certReqs: [], fieldLog: [], parcelRef: {}, parcelPair: {}, distSites: [], distLots: [], parcelNdvi: {}, satObs: [], climateCache: {}, parcelFiche: {} }; } }
 function saveStore(s) { try { fs.writeFileSync(STORE_FILE, JSON.stringify(s, null, 2)); } catch (e) {} }
 
 // ---------- Mots de passe & sessions ----------
@@ -318,7 +326,7 @@ async function deleteParcelSoil(userId, parcelId) {
 
 // ---------- Carnet de champ (interventions et récoltes, par parcelle) ----------
 // residu : résidus valorisés (compost, paillis…), en kg ; germination : test de maturité du compost, en % de la levée du témoin.
-const LOG_KINDS = { arrosage: "L", pluie: "mm", compost: "kg", engrais: "kg", traitement: "L", semis: "", recolte: "kg", perte: "kg", residu: "kg", germination: "%", incident: "", observation: "" };
+const LOG_KINDS = { arrosage: "L", pluie: "mm", compost: "kg", engrais: "kg", traitement: "L", semis: "", recolte: "kg", perte: "kg", residu: "kg", germination: "%", incident: "", observation: "", vente: "kg" };
 // Le test de germination demande ses propres champs : il n'est pas proposé dans la saisie rapide de l'animateur.
 const COOP_LOG_KINDS = Object.fromEntries(Object.entries(LOG_KINDS).filter(([k]) => k !== "germination"));
 async function listFieldLog(userId, parcelId) {
@@ -365,8 +373,8 @@ async function addFieldLog(rec) {
     try { await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal,resolution=ignore-duplicates" }, body: JSON.stringify([rec]) }); }
     catch (e) {
       // Colonnes v8.0 (season, product) pas encore créées : on enregistre quand même l'essentiel.
-      if (!/season|product|column/i.test(e.message)) throw e;
-      const { season: _s, product: _p, ...base } = rec;
+      if (!/season|product|amount|column/i.test(e.message)) throw e;
+      const { season: _s, product: _p, amount_fcfa: _a, ...base } = rec;
       await sb(`/trv_field_log`, { method: "POST", headers: { Prefer: "return=minimal,resolution=ignore-duplicates" }, body: JSON.stringify([base]) });
       return "partial";
     }
@@ -635,11 +643,12 @@ async function geocodeCI(region) {
 }
 // Prévisions Open-Meteo pour des coordonnées précises (partagé par la météo région et GPS).
 async function openMeteoForecast(lat, lon) {
-  const f = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=4&timezone=auto`).then((r) => r.json());
+  const base = (process.env.OPEN_METEO_FORECAST_URL || "https://api.open-meteo.com").replace(/\/$/, "");
+  const f = await fetch(`${base}/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&forecast_days=4&timezone=auto`).then((r) => r.json());
   if (!f || !f.current) return null;
   return {
     current: { temp: Math.round(f.current.temperature_2m), hum: f.current.relative_humidity_2m, rain: f.current.precipitation, code: f.current.weather_code },
-    daily: f.daily ? f.daily.time.map((t, i) => ({ date: t, code: f.daily.weather_code[i], tmax: Math.round(f.daily.temperature_2m_max[i]), tmin: Math.round(f.daily.temperature_2m_min[i]), rainP: f.daily.precipitation_probability_max ? f.daily.precipitation_probability_max[i] : null })) : []
+    daily: f.daily ? f.daily.time.map((t, i) => ({ date: t, code: f.daily.weather_code[i], tmax: Math.round(f.daily.temperature_2m_max[i]), tmin: Math.round(f.daily.temperature_2m_min[i]), rainP: f.daily.precipitation_probability_max ? f.daily.precipitation_probability_max[i] : null, rainMm: f.daily.precipitation_sum ? f.daily.precipitation_sum[i] : null })) : []
   };
 }
 async function fetchWeather(region) {
@@ -668,7 +677,7 @@ async function fetchWeatherLatLon(lat, lon) {
   try {
     let place = "Ma position";
     try {
-      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=12&lat=${lat}&lon=${lon}`, { headers: { "User-Agent": "Terravive/1.0 (agriculture durable - Cote d'Ivoire)", "Accept-Language": "fr" } }).then((x) => x.json());
+      const r = await fetch(`${(process.env.NOMINATIM_URL || "https://nominatim.openstreetmap.org").replace(/\/$/, "")}/reverse?format=json&zoom=12&lat=${lat}&lon=${lon}`, { headers: { "User-Agent": "Terravive/1.0 (agriculture durable - Cote d'Ivoire)", "Accept-Language": "fr" } }).then((x) => x.json());
       if (r && r.display_name) place = String(r.display_name).split(",").slice(0, 2).map((s) => s.trim()).join(", ");
     } catch (e) {}
     const fc = await openMeteoForecast(lat, lon);
@@ -712,7 +721,7 @@ async function callClaudeOnce(system, messages, model, maxTokens, extra) {
   for (let i = 0; i < n; i++) {
     const key = API_KEYS[(start + i) % n];
     try {
-      const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body });
+      const r = await fetch(ANTHROPIC_BASE + "/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body });
       const data = await r.json().catch(() => ({}));
       if (r.ok) return (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
       const status = r.status; lastErr = Object.assign(new Error((data && data.error && data.error.message) || ("Erreur IA " + status)), { status });
@@ -733,7 +742,7 @@ async function streamClaude(system, messages, model, maxTokens, onText, extra) {
     const mk = () => JSON.stringify(Object.assign({ model: mdl, max_tokens: maxTokens || 4096, stream: true, system, messages: messages.map((m) => ({ role: m.role, content: m.content })) }, ex || {}));
     for (let i = 0; i < n; i++) {
       const body = mk(); let r;
-      try { r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": API_KEYS[(start + i) % n], "anthropic-version": "2023-06-01" }, body }); }
+      try { r = await fetch(ANTHROPIC_BASE + "/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": API_KEYS[(start + i) % n], "anthropic-version": "2023-06-01" }, body }); }
       catch (e) { lastErr = e; continue; }
       if (!r.ok) {
         const data = await r.json().catch(() => ({}));
@@ -965,11 +974,21 @@ const CHAT_LANGS = {
   agni: "agni",
   malinke: "malinké",
 };
-function advisorSystem(plan, lang) {
+function advisorSystem(plan, lang, parcelCtx) {
   let s = DURABLE_CONTEXT + `
 
 Tu réponds aux questions de l'agriculteur au fil de sa saison : diagnostic de problèmes (à partir de sa description : feuilles jaunes, taches, insectes, sol…), conseils d'arrosage, de fertilisation naturelle, de protection biologique, de récolte. Réponses courtes, concrètes, pas à pas. Si un symptôme peut avoir plusieurs causes, propose comment les distinguer. Termine par l'action durable la plus simple à essayer en premier.`;
   if (plan) s += `\n\nContexte de sa parcelle : culture « ${plan.crop} », région « ${plan.region || "?"} », sol « ${plan.soil || "?"} », saison « ${plan.season || "?"} ».`;
+  if (parcelCtx) s += `\n\nDONNÉES RÉELLES DE LA PARCELLE CHOISIE (enregistrées dans Terravive, à jour) :
+${parcelCtx}
+
+RÈGLES POUR CETTE RÉPONSE (obligatoires) :
+- Structure ta réponse avec ces titres (##) : « Ce que l'on sait » (uniquement des faits tirés des données ci-dessus ou de la question, en citant leur origine : carnet, satellite, climat, fiche), « Hypothèses » (ce qui est possible, avec le niveau de confiance en mots simples), « Ce que je recommande » (gestes concrets, adaptés aux moyens indiqués), « À vérifier sur le terrain ».
+- N'affirme JAMAIS une donnée absente des données ci-dessus. Si une information utile fait partie des « Données NON disponibles », dis-le et explique comment l'obtenir dans Terravive.
+- Une région n'est pas une zone homogène : raisonne sur CETTE parcelle (sol, culture, stade, climat local).
+- Respecte le mode de conduite choisi : en agriculture biologique ou agroécologique, aucune chimie de synthèse.
+- Ne recommande aucun produit phytosanitaire sans diagnostic fiable : propose d'abord l'observation, la photo (module Diagnostic) et des mesures préventives. Une baisse du NDVI signale une zone à inspecter, pas une maladie.
+- Si la situation dépasse ce que l'on peut évaluer à distance, recommande une inspection par l'animateur ou un agronome.`;
   const lname = lang && CHAT_LANGS[lang];
   if (lname) {
     s += `\n\nLANGUE : réponds en ${lname} (une langue de Côte d'Ivoire), dans un langage simple et parlé. C'est une aide de compréhension, pas une traduction officielle : si tu n'es pas sûr d'un mot technique, garde le terme en français entre parenthèses. Reste fidèle au conseil agronomique. Ne préviens pas que tu traduis, réponds directement.`;
@@ -1311,6 +1330,7 @@ async function handleParcelSave(req, res) {
   const name = (String(p.name || "").trim().slice(0, 80)) || ("Parcelle " + new Date().toLocaleDateString("fr-FR"));
   const rec = { id: newId(), user_id: user.id, name, geom: JSON.stringify(zone), created_at: new Date().toISOString() };
   await saveParcel(rec);
+  warmClimate(zone); // climat calculé en arrière-plan : prêt quand on ouvrira « Climat »
   sendJson(res, 200, { parcel: { id: rec.id, name, zone, created_at: rec.created_at } });
 }
 async function handleParcelDelete(req, res) {
@@ -1389,13 +1409,21 @@ function buildFieldLogRec(p, ownerId, parcel, rateKey, notePrefix) {
     qty = g.pct;
     auto = "Test de germination : " + g.summary + (g.kind === "absolu" ? " · sans témoin" : "");
   }
+  // Montant en FCFA : coût d'une intervention (facultatif) ou somme reçue pour une vente (obligatoire).
+  let amount = null;
+  if (p.amount_fcfa !== undefined && p.amount_fcfa !== null && String(p.amount_fcfa).trim() !== "") {
+    amount = Number(String(p.amount_fcfa).replace(/[\s ]/g, "").replace(",", "."));
+    if (!isFinite(amount) || amount < 0 || amount > 1e10) return { code: 400, error: "Montant invalide (FCFA)." };
+    amount = Math.round(amount);
+  }
+  if (kind === "vente" && (qty == null || qty <= 0 || amount == null)) return { code: 400, error: "Pour une vente, indiquez les kilos vendus et le montant reçu (FCFA)." };
   if (qty == null && !own && !auto) return { code: 400, error: "Indiquez une quantité ou une note." };
   const note = [notePrefix, auto, own].filter(Boolean).join(" · ").slice(0, 300) || null;
   if (!rateOk("log:" + rateKey, 200, 24 * 60 * 60 * 1000)) return { code: 429, error: "Beaucoup d'entrées aujourd'hui. Reprenez demain." };
   const season = String(p.season || "").trim().slice(0, 60) || IMPACT.defaultSeason(date);
   // Identifiant choisi par le téléphone : renvoyer la même saisie ne crée pas de doublon.
   const cid = String(p.client_id || "");
-  return { rec: { id: /^[a-f0-9]{24}$/.test(cid) ? cid : newId(), user_id: ownerId, parcel_id: parcel.id, date, kind, qty, unit: LOG_KINDS[kind] || null, product, season, note, created_at: new Date().toISOString() } };
+  return { rec: { id: /^[a-f0-9]{24}$/.test(cid) ? cid : newId(), user_id: ownerId, parcel_id: parcel.id, date, kind, qty, unit: LOG_KINDS[kind] || null, product, season, note, created_at: new Date().toISOString(), ...(amount != null ? { amount_fcfa: amount } : {}) } };
 }
 async function saveFieldLogRec(res, rec) {
   let partial = null;
@@ -1488,7 +1516,8 @@ async function handleImpactGet(req, res) {
   if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
   let rep; try { rep = await parcelReport(user, parcel); } catch (e) { return sendJson(res, 500, { error: LOG_SAVE_ERROR }); }
   const ref = await getParcelRef(parcel.id);
-  sendJson(res, 200, { report: rep, ref: ref && ref.user_id === user.id ? ref : null });
+  let eco = null; try { eco = ECO.economics(await listFieldLog(user.id, parcel.id), FERT.zoneAreaM2(parcel.zone)); } catch (e) {}
+  sendJson(res, 200, { report: rep, ref: ref && ref.user_id === user.id ? ref : null, economics: eco });
 }
 async function handleImpactCsv(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
@@ -1610,6 +1639,7 @@ async function handleParcelSoil(req, res) {
   }
   rec.updated_at = now;
   try { await saveParcelSoil(rec); } catch (e) { console.error("saveParcelSoil:", e.message); return sendJson(res, 500, { error: SOIL_SAVE_ERROR }); }
+  warmClimate(parcel.zone);
   sendJson(res, 200, { fiche: await buildSoilFiche(parcel, rec) });
 }
 // POST { id, texture, depth_cm, stones } : correction de terrain (test du bocal, fosse). Vide = on efface.
@@ -1635,6 +1665,7 @@ async function handleParcelSoilManual(req, res) {
   rec.manual = (texture || dep.v != null || sto.v != null) ? { texture, depth_cm: dep.v, stones: sto.v, at: now } : null;
   rec.updated_at = now;
   try { await saveParcelSoil(rec); } catch (e) { console.error("saveParcelSoil:", e.message); return sendJson(res, 500, { error: SOIL_SAVE_ERROR }); }
+  warmClimate(parcel.zone);
   sendJson(res, 200, { fiche: await buildSoilFiche(parcel, rec) });
 }
 // Conseil de la parcelle la plus récemment analysée (seuil d'arrosage de la station).
@@ -1913,10 +1944,13 @@ async function handleChat(req, res) {
   let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
   const q = String(p.message || "").trim(); if (!q) return sendJson(res, 400, { error: "Message vide." });
   let plan = null; if (p.planId) { const pl = await getPlan(p.planId); if (pl && pl.user_id === user.id) plan = pl; }
+  // Parcelle choisie : le conseiller reçoit sa fiche réelle (jamais celle d'un autre compte).
+  let parcelCtx = null;
+  if (p.parcel_id) { const parcel = await findUserParcel(user.id, String(p.parcel_id)); if (parcel) { try { parcelCtx = PARCELLE.contextText(await parcelContext(user.id, parcel)); } catch (e) { console.error("contexte parcelle :", e.message); } } }
   const lang = (typeof p.lang === "string" && Object.prototype.hasOwnProperty.call(CHAT_LANGS, p.lang) && p.lang !== "fr") ? p.lang : null;
   const history = Array.isArray(p.history) ? p.history.slice(-8).filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string").map((m) => ({ role: m.role, content: m.content.slice(0, 2000) })) : [];
   try {
-    const reply = await callClaude(advisorSystem(plan, lang), history.concat([{ role: "user", content: q.slice(0, 2000) }]));
+    const reply = await callClaude(advisorSystem(plan, lang, parcelCtx), history.concat([{ role: "user", content: q.slice(0, 2000) }]));
     sendJson(res, 200, { reply });
     // Journal (après la réponse, sans bloquer) : ce que les cultivateurs cherchent à comprendre.
     logQuestion({ id: newId(), user_id: user.id, question: q.slice(0, 400), crop: (plan && plan.crop) || String(p.crop || "").slice(0, 80) || null, created_at: new Date().toISOString() });
@@ -2351,6 +2385,258 @@ async function handleParcelNdvi(req, res) {
   const clampPct = (x) => (Number.isFinite(x) ? Math.max(0, Math.min(100, Math.round(x * 10) / 10)) : null);
   const rec = { parcel_id: p.parcel_id, user_id: user.id, ndvi: Math.round(nd * 1000) / 1000, pct_faible: clampPct(f), pct_moyen: clampPct(m), measured_at: new Date().toISOString() };
   await saveParcelNdvi(rec); sendJson(res, 200, { ndvi: rec, health: DIST.healthOf(rec) });
+}
+
+// ================================================================
+// Vertea, moteur satellite intégré : le navigateur n'appelle plus Vertea directement.
+// Le serveur Terravive relaie (/api/sat/<opération>), ajoute le jeton partagé, limite l'usage,
+// et garde chaque observation dans l'historique de la parcelle (comparaison dans le temps, alertes).
+// ================================================================
+const VERTEA_URL = (process.env.VERTEA_URL || "https://agriscan-z7dc.onrender.com").replace(/\/$/, "");
+const VERTEA_TOKEN = process.env.VERTEA_TOKEN || "";
+const SAT_OPS = new Set(["ndvi", "evolution", "anomalie", "irrigation", "irrigation_carte", "irrigation_evolution", "plantation"]);
+async function verteaCall(op, body, timeoutMs) {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), timeoutMs || 110000);
+  try {
+    const r = await fetch(VERTEA_URL + "/" + op, { method: "POST", signal: ctl.signal, headers: Object.assign({ "content-type": "application/json" }, VERTEA_TOKEN ? { "X-Vertea-Token": VERTEA_TOKEN } : {}), body: JSON.stringify(body) });
+    let j = null; try { j = await r.json(); } catch (e) { j = null; }
+    return { status: r.status, json: j };
+  } catch (e) {
+    return { status: 0, json: { erreur: e.name === "AbortError" ? "Le moteur satellite met trop de temps à répondre. Réessayez dans un instant." : "Moteur satellite injoignable pour le moment." } };
+  } finally { clearTimeout(t); }
+}
+async function saveSatObs(rec) {
+  if (USE_DB) { try { await sb(`/trv_sat_obs`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("saveSatObs (exécutez schema.sql) :", e.message); } return; }
+  const s = loadStore(); s.satObs = s.satObs || []; s.satObs.push(rec); saveStore(s);
+}
+async function listSatObs(parcelId, kind, limit) {
+  if (USE_DB) { try { return (await sb(`/trv_sat_obs?parcel_id=eq.${encodeURIComponent(parcelId)}${kind ? "&kind=eq." + encodeURIComponent(kind) : ""}&select=*&order=created_at.desc&limit=${limit || 50}`)) || []; } catch (e) { return []; } }
+  return (loadStore().satObs || []).filter((x) => x.parcel_id === parcelId && (!kind || x.kind === kind)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, limit || 50);
+}
+function parseObs(o) { const x = Object.assign({}, o); if (typeof x.summary === "string") { try { x.summary = JSON.parse(x.summary); } catch (e) { x.summary = null; } } return x; }
+async function handleSat(req, res, op) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Connectez-vous pour lancer une analyse satellite." });
+  if (!SAT_OPS.has(op)) return sendJson(res, 404, { error: "Analyse inconnue." });
+  if (!rateOk("sat:" + user.id, 80, 24 * 60 * 60 * 1000)) return sendJson(res, 429, { error: "Limite quotidienne d'analyses satellite atteinte. Réessayez demain." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  let parcel = null;
+  if (p.parcel_id) { parcel = await findUserParcel(user.id, String(p.parcel_id)); if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." }); }
+  const zone = parcel ? parcel.zone : cleanZone(p);
+  if (!zone) return sendJson(res, 400, { error: "Dessinez d'abord une parcelle valide sur la carte." });
+  const body = Object.assign({}, p, zone); delete body.parcel_id;
+  const r = await verteaCall(op, body);
+  if (r.status !== 200 || !r.json || r.json.erreur) return sendJson(res, r.status && r.status !== 200 ? (r.status === 401 ? 502 : r.status) : 502, { erreur: (r.json && r.json.erreur) || "Analyse satellite impossible pour le moment." });
+  const out = Object.assign({}, r.json);
+  if (op === "ndvi") {
+    const sum = SAT.ndviSummary(out);
+    out.fiabilite = SAT.reliability(sum);
+    if (parcel) {
+      const prev = (await listSatObs(parcel.id, "ndvi", 1)).map(parseObs)[0];
+      const prevSum = prev && prev.summary ? Object.assign({ at: prev.created_at }, prev.summary) : null;
+      out.interpretation = SAT.interpretNdvi(sum, prevSum);
+      const now = new Date().toISOString();
+      await saveSatObs({ id: newId(), parcel_id: parcel.id, user_id: user.id, kind: "ndvi", created_at: now, summary: JSON.stringify(Object.assign({}, sum, { level: out.interpretation.level })) });
+      if (sum.ndvi != null) await saveParcelNdvi({ parcel_id: parcel.id, user_id: user.id, ndvi: sum.ndvi, pct_faible: sum.pct_faible, pct_moyen: sum.pct_moyen, measured_at: now });
+    } else out.interpretation = SAT.interpretNdvi(sum, null);
+  } else if (parcel && op === "anomalie") {
+    await saveSatObs({ id: newId(), parcel_id: parcel.id, user_id: user.id, kind: "anomalie", created_at: new Date().toISOString(), summary: JSON.stringify({ pct_degrade: out.pct_degrade, pct_stable: out.pct_stable, pct_ameliore: out.pct_ameliore, ref: out.periode_reference, rec: out.periode_recente }) });
+  }
+  sendJson(res, 200, out);
+}
+async function handleSatHistory(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const id = new URL(req.url, "http://x").searchParams.get("parcel") || "";
+  const parcel = await findUserParcel(user.id, id); if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const obs = (await listSatObs(parcel.id, null, 60)).map(parseObs);
+  sendJson(res, 200, { parcel: { id: parcel.id, name: parcel.name }, observations: obs.map((o) => ({ kind: o.kind, at: o.created_at, summary: o.summary, reliability: o.kind === "ndvi" && o.summary ? SAT.reliability(o.summary) : null })) });
+}
+
+// ================================================================
+// Climat de la parcelle : ~35 ans de données journalières, deux sources indépendantes, mêmes calculs.
+//   - « era5 »   : ERA5 via les archives Open-Meteo (sans compte ; clé facultative OPEN_METEO_API_KEY)
+//   - « chirps » : pluie CHIRPS + températures ERA5-Land via Google Earth Engine (moteur Vertea)
+// Les résultats sont mis en cache (le climat passé ne change pas) : 90 jours, par point arrondi à ~1 km.
+// ================================================================
+const CLIMATE_TTL = 90 * 24 * 3600 * 1000;
+const OPEN_METEO_KEY = process.env.OPEN_METEO_API_KEY || "";
+function climateYears() { const last = new Date().getUTCFullYear() - 1; return [Math.max(1991, last - 34), last]; }
+async function getClimateCache(key) {
+  if (USE_DB) { try { const r = await sb(`/trv_climate_cache?key=eq.${encodeURIComponent(key)}&select=*&limit=1`); const x = r && r[0]; if (x && typeof x.result === "string") { try { x.result = JSON.parse(x.result); } catch (e) { return null; } } return x || null; } catch (e) { return null; } }
+  return (loadStore().climateCache || {})[key] || null;
+}
+async function setClimateCache(key, result) {
+  const rec = { key, result: JSON.stringify(result), created_at: new Date().toISOString() };
+  if (USE_DB) { try { await sb(`/trv_climate_cache?on_conflict=key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([rec]) }); } catch (e) { console.error("setClimateCache (exécutez schema.sql) :", e.message); } return; }
+  const s = loadStore(); s.climateCache = s.climateCache || {}; s.climateCache[key] = Object.assign({}, rec, { result }); saveStore(s);
+}
+async function fetchEra5OpenMeteo(lat, lon, y0, y1) {
+  const host = (process.env.OPEN_METEO_ARCHIVE_URL || (OPEN_METEO_KEY ? "https://customer-archive-api.open-meteo.com" : "https://archive-api.open-meteo.com")).replace(/\/$/, "");
+  const url = `${host}/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${y0}-01-01&end_date=${y1}-12-31&daily=precipitation_sum,temperature_2m_max,temperature_2m_min,et0_fao_evapotranspiration&timezone=UTC` + (OPEN_METEO_KEY ? `&apikey=${encodeURIComponent(OPEN_METEO_KEY)}` : "");
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 60000);
+  try {
+    const r = await fetch(url, { signal: ctl.signal }); const j = await r.json().catch(() => null);
+    if (!r.ok || !j || j.error || !j.daily) throw new Error((j && j.reason) || ("HTTP " + r.status));
+    return { dates: j.daily.time, pluie: j.daily.precipitation_sum, tmax: j.daily.temperature_2m_max, tmin: j.daily.temperature_2m_min, et0: j.daily.et0_fao_evapotranspiration || null };
+  } finally { clearTimeout(t); }
+}
+async function fetchChirpsVertea(lat, lon, y0, y1) {
+  const r = await verteaCall("climat", { lat, lon, annee_debut: y0, annee_fin: y1 }, 115000);
+  if (r.status !== 200 || !r.json || r.json.erreur || !r.json.dates) throw new Error((r.json && r.json.erreur) || "Moteur satellite indisponible.");
+  return { dates: r.json.dates, pluie: r.json.pluie, tmax: r.json.tmax, tmin: r.json.tmin };
+}
+const CLIMATE_SOURCES = {
+  era5: { label: "ERA5 (réanalyse ECMWF, via Open-Meteo)", detail: "Pluie et températures ERA5, maille ~25 km.", limits: "Réanalyse à maille large : la pluie y est lissée et les extrêmes journaliers sous-estimés.", fetch: fetchEra5OpenMeteo },
+  chirps: { label: "CHIRPS (pluie, satellite + stations) et ERA5-Land (températures), via Google Earth Engine", detail: "Pluie CHIRPS ~5 km ; températures ERA5-Land ~9 km.", limits: "Estimations satellitaires : à valider avec des stations au sol ; extrêmes journaliers parfois sous-estimés.", fetch: fetchChirpsVertea }
+};
+const CLIMATE_INFLIGHT = new Map();
+// v2 : la climatologie jour par jour (calendrier des cultures) fait partie du résultat gardé.
+function climateKey(src, lat, lon) { const [y0, y1] = climateYears(); return `v2:${src}:${Number(lat).toFixed(2)}:${Number(lon).toFixed(2)}:${y0}-${y1}`; }
+async function cachedClimate(src, lat, lon) { const c = await getClimateCache(climateKey(src, lat, lon)); return c && c.result && Date.now() - Date.parse(c.created_at) < CLIMATE_TTL ? Object.assign({ cached_at: c.created_at }, c.result) : null; }
+// Calcul en arrière-plan (parcelle enregistrée, culture modifiée) : quand on ouvre « Climat », c'est prêt.
+function warmClimate(zone) {
+  // Pendant les tests automatiques, jamais d'appel réseau en arrière-plan (sauf demande explicite).
+  if (process.env.NODE_ENV === "test" && process.env.CLIMATE_WARM !== "1") return;
+  const c = DIST.zoneCenter(zone); if (!c) return;
+  const lat = Math.round(c.lat * 100) / 100, lon = Math.round(c.lon * 100) / 100;
+  Object.keys(CLIMATE_SOURCES).forEach((src) => { climateForPoint(src, lat, lon, false).catch((e) => console.error("climat (arrière-plan, " + src + ") :", String(e.message || e).slice(0, 160))); });
+}
+// Le climat appliqué à la culture de la parcelle (lit le cache seulement : rapide).
+async function cropClimateFor(userId, parcel, srcs) {
+  const center = DIST.zoneCenter(parcel.zone); if (!center) return null;
+  const lat = Math.round(center.lat * 100) / 100, lon = Math.round(center.lon * 100) / 100;
+  const era5 = (srcs && srcs.era5 && !srcs.era5.error ? srcs.era5 : null) || await cachedClimate("era5", lat, lon);
+  const chirps = (srcs && srcs.chirps && !srcs.chirps.error ? srcs.chirps : null) || await cachedClimate("chirps", lat, lon);
+  const tempSrc = era5 || chirps; if (!tempSrc || !tempSrc.clim) return null;
+  const rainSrc = chirps && chirps.clim ? chirps : tempSrc;
+  const [soil, fiche] = await Promise.all([getParcelSoil(parcel.id), getParcelFiche(parcel.id)]);
+  return CLIMCULT.cropClimate({ cropName: soil && soil.crop, sownAt: soil && soil.sown_at, areaM2: FERT.zoneAreaM2(parcel.zone), irrigation: fiche && fiche.irrigation, soil: soil || {},
+    clim: Object.assign({}, tempSrc.clim, { label: tempSrc.label }), rainClim: Object.assign({}, rainSrc.clim, { label: rainSrc.label }), today: new Date().toISOString().slice(0, 10) });
+}
+// Ce qui part vers le navigateur : sans les grosses séries internes (climatologie jour par jour, pluie de chaque année).
+function publicClimate(x) { if (!x || x.error || !x.clim) return x; const o = Object.assign({}, x); o.clim = { hot35_by_month: x.clim.hot35_by_month }; return o; }
+async function climateForPoint(src, lat, lon, refresh) {
+  const [y0, y1] = climateYears(), key = climateKey(src, lat, lon);
+  if (!refresh) { const c = await getClimateCache(key); if (c && Date.now() - Date.parse(c.created_at) < CLIMATE_TTL) return Object.assign({ cached_at: c.created_at }, c.result); }
+  if (CLIMATE_INFLIGHT.has(key)) return CLIMATE_INFLIGHT.get(key);
+  const job = (async () => {
+    const series = await CLIMATE_SOURCES[src].fetch(lat, lon, y0, y1);
+    const a = CLIMAT.analyse(series, { base: [Math.max(y0, 1991), Math.min(y1, 2020)] });
+    if (a.error) throw new Error(a.error);
+    const result = Object.assign({ source: src, label: CLIMATE_SOURCES[src].label, detail: CLIMATE_SOURCES[src].detail, limits: CLIMATE_SOURCES[src].limits, computed_at: new Date().toISOString() }, a);
+    await setClimateCache(key, result);
+    return result;
+  })();
+  CLIMATE_INFLIGHT.set(key, job);
+  try { return await job; } finally { CLIMATE_INFLIGHT.delete(key); }
+}
+async function handleParcelClimate(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const u = new URL(req.url, "http://x"), id = u.searchParams.get("parcel") || "", refresh = u.searchParams.get("refresh") === "1";
+  const parcel = await findUserParcel(user.id, id); if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const c = DIST.zoneCenter(parcel.zone); if (!c) return sendJson(res, 400, { error: "Position de la parcelle inconnue." });
+  if (refresh && !rateOk("climate:" + user.id, 10, 24 * 3600 * 1000)) return sendJson(res, 429, { error: "Trop de recalculs aujourd'hui." });
+  const lat = Math.round(c.lat * 100) / 100, lon = Math.round(c.lon * 100) / 100;
+  // ?source=era5 ou chirps : on calcule cette source (l'autre est lue en cache si elle est prête) ;
+  // l'écran affiche ainsi ERA5 (rapide) sans attendre CHIRPS (Earth Engine, plus lent).
+  const only = CLIMATE_SOURCES[u.searchParams.get("source")] ? u.searchParams.get("source") : null;
+  const out = {};
+  await Promise.all(Object.keys(CLIMATE_SOURCES).map(async (src) => {
+    if (only && src !== only) { const cc = await cachedClimate(src, lat, lon); out[src] = cc || { source: src, label: CLIMATE_SOURCES[src].label, pending: true }; return; }
+    try { out[src] = await climateForPoint(src, lat, lon, refresh); }
+    catch (e) { out[src] = { source: src, label: CLIMATE_SOURCES[src].label, error: "Données indisponibles pour le moment (" + String(e.message || e).slice(0, 160) + ")." }; }
+  }));
+  const ok = Object.values(out).filter((x) => x && !x.error && !x.pending);
+  const comparison = ok.length === 2 ? CLIMAT.compareSources(out.chirps, out.era5) : null;
+  let crop = null; try { crop = await cropClimateFor(user.id, parcel, out); } catch (e) { console.error("climat × culture :", e.message); }
+  const pub = {}; Object.keys(out).forEach((k) => { pub[k] = publicClimate(out[k]); });
+  sendJson(res, 200, { parcel: { id: parcel.id, name: parcel.name }, point: { lat, lon }, years: climateYears(), sources: pub, comparison, crop });
+}
+
+// ================================================================
+// Fiche parcelle unifiée (variété, mode de conduite, stade, campagne, moyens) + contexte partagé
+// par le conseiller, les alertes et l'itinéraire. Une seule source de vérité par parcelle.
+// ================================================================
+async function getParcelFiche(parcelId) {
+  if (USE_DB) { try { const r = await sb(`/trv_parcel_fiche?parcel_id=eq.${encodeURIComponent(parcelId)}&select=*&limit=1`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return (loadStore().parcelFiche || {})[parcelId] || null;
+}
+async function saveParcelFiche(rec) {
+  if (USE_DB) { await sb(`/trv_parcel_fiche?on_conflict=parcel_id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([rec]) }); return; }
+  const s = loadStore(); s.parcelFiche = s.parcelFiche || {}; s.parcelFiche[rec.parcel_id] = rec; saveStore(s);
+}
+async function getParcelNdvi(parcelId) {
+  if (USE_DB) { try { const r = await sb(`/trv_parcel_ndvi?parcel_id=eq.${encodeURIComponent(parcelId)}&select=*&limit=1`); return (r && r[0]) || null; } catch (e) { return null; } }
+  return (loadStore().parcelNdvi || {})[parcelId] || null;
+}
+// Climat déjà calculé (cache seulement : jamais d'appel lent ici) → phrases « défavorables ».
+async function cachedClimateLines(center) {
+  if (!center) return null;
+  const [y0, y1] = climateYears(), lat = Math.round(center.lat * 100) / 100, lon = Math.round(center.lon * 100) / 100;
+  for (const src of ["chirps", "era5"]) {
+    const r = await cachedClimate(src, lat, lon);
+    if (r && r.readings) {
+      const c = { result: r }, rs = r.readings;
+      const lines = rs.filter((r) => ["CDD", "R50mm", "SU35", "TR23", "PRCPTOT"].includes(r.code)).map((r) => r.name + " : " + r.mean + " " + r.unit + "/an" + (r.trend && r.trend.significant ? ", " + r.trend.direction + " nette (" + r.trend.slope_per_decade + "/décennie)" : ""));
+      return { source: c.result.label, lines };
+    }
+  }
+  return null;
+}
+async function parcelContext(userId, parcel) {
+  const [fiche, soil, entries, ndvi] = await Promise.all([getParcelFiche(parcel.id), getParcelSoil(parcel.id), listFieldLog(userId, parcel.id).catch(() => []), getParcelNdvi(parcel.id)]);
+  const center = DIST.zoneCenter(parcel.zone), areaM2 = FERT.zoneAreaM2(parcel.zone);
+  const clim = await cachedClimateLines(center);
+  let cropLines = []; try { cropLines = CLIMCULT.cropClimateLines(await cropClimateFor(userId, parcel)); } catch (e) {}
+  const base = { name: parcel.name, fiche: fiche || {}, soil: soil || {}, entries: entries || [], ndvi, areaM2, center, climate: clim ? clim.lines : null, climateSource: clim ? clim.source : null, cropClimate: cropLines };
+  const check = PARCELLE.checkParcel(base);
+  return Object.assign(base, check);
+}
+// Alertes de toutes les parcelles du compte (satellite, prévisions des prochains jours, carnet, fiche).
+async function handleAlerts(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const rows = (await listParcelsForUser(user.id)).slice(0, 12), today = new Date().toISOString().slice(0, 10);
+  const all = [];
+  await Promise.all(rows.map(async (row) => {
+    const parcel = await findUserParcel(user.id, row.id); if (!parcel) return;
+    try {
+      const ctx = await parcelContext(user.id, parcel);
+      const last = (await listSatObs(parcel.id, "ndvi", 1)).map(parseObs)[0];
+      let forecast = [];
+      if (ctx.center) { try { const w = await fetchWeatherLatLon(Math.round(ctx.center.lat * 1000) / 1000, Math.round(ctx.center.lon * 1000) / 1000); forecast = (w && w.daily) || []; } catch (e) {} }
+      let cc = null; try { cc = await cropClimateFor(user.id, parcel); } catch (e) {}
+      ALERTES.parcelAlerts({ cropClimate: cc && !cc.error ? cc : null, parcel: { id: parcel.id, name: parcel.name }, fiche: ctx.fiche, soil: ctx.soil, lastNdvi: last ? { at: last.created_at, summary: last.summary } : null, forecast, warnings: ctx.warnings, missing: ctx.missing, today }).forEach((a) => all.push(a));
+    } catch (e) { console.error("alertes :", e.message); }
+  }));
+  const rank = { inspect: 0, watch: 1, info: 2 };
+  sendJson(res, 200, { alerts: all.sort((a, b) => rank[a.level] - rank[b.level]) });
+}
+// Climat × culture d'une parcelle, lu en cache (rapide) : utilisé par l'écran « Aujourd'hui » du planteur.
+async function handleCropClimate(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const parcel = await findUserParcel(user.id, new URL(req.url, "http://x").searchParams.get("parcel") || ""); if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  let cc = null; try { cc = await cropClimateFor(user.id, parcel); } catch (e) {}
+  if (!cc) warmClimate(parcel.zone);
+  sendJson(res, 200, { crop: cc, ready: !!cc });
+}
+async function handleFicheGet(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const id = new URL(req.url, "http://x").searchParams.get("parcel") || "";
+  const parcel = await findUserParcel(user.id, id); if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const ctx = await parcelContext(user.id, parcel);
+  sendJson(res, 200, { parcel: { id: parcel.id, name: parcel.name, area_m2: Math.round(ctx.areaM2 || 0) }, fiche: ctx.fiche, crop: ctx.soil.crop || null, sown_at: ctx.soil.sown_at || null,
+    missing: ctx.missing, warnings: ctx.warnings, completeness: ctx.completeness,
+    options: { mode: PARCELLE.MODES, stage: PARCELLE.STAGES, irrigation: PARCELLE.IRRIGATION, mechanization: PARCELLE.MECA, budget: PARCELLE.BUDGET } });
+}
+async function handleFicheSave(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  let p = {}; try { p = JSON.parse((await readBody(req)) || "{}"); } catch (e) { return sendJson(res, 400, { error: "Requête invalide." }); }
+  const parcel = await findUserParcel(user.id, String(p.parcel_id || "")); if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  const chk = PARCELLE.checkFicheInput(p); if (chk.error) return sendJson(res, 400, { error: chk.error });
+  const old = (await getParcelFiche(parcel.id)) || {};
+  const rec = Object.assign({}, old, chk.fiche, { parcel_id: parcel.id, user_id: user.id, updated_at: new Date().toISOString() });
+  try { await saveParcelFiche(rec); } catch (e) { console.error("saveParcelFiche :", e.message); return sendJson(res, 500, { error: "Enregistrement impossible (base à mettre à jour : exécutez schema.sql)." }); }
+  const ctx = await parcelContext(user.id, parcel);
+  sendJson(res, 200, { fiche: ctx.fiche, missing: ctx.missing, warnings: ctx.warnings, completeness: ctx.completeness });
 }
 
 // ---------- Fichiers statiques ----------
@@ -3709,6 +3995,13 @@ async function routeRequest(req, res) {
   if (req.method === "GET" && url === "/api/today") return handleToday(req, res);
   if (req.method === "GET" && url === "/api/parcels") return handleParcelsList(req, res);
   if (req.method === "POST" && url === "/api/parcels/ndvi") return handleParcelNdvi(req, res);
+  if (req.method === "POST" && url.startsWith("/api/sat/")) return handleSat(req, res, url.slice(9));
+  if (req.method === "GET" && url === "/api/parcels/sat") return handleSatHistory(req, res);
+  if (req.method === "GET" && url === "/api/parcels/climate") return handleParcelClimate(req, res);
+  if (req.method === "GET" && url === "/api/parcels/fiche") return handleFicheGet(req, res);
+  if (req.method === "GET" && url === "/api/alerts") return handleAlerts(req, res);
+  if (req.method === "GET" && url === "/api/parcels/crop-climate") return handleCropClimate(req, res);
+  if (req.method === "POST" && url === "/api/parcels/fiche") return handleFicheSave(req, res);
   if (req.method === "GET" && url === "/api/dist") return handleDistGet(req, res);
   if (req.method === "POST" && url === "/api/dist/site") return handleDistSite(req, res);
   if (req.method === "POST" && url === "/api/dist/site/delete") return handleDistSiteDelete(req, res);
