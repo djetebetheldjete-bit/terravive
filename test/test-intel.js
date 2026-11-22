@@ -54,7 +54,7 @@ const mock = http.createServer((req, res) => {
       calls.meteo++;
       const y0 = +u.searchParams.get("start_date").slice(0, 4), y1 = +u.searchParams.get("end_date").slice(0, 4);
       const s = series(y0, y1, 0);
-      return send(200, { daily: { time: s.dates, precipitation_sum: s.pluie, temperature_2m_max: s.tmax, temperature_2m_min: s.tmin } });
+      return send(200, { daily: { time: s.dates, precipitation_sum: s.pluie, temperature_2m_max: s.tmax, temperature_2m_min: s.tmin, et0_fao_evapotranspiration: s.dates.map((d, i) => (s.pluie[i] > 0 ? 3.4 : 4.6)) } });
     }
     calls.tokens.push(req.headers["x-vertea-token"] || "");
     let p = {}; try { p = JSON.parse(body || "{}"); } catch (e) {}
@@ -166,6 +166,32 @@ async function main() {
       assert.ok(!r.json.missing.some((m) => ["variety", "mode", "stage", "irrigation", "crop", "sown_at", "soil", "ndvi"].includes(m.field)), JSON.stringify(r.json.missing));
       assert.strictEqual(r.json.completeness, 100);
       assert.strictEqual((await req("GET", "/api/parcels/fiche?parcel=" + parcelId, { cookie: other })).status, 404, "fiche privée");
+    });
+    await t.test("climat appliqué à la culture : calendrier des stades, arrosage selon le sol, meilleure période de semis", async () => {
+      const r = await req("GET", "/api/parcels/climate?parcel=" + parcelId, { cookie: C });
+      assert.strictEqual(r.status, 200, r.text);
+      const c = r.json.crop;
+      assert.ok(c && !c.error, JSON.stringify(c).slice(0, 300));
+      assert.strictEqual(c.crop, "tomate"); assert.strictEqual(c.calendar.length, 4);
+      assert.strictEqual(c.calendar[0].from, daysAgo(70), "le calendrier part de la date de semis");
+      assert.ok(c.calendar.some((s) => s.dose_l_m2 > 0 && s.interval_days >= 1 && s.interval_days <= 14 && (s.cans_per_watering > 0 || s.cans_impractical)), "dose, fréquence et arrosoirs calculés (sol sableux connu, irrigation à l'arrosoir)");
+      assert.ok(c.sowing.best.length >= 1 && c.sowing.current && c.sowing.current.verdict, "meilleure période de semis et avis sur le semis réel");
+      assert.ok(c.irrigation.total_need_mm != null, "besoin total sur le cycle");
+      assert.ok(!r.json.sources.era5.clim.doy, "les séries internes ne partent pas vers le navigateur");
+      const q = await req("GET", "/api/parcels/crop-climate?parcel=" + parcelId, { cookie: C });
+      assert.strictEqual(q.json.ready, true); assert.strictEqual(q.json.crop.crop, "tomate");
+      calls.ai.length = 0;
+      await post("/api/chat", C, { message: "Quand arroser ?", parcel_id: parcelId });
+      assert.ok(calls.ai[0].system.includes("Climat appliqué à cette culture"), "le conseiller reçoit le climat appliqué à la culture");
+    });
+    await t.test("affichage progressif : ERA5 tout de suite, CHIRPS ensuite", async () => {
+      const far = await post("/api/parcels", C, { name: "Champ de Soubré", zone: { bbox: [-6.60, 5.78, -6.5996, 5.7804] } });
+      const id2 = far.json.parcel.id;
+      const a = await req("GET", "/api/parcels/climate?parcel=" + id2 + "&source=era5", { cookie: C });
+      assert.ok(a.json.sources.era5 && !a.json.sources.era5.pending, "ERA5 calculé");
+      assert.strictEqual(a.json.sources.chirps.pending, true, "CHIRPS annoncé « en cours »");
+      const b = await req("GET", "/api/parcels/climate?parcel=" + id2 + "&source=chirps", { cookie: C });
+      assert.ok(b.json.sources.chirps && !b.json.sources.chirps.pending && !b.json.sources.chirps.error && b.json.comparison, "CHIRPS ajouté, sources comparées");
     });
     await t.test("5. observation notée ; envoyée deux fois (réseau coupé), elle n'est gardée qu'une fois", async () => {
       const cid = "a1b2c3d4e5f6a7b8c9d0e1f2";

@@ -387,6 +387,22 @@ async function loadAlerts(){
       +a.map(function(x){ return '<div class="alrt lv-'+x.level+'"><i class="dot"></i><div><b>'+esc(x.title)+(PARCELS.length>1?' · '+esc(x.parcel):'')+'</b><span>'+esc(x.text)+'</span><small>Source : '+esc(x.source)+'</small></div></div>'; }).join("")+'</div>';
   }catch(e){}
 }
+// Aujourd'hui : le stade en cours, avec l'arrosage et les conseils tirés du climat de la parcelle.
+async function loadStageClimate(id){
+  try{ var r=await fetch("/api/parcels/crop-climate?parcel="+encodeURIComponent(id)); if(!r.ok) return; var d=await r.json(); var c=d.crop;
+    if(!c||c.error||!c.calendar||!cur||cur.id!==id) return;
+    var today=new Date().toISOString().slice(0,10), s=c.calendar.filter(function(x){ return x.from<=today&&x.to>=today; })[0]; if(!s) return;
+    var lines=[];
+    if(s.dose_l_m2) lines.push("<b>Arrosage conseillé :</b> environ "+s.dose_l_m2+" L/m² tous les "+s.interval_days+" jours"+(s.cans_per_watering?" — "+s.cans_per_watering+" arrosoirs de 10 L pour la parcelle":s.cans_impractical?" — trop pour l'arrosoir sur toute la parcelle : arrosez au pied des plants":"")+".");
+    else if(s.need_mm!=null&&s.need_mm<5) lines.push("<b>Arrosage :</b> en année normale, la pluie suffit à ce stade. Arrosez seulement s'il ne pleut pas pendant plusieurs jours.");
+    s.advice.forEach(function(a){ lines.push(esc(a)); });
+    if(!lines.length) return;
+    var el=document.createElement("div"); el.className="panel pin"; el.style.marginBottom="12px";
+    el.innerHTML='<div class="phd"><span class="pi">'+ic("water",18)+'</span><h3>'+esc(s.label)+'</h3><span class="tag ok">jusqu\'au '+new Date(s.to+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})+'</span></div>'
+      +lines.map(function(l){ return '<p style="margin-top:6px">'+l+'</p>'; }).join("")+'<p style="font-size:.72rem;color:var(--faint);margin-top:8px">D\'après le climat de votre parcelle (année moyenne) : ajustez selon la pluie tombée.</p>';
+    var tb=$("todayBody"); if(tb&&tb.firstChild) tb.insertBefore(el, tb.firstChild); else if(tb) tb.appendChild(el);
+  }catch(e){}
+}
 // Aujourd'hui : progression des tâches faites dans la journée.
 function updateProg(){
   var box=$("tProg"); if(!box||!cur) return;
@@ -475,6 +491,7 @@ function openParcel(id){
   if(window.trvCanSpeak&&trvCanSpeak()&&t.speech){ lb.style.display=""; lb.innerHTML=ic("speaker",18)+" Écouter"; } else lb.style.display="none";
   renderTodayBody(t);
   go("today");
+  loadStageClimate(id);
 }
 function fdate(iso){ try{ return new Date(String(iso).slice(0,10)+"T12:00:00").toLocaleDateString("fr-FR"); }catch(e){ return iso; } }
 function taskCard(x,parcelId,i){

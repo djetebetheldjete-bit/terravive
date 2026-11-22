@@ -1318,15 +1318,37 @@ html.simple .adv{display:none!important}
 
   // ===== Climat de ma parcelle : ~35 ans, deux sources (CHIRPS via Earth Engine, ERA5 via Open-Meteo) =====
   let climData=null, climSrc=null;
-  async function openClimate(id){
+  // ---- « Pour votre culture » : le climat de la parcelle appliqué à la culture en cours ----
+  function cropHtml(c){
+    if(!c) return "";
+    if(c.error) return '<div class="valert warn" style="margin-bottom:10px"><b>Pour votre culture :</b> '+esc(c.error)+'</div>';
+    const fd=(s)=>new Date(s+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"}), n=(x)=>x==null?"—":Number(x).toLocaleString("fr-FR");
+    let h='<div style="border:1px solid var(--leaf);border-radius:12px;padding:12px 14px;margin-bottom:12px;background:color-mix(in srgb,var(--leaf) 5%,var(--surface))">'
+      +'<div style="font-weight:700;color:var(--ink);font-size:1rem">Pour votre culture : '+esc(c.crop)+' <span class="muted" style="font-weight:500;font-size:.82rem">(cycle d\'environ '+c.cycle_days+' jours)</span></div>';
+    (c.notes||[]).forEach((t,i)=>{ h+='<div style="font-size:.86rem;margin-top:6px'+(i===0&&c.sowing&&c.sowing.current&&c.sowing.current.verdict==="défavorable"?';color:var(--bad,#c0392b);font-weight:600':'')+'">'+esc(t)+'</div>'; });
+    if(c.sowing&&c.sowing.best&&c.sowing.best.length) h+='<div style="font-size:.86rem;margin-top:8px"><b>Meilleure période de semis ici :</b> '+c.sowing.best.map(b=>esc(b.from)+' – '+esc(b.to)+(b.need_mm!=null?' (≈ '+n(b.need_mm)+' mm d\'arrosage sur le cycle'+(b.heat_flower_days?', '+b.heat_flower_days+' j > 35 °C à la floraison':', pas de forte chaleur à la floraison')+')':'')).join(' ou ')+'. <span class="muted">À éviter : semis vers le '+esc(c.sowing.worst.around)+'</span></div>';
+    if(c.calendar){
+      h+='<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:.82rem;min-width:640px"><tr style="text-align:left;color:var(--soft)"><th style="padding:5px 6px">Stade</th><th>Dates</th><th>Pluie attendue</th><th>À apporter</th><th>Arrosage conseillé</th><th>Chaleur &gt; 35 °C</th></tr>'
+        +c.calendar.map(s=>'<tr style="border-top:1px solid var(--line);vertical-align:top"><td style="padding:6px"><b>'+esc(s.label)+'</b><div class="muted">racines ≈ '+s.root_cm+' cm</div></td><td>'+fd(s.from)+' → '+fd(s.to)+'</td><td>'+n(s.rain_mm)+' mm</td><td>'+(s.need_mm!=null?n(s.need_mm)+' mm<div class="muted">'+s.need_l_m2_week+' L/m²/sem.</div>':'—')+'</td><td>'+(s.dose_l_m2?s.dose_l_m2+' L/m² tous les '+s.interval_days+' j'+(s.dose_l_parcel?'<div class="muted">'+n(s.dose_l_parcel)+' L pour la parcelle'+(s.cans_per_watering?' ≈ '+n(s.cans_per_watering)+' arrosoirs':s.cans_impractical?' (trop pour l\'arrosoir)':'')+'</div>':''):(s.need_mm!=null&&s.need_mm<5?'pluie suffisante':s.light_need?'appoint seulement':'<span class="muted">sol à renseigner</span>'))+'</td><td>'+(s.hot_days!=null?s.hot_days+' j':'—')+'</td></tr>'
+          +(s.advice.length?'<tr><td colspan="6" style="padding:0 6px 8px"><ul style="margin:0;padding-left:18px;color:var(--ink)">'+s.advice.map(a=>'<li>'+esc(a)+'</li>').join("")+'</ul></td></tr>':'')).join("")+'</table></div>';
+      const ir=c.irrigation||{};
+      if(ir.total_need_mm!=null) h+='<div style="font-size:.86rem;margin-top:8px"><b>Arrosage sur tout le cycle (année moyenne) :</b> '+n(ir.total_need_mm)+' mm'+(ir.total_need_l_parcel!=null?', soit '+n(ir.total_need_l_parcel)+' L pour la parcelle':'')+(ir.peak?' ; pic pendant « '+esc(ir.peak.stage.toLowerCase())+' » ('+ir.peak.l_m2_week+' L/m² par semaine)':'')+'.</div>';
+    }
+    h+='<div class="muted" style="font-size:.74rem;margin-top:8px">'+esc(c.assumptions||"")+' Pluie : '+esc((c.source&&c.source.rain)||"")+'. Températures et évapotranspiration : '+esc((c.source&&c.source.temperature)||"")+'.</div></div>';
+    return h;
+  }
+  async function openClimate(id){ climData=null;
     const box=$("climateOut"); const p=myParcels.find(x=>x.id===id);
     box.innerHTML='<div class="card"><h2 class="ct" style="margin:0 0 6px">Climat de la parcelle'+(p?' · '+esc(p.name):'')+'</h2><div class="muted">Calcul sur environ 35 ans de données journalières (deux sources). La première fois, cela peut prendre jusqu\'à une minute ; ensuite le résultat est gardé.</div></div>';
     try{ box.scrollIntoView({behavior:"smooth",block:"start"}); }catch(e){}
+    // ERA5 (rapide) d'abord, puis CHIRPS (Earth Engine, plus lent) dès qu'il est prêt.
+    const get=(src)=>fetch("/api/parcels/climate?parcel="+encodeURIComponent(id)+"&source="+src).then(r=>r.json().then(d=>({ok:r.ok,d:d})));
     try{
-      const r=await fetch("/api/parcels/climate?parcel="+encodeURIComponent(id)); const d=await r.json();
-      if(!r.ok){ box.innerHTML='<div class="card"><div class="valert warn">'+esc(d.error||"Erreur.")+'</div></div>'; return; }
-      climData=d; climSrc=(d.sources.chirps&&!d.sources.chirps.error)?"chirps":"era5"; renderClimate();
-    }catch(e){ box.innerHTML='<div class="card"><div class="valert warn">Serveur injoignable. Réessayez plus tard.</div></div>'; }
+      const a=await get("era5");
+      if(!a.ok){ box.innerHTML='<div class="card"><div class="valert warn">'+esc(a.d.error||"Erreur.")+'</div></div>'; return; }
+      climData=a.d; const ch=climData.sources.chirps; climSrc=(ch&&!ch.error&&!ch.pending)?"chirps":"era5"; renderClimate();
+      if(ch&&ch.pending){ const b=await get("chirps"); if(b.ok&&climData&&climData.parcel.id===id){ climData=b.d; renderClimate(); } }
+    }catch(e){ if(!climData) box.innerHTML='<div class="card"><div class="valert warn">Serveur injoignable. Réessayez plus tard.</div></div>'; }
   }
   function spark(series, tr){
     const ys=Object.keys(series||{}).map(Number).sort((a,b)=>a-b).filter(y=>typeof series[y]==="number"); if(ys.length<3) return "";
@@ -1337,12 +1359,13 @@ html.simple .adv{display:none!important}
   }
   function renderClimate(){
     const d=climData, s=d.sources[climSrc], other=climSrc==="chirps"?"era5":"chirps", o=d.sources[other], box=$("climateOut");
-    const tab=(k,t)=>'<button class="btn'+(climSrc===k?' primary':'')+'" type="button" data-clsrc="'+k+'" style="padding:6px 12px;font-size:.84rem">'+t+(d.sources[k]&&d.sources[k].error?' (indisponible)':'')+'</button>';
+    const tab=(k,t)=>'<button class="btn'+(climSrc===k?' primary':'')+'" type="button" data-clsrc="'+k+'" style="padding:6px 12px;font-size:.84rem"'+(d.sources[k]&&d.sources[k].pending?' disabled':'')+'>'+t+(d.sources[k]&&d.sources[k].error?' (indisponible)':d.sources[k]&&d.sources[k].pending?' (calcul en cours…)':'')+'</button>';
     let h='<div class="card"><h2 class="ct" style="margin:0 0 4px">Climat de la parcelle · '+esc(d.parcel.name)+'</h2>'
       +'<div class="muted" style="font-size:.84rem">Point '+d.point.lat+'° N, '+Math.abs(d.point.lon)+'° '+(d.point.lon<0?'O':'E')+' · années '+d.years[0]+'–'+d.years[1]+'. Ce sont des statistiques du passé, pas une prévision.</div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0">'+tab("chirps","CHIRPS (satellite)")+tab("era5","ERA5 (réanalyse)")+'</div>';
     if(d.comparison){ const ag=d.comparison.filter(c=>c.agree).length; h+='<div class="valert '+(ag>=d.comparison.length*0.7?'ok':'warn')+'" style="margin-bottom:10px">Les deux sources concordent sur '+ag+' indicateur'+(ag>1?'s':'')+' sur '+d.comparison.length+'. '+(ag<d.comparison.length?'Là où elles divergent, restez prudent et croisez avec ce que vous observez au champ.':'Les résultats sont cohérents.')+'</div>'; }
-    if(!s||s.error){ h+='<div class="valert warn">'+esc((s&&s.error)||"Source indisponible.")+'</div></div>'; box.innerHTML=h; wireClim(); return; }
+    h+=cropHtml(d.crop);
+    if(!s||s.error||s.pending){ h+='<div class="valert warn">'+esc((s&&s.error)||"Source en cours de calcul.")+'</div></div>'; box.innerHTML=h; wireClim(); return; }
     const order=["CDD","CWD","R50mm","Rx1day","SU35","TR23","PRCPTOT","SDII","Rx5day","R95pTOT","TX90p","WSDI","TXx"];
     const rs=order.map(c=>s.readings.find(r=>r.code===c)).filter(Boolean);
     const top=rs.filter(r=>r.flag==="defavorable");

@@ -25,6 +25,7 @@ const SAT = require("./lib/satellite");
 // Adresse de l'API Claude (modifiable pour un relais d'entreprise ou pour les tests automatiques).
 const ANTHROPIC_BASE = (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com").replace(/\/$/, "");
 const CLIMAT = require("./lib/climat");
+const CLIMCULT = require("./lib/climat-culture"); // climat appliqué à la culture (stades, arrosage, semis)
 const PARCELLE = require("./lib/parcelle");
 const ALERTES = require("./lib/alertes");
 const ECO = require("./lib/economie"); // résultat économique d'une parcelle (ventes et coûts du carnet) // alertes « à surveiller » (satellite, prévisions, carnet) // fiche parcelle unifiée, données manquantes, cohérence du carnet // indices climatiques (contrôle, indices, tendances) // lecture des résultats Vertea (fiabilité, interprétation) // module Distribution (projet ASTRIDE)
@@ -1329,6 +1330,7 @@ async function handleParcelSave(req, res) {
   const name = (String(p.name || "").trim().slice(0, 80)) || ("Parcelle " + new Date().toLocaleDateString("fr-FR"));
   const rec = { id: newId(), user_id: user.id, name, geom: JSON.stringify(zone), created_at: new Date().toISOString() };
   await saveParcel(rec);
+  warmClimate(zone); // climat calculé en arrière-plan : prêt quand on ouvrira « Climat »
   sendJson(res, 200, { parcel: { id: rec.id, name, zone, created_at: rec.created_at } });
 }
 async function handleParcelDelete(req, res) {
@@ -1637,6 +1639,7 @@ async function handleParcelSoil(req, res) {
   }
   rec.updated_at = now;
   try { await saveParcelSoil(rec); } catch (e) { console.error("saveParcelSoil:", e.message); return sendJson(res, 500, { error: SOIL_SAVE_ERROR }); }
+  warmClimate(parcel.zone);
   sendJson(res, 200, { fiche: await buildSoilFiche(parcel, rec) });
 }
 // POST { id, texture, depth_cm, stones } : correction de terrain (test du bocal, fosse). Vide = on efface.
@@ -1662,6 +1665,7 @@ async function handleParcelSoilManual(req, res) {
   rec.manual = (texture || dep.v != null || sto.v != null) ? { texture, depth_cm: dep.v, stones: sto.v, at: now } : null;
   rec.updated_at = now;
   try { await saveParcelSoil(rec); } catch (e) { console.error("saveParcelSoil:", e.message); return sendJson(res, 500, { error: SOIL_SAVE_ERROR }); }
+  warmClimate(parcel.zone);
   sendJson(res, 200, { fiche: await buildSoilFiche(parcel, rec) });
 }
 // Conseil de la parcelle la plus récemment analysée (seuil d'arrosage de la station).
@@ -2467,12 +2471,12 @@ async function setClimateCache(key, result) {
 }
 async function fetchEra5OpenMeteo(lat, lon, y0, y1) {
   const host = (process.env.OPEN_METEO_ARCHIVE_URL || (OPEN_METEO_KEY ? "https://customer-archive-api.open-meteo.com" : "https://archive-api.open-meteo.com")).replace(/\/$/, "");
-  const url = `${host}/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${y0}-01-01&end_date=${y1}-12-31&daily=precipitation_sum,temperature_2m_max,temperature_2m_min&timezone=UTC` + (OPEN_METEO_KEY ? `&apikey=${encodeURIComponent(OPEN_METEO_KEY)}` : "");
+  const url = `${host}/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${y0}-01-01&end_date=${y1}-12-31&daily=precipitation_sum,temperature_2m_max,temperature_2m_min,et0_fao_evapotranspiration&timezone=UTC` + (OPEN_METEO_KEY ? `&apikey=${encodeURIComponent(OPEN_METEO_KEY)}` : "");
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 60000);
   try {
     const r = await fetch(url, { signal: ctl.signal }); const j = await r.json().catch(() => null);
     if (!r.ok || !j || j.error || !j.daily) throw new Error((j && j.reason) || ("HTTP " + r.status));
-    return { dates: j.daily.time, pluie: j.daily.precipitation_sum, tmax: j.daily.temperature_2m_max, tmin: j.daily.temperature_2m_min };
+    return { dates: j.daily.time, pluie: j.daily.precipitation_sum, tmax: j.daily.temperature_2m_max, tmin: j.daily.temperature_2m_min, et0: j.daily.et0_fao_evapotranspiration || null };
   } finally { clearTimeout(t); }
 }
 async function fetchChirpsVertea(lat, lon, y0, y1) {
@@ -2485,8 +2489,33 @@ const CLIMATE_SOURCES = {
   chirps: { label: "CHIRPS (pluie, satellite + stations) et ERA5-Land (températures), via Google Earth Engine", detail: "Pluie CHIRPS ~5 km ; températures ERA5-Land ~9 km.", limits: "Estimations satellitaires : à valider avec des stations au sol ; extrêmes journaliers parfois sous-estimés.", fetch: fetchChirpsVertea }
 };
 const CLIMATE_INFLIGHT = new Map();
+// v2 : la climatologie jour par jour (calendrier des cultures) fait partie du résultat gardé.
+function climateKey(src, lat, lon) { const [y0, y1] = climateYears(); return `v2:${src}:${Number(lat).toFixed(2)}:${Number(lon).toFixed(2)}:${y0}-${y1}`; }
+async function cachedClimate(src, lat, lon) { const c = await getClimateCache(climateKey(src, lat, lon)); return c && c.result && Date.now() - Date.parse(c.created_at) < CLIMATE_TTL ? Object.assign({ cached_at: c.created_at }, c.result) : null; }
+// Calcul en arrière-plan (parcelle enregistrée, culture modifiée) : quand on ouvre « Climat », c'est prêt.
+function warmClimate(zone) {
+  // Pendant les tests automatiques, jamais d'appel réseau en arrière-plan (sauf demande explicite).
+  if (process.env.NODE_ENV === "test" && process.env.CLIMATE_WARM !== "1") return;
+  const c = DIST.zoneCenter(zone); if (!c) return;
+  const lat = Math.round(c.lat * 100) / 100, lon = Math.round(c.lon * 100) / 100;
+  Object.keys(CLIMATE_SOURCES).forEach((src) => { climateForPoint(src, lat, lon, false).catch((e) => console.error("climat (arrière-plan, " + src + ") :", String(e.message || e).slice(0, 160))); });
+}
+// Le climat appliqué à la culture de la parcelle (lit le cache seulement : rapide).
+async function cropClimateFor(userId, parcel, srcs) {
+  const center = DIST.zoneCenter(parcel.zone); if (!center) return null;
+  const lat = Math.round(center.lat * 100) / 100, lon = Math.round(center.lon * 100) / 100;
+  const era5 = (srcs && srcs.era5 && !srcs.era5.error ? srcs.era5 : null) || await cachedClimate("era5", lat, lon);
+  const chirps = (srcs && srcs.chirps && !srcs.chirps.error ? srcs.chirps : null) || await cachedClimate("chirps", lat, lon);
+  const tempSrc = era5 || chirps; if (!tempSrc || !tempSrc.clim) return null;
+  const rainSrc = chirps && chirps.clim ? chirps : tempSrc;
+  const [soil, fiche] = await Promise.all([getParcelSoil(parcel.id), getParcelFiche(parcel.id)]);
+  return CLIMCULT.cropClimate({ cropName: soil && soil.crop, sownAt: soil && soil.sown_at, areaM2: FERT.zoneAreaM2(parcel.zone), irrigation: fiche && fiche.irrigation, soil: soil || {},
+    clim: Object.assign({}, tempSrc.clim, { label: tempSrc.label }), rainClim: Object.assign({}, rainSrc.clim, { label: rainSrc.label }), today: new Date().toISOString().slice(0, 10) });
+}
+// Ce qui part vers le navigateur : sans les grosses séries internes (climatologie jour par jour, pluie de chaque année).
+function publicClimate(x) { if (!x || x.error || !x.clim) return x; const o = Object.assign({}, x); o.clim = { hot35_by_month: x.clim.hot35_by_month }; return o; }
 async function climateForPoint(src, lat, lon, refresh) {
-  const [y0, y1] = climateYears(), key = `${src}:${lat.toFixed(2)}:${lon.toFixed(2)}:${y0}-${y1}`;
+  const [y0, y1] = climateYears(), key = climateKey(src, lat, lon);
   if (!refresh) { const c = await getClimateCache(key); if (c && Date.now() - Date.parse(c.created_at) < CLIMATE_TTL) return Object.assign({ cached_at: c.created_at }, c.result); }
   if (CLIMATE_INFLIGHT.has(key)) return CLIMATE_INFLIGHT.get(key);
   const job = (async () => {
@@ -2507,14 +2536,20 @@ async function handleParcelClimate(req, res) {
   const c = DIST.zoneCenter(parcel.zone); if (!c) return sendJson(res, 400, { error: "Position de la parcelle inconnue." });
   if (refresh && !rateOk("climate:" + user.id, 10, 24 * 3600 * 1000)) return sendJson(res, 429, { error: "Trop de recalculs aujourd'hui." });
   const lat = Math.round(c.lat * 100) / 100, lon = Math.round(c.lon * 100) / 100;
+  // ?source=era5 ou chirps : on calcule cette source (l'autre est lue en cache si elle est prête) ;
+  // l'écran affiche ainsi ERA5 (rapide) sans attendre CHIRPS (Earth Engine, plus lent).
+  const only = CLIMATE_SOURCES[u.searchParams.get("source")] ? u.searchParams.get("source") : null;
   const out = {};
   await Promise.all(Object.keys(CLIMATE_SOURCES).map(async (src) => {
+    if (only && src !== only) { const cc = await cachedClimate(src, lat, lon); out[src] = cc || { source: src, label: CLIMATE_SOURCES[src].label, pending: true }; return; }
     try { out[src] = await climateForPoint(src, lat, lon, refresh); }
     catch (e) { out[src] = { source: src, label: CLIMATE_SOURCES[src].label, error: "Données indisponibles pour le moment (" + String(e.message || e).slice(0, 160) + ")." }; }
   }));
-  const ok = Object.values(out).filter((x) => x && !x.error);
+  const ok = Object.values(out).filter((x) => x && !x.error && !x.pending);
   const comparison = ok.length === 2 ? CLIMAT.compareSources(out.chirps, out.era5) : null;
-  sendJson(res, 200, { parcel: { id: parcel.id, name: parcel.name }, point: { lat, lon }, years: climateYears(), sources: out, comparison });
+  let crop = null; try { crop = await cropClimateFor(user.id, parcel, out); } catch (e) { console.error("climat × culture :", e.message); }
+  const pub = {}; Object.keys(out).forEach((k) => { pub[k] = publicClimate(out[k]); });
+  sendJson(res, 200, { parcel: { id: parcel.id, name: parcel.name }, point: { lat, lon }, years: climateYears(), sources: pub, comparison, crop });
 }
 
 // ================================================================
@@ -2538,9 +2573,9 @@ async function cachedClimateLines(center) {
   if (!center) return null;
   const [y0, y1] = climateYears(), lat = Math.round(center.lat * 100) / 100, lon = Math.round(center.lon * 100) / 100;
   for (const src of ["chirps", "era5"]) {
-    const c = await getClimateCache(`${src}:${lat.toFixed(2)}:${lon.toFixed(2)}:${y0}-${y1}`);
-    if (c && c.result && c.result.readings) {
-      const rs = c.result.readings;
+    const r = await cachedClimate(src, lat, lon);
+    if (r && r.readings) {
+      const c = { result: r }, rs = r.readings;
       const lines = rs.filter((r) => ["CDD", "R50mm", "SU35", "TR23", "PRCPTOT"].includes(r.code)).map((r) => r.name + " : " + r.mean + " " + r.unit + "/an" + (r.trend && r.trend.significant ? ", " + r.trend.direction + " nette (" + r.trend.slope_per_decade + "/décennie)" : ""));
       return { source: c.result.label, lines };
     }
@@ -2551,7 +2586,8 @@ async function parcelContext(userId, parcel) {
   const [fiche, soil, entries, ndvi] = await Promise.all([getParcelFiche(parcel.id), getParcelSoil(parcel.id), listFieldLog(userId, parcel.id).catch(() => []), getParcelNdvi(parcel.id)]);
   const center = DIST.zoneCenter(parcel.zone), areaM2 = FERT.zoneAreaM2(parcel.zone);
   const clim = await cachedClimateLines(center);
-  const base = { name: parcel.name, fiche: fiche || {}, soil: soil || {}, entries: entries || [], ndvi, areaM2, center, climate: clim ? clim.lines : null, climateSource: clim ? clim.source : null };
+  let cropLines = []; try { cropLines = CLIMCULT.cropClimateLines(await cropClimateFor(userId, parcel)); } catch (e) {}
+  const base = { name: parcel.name, fiche: fiche || {}, soil: soil || {}, entries: entries || [], ndvi, areaM2, center, climate: clim ? clim.lines : null, climateSource: clim ? clim.source : null, cropClimate: cropLines };
   const check = PARCELLE.checkParcel(base);
   return Object.assign(base, check);
 }
@@ -2567,11 +2603,20 @@ async function handleAlerts(req, res) {
       const last = (await listSatObs(parcel.id, "ndvi", 1)).map(parseObs)[0];
       let forecast = [];
       if (ctx.center) { try { const w = await fetchWeatherLatLon(Math.round(ctx.center.lat * 1000) / 1000, Math.round(ctx.center.lon * 1000) / 1000); forecast = (w && w.daily) || []; } catch (e) {} }
-      ALERTES.parcelAlerts({ parcel: { id: parcel.id, name: parcel.name }, fiche: ctx.fiche, soil: ctx.soil, lastNdvi: last ? { at: last.created_at, summary: last.summary } : null, forecast, warnings: ctx.warnings, missing: ctx.missing, today }).forEach((a) => all.push(a));
+      let cc = null; try { cc = await cropClimateFor(user.id, parcel); } catch (e) {}
+      ALERTES.parcelAlerts({ cropClimate: cc && !cc.error ? cc : null, parcel: { id: parcel.id, name: parcel.name }, fiche: ctx.fiche, soil: ctx.soil, lastNdvi: last ? { at: last.created_at, summary: last.summary } : null, forecast, warnings: ctx.warnings, missing: ctx.missing, today }).forEach((a) => all.push(a));
     } catch (e) { console.error("alertes :", e.message); }
   }));
   const rank = { inspect: 0, watch: 1, info: 2 };
   sendJson(res, 200, { alerts: all.sort((a, b) => rank[a.level] - rank[b.level]) });
+}
+// Climat × culture d'une parcelle, lu en cache (rapide) : utilisé par l'écran « Aujourd'hui » du planteur.
+async function handleCropClimate(req, res) {
+  const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
+  const parcel = await findUserParcel(user.id, new URL(req.url, "http://x").searchParams.get("parcel") || ""); if (!parcel) return sendJson(res, 404, { error: "Parcelle introuvable." });
+  let cc = null; try { cc = await cropClimateFor(user.id, parcel); } catch (e) {}
+  if (!cc) warmClimate(parcel.zone);
+  sendJson(res, 200, { crop: cc, ready: !!cc });
 }
 async function handleFicheGet(req, res) {
   const user = await currentUser(req); if (!user) return sendJson(res, 401, { error: "Non connecté." });
@@ -3955,6 +4000,7 @@ async function routeRequest(req, res) {
   if (req.method === "GET" && url === "/api/parcels/climate") return handleParcelClimate(req, res);
   if (req.method === "GET" && url === "/api/parcels/fiche") return handleFicheGet(req, res);
   if (req.method === "GET" && url === "/api/alerts") return handleAlerts(req, res);
+  if (req.method === "GET" && url === "/api/parcels/crop-climate") return handleCropClimate(req, res);
   if (req.method === "POST" && url === "/api/parcels/fiche") return handleFicheSave(req, res);
   if (req.method === "GET" && url === "/api/dist") return handleDistGet(req, res);
   if (req.method === "POST" && url === "/api/dist/site") return handleDistSite(req, res);

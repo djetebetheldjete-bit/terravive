@@ -83,5 +83,50 @@ test("satellite : une baisse nette déclenche une inspection, jamais un « diagn
   assert.strictEqual(SAT.interpretNdvi({ ndvi: 0.42, pct_faible: 30, images: 1 }, null).level, "watch", "une seule image : prudence");
 });
 
+
+const CC = require("../lib/climat-culture");
+// Climat synthétique de type San-Pédro : saisons des pluies avr.-juil. et sept.-nov., chaleur > 35 °C en févr.-mars.
+function sanPedroLike() {
+  const zone = (i) => ((i >= 90 && i < 200) || (i >= 245 && i < 320)) ? "pluie" : (i >= 31 && i < 90) ? "chaleur" : "sec";
+  const s = build([1991, 2020], (y, i) => ({ p: zone(i) === "pluie" ? (i % 2 === 0 ? 12 : 0) : (i % 9 === 0 ? 4 : 0), tx: zone(i) === "chaleur" ? 35.5 + (i % 3) : 31, tn: 23.5 }));
+  s.et0 = s.dates.map((d) => ({ pluie: 3.5, chaleur: 5, sec: 4.2 })[zone(C.dayOfYear(d) - 1)]);
+  return C.analyse(s);
+}
+const clim = sanPedroLike();
+const ctx = (o) => Object.assign({ cropName: "tomate", areaM2: 1000, irrigation: "arrosoir", soil: { manual: { texture: "sand" } }, clim: clim.clim, rainClim: clim.clim, today: "2026-11-22" }, o);
+test("climat × culture : calendrier des 4 stades FAO-56 de la tomate à partir du semis", () => {
+  const r = CC.cropClimate(ctx({ sownAt: "2026-10-01" }));
+  assert.ok(!r.error, r.error); assert.strictEqual(r.calendar.length, 4); assert.strictEqual(r.cycle_days, 135);
+  assert.strictEqual(r.calendar[0].from, "2026-10-01"); assert.strictEqual(r.calendar[0].to, "2026-10-30");
+  assert.strictEqual(r.calendar[3].to, "2027-02-12");
+});
+test("arrosage : besoin = ETc − pluie efficace ; dose et fréquence selon le sol sableux et les racines", () => {
+  const r = CC.cropClimate(ctx({ sownAt: "2026-12-01" }));   // cycle en saison sèche
+  const s = r.calendar[2];
+  assert.ok(s.need_mm > 50, "saison sèche : il faut arroser (" + s.need_mm + " mm)");
+  assert.ok(s.dose_l_m2 > 0 && s.interval_days >= 1, "dose et fréquence calculées");
+  assert.ok(Math.abs(s.dose_l_parcel - s.dose_l_m2 * 1000) <= 500, "dose pour 1 000 m² ≈ dose par m² × 1 000");
+  assert.ok(s.cans_impractical && s.cans_per_watering == null, "1 000 m² à l'arrosoir : trop d'arrosoirs, on le dit au lieu de les compter");
+  assert.ok(r.notes.some((x) => /au pied des plants/.test(x)), "conseil pratique pour l'arrosoir");
+  const garden = CC.cropClimate(ctx({ sownAt: "2026-12-01", areaM2: 50 })).calendar[2];
+  assert.ok(Math.abs(garden.cans_per_watering - garden.dose_l_parcel / 10) <= 1, "petit jardin de 50 m² : nombre d'arrosoirs de 10 L");
+  assert.ok(r.irrigation.total_need_mm > 0 && r.irrigation.peak, "total et pic de besoin");
+  const wet = CC.cropClimate(ctx({ sownAt: "2026-04-01" }));
+  assert.ok(wet.calendar[1].need_mm < s.need_mm, "en saison des pluies, moins d'arrosage");
+});
+test("chaleur à la floraison signalée, et meilleure période de semis qui l'évite", () => {
+  const bad = CC.cropClimate(ctx({ sownAt: "2026-12-10" }));    // floraison en février-mars (chaleur)
+  assert.ok(bad.calendar[2].hot_days >= 3 && bad.calendar[2].advice.some((a) => /35 °C/.test(a)), JSON.stringify(bad.calendar[2]));
+  assert.ok(["moyenne", "défavorable"].includes(bad.sowing.current.verdict));
+  assert.ok(bad.sowing.best.length >= 1 && bad.sowing.best[0].heat_flower_days < bad.calendar[2].hot_days, "la période conseillée évite la chaleur à la floraison");
+});
+test("sans date de semis : seulement la meilleure période ; sans sol : pas de dose inventée", () => {
+  const r = CC.cropClimate(ctx({ sownAt: null })); assert.ok(r.sowing.best.length && !r.calendar && /date de semis/.test(r.notes[0]));
+  const n = CC.cropClimate(ctx({ sownAt: "2026-12-01", soil: {} })); assert.ok(n.calendar[2].dose_l_m2 == null && n.notes.some((x) => /Sol inconnu/.test(x)));
+  assert.ok(CC.cropClimate(ctx({ cropName: "" })).error, "sans culture : message clair");
+});
+test("pluie efficace (méthode USDA) bornée et nulle sans pluie", () => {
+  assert.strictEqual(CC.effectiveRain(0, 30), 0); const pe = CC.effectiveRain(100, 30); assert.ok(pe > 80 && pe < 100, pe);
+});
 console.log("\n  " + (total - failed) + "/" + total + " tests réussis\n");
 process.exit(failed ? 1 : 0);
