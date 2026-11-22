@@ -1,5 +1,15 @@
 # Journal des versions — Terravive
 
+## v8.16 — 21 novembre 2026 : espace planteur, version sobre et professionnelle
+Retour d'utilisation sur la v8.15 : « pas professionnel ». Le décor de dessin animé est retiré.
+- **Fond uni** : plus de collines, pousses, nuages ni soleil animés.
+- **Bandeau compact** avec un motif discret de courbes de niveau (comme une carte topographique) ; la météo réelle de la parcelle dans une pastille, avec des icônes au trait, sans animation.
+- **Indicateurs** (parcelles, à faire, travaux notés) affichés seulement quand le compte a au moins une parcelle — plus de rangée de zéros. Chiffres en police sans empattement, alignés.
+- **« Bien démarrer »** : une liste de 3 étapes avec barre de progression, cochées d'après les vraies données du compte (parcelle dessinée, culture renseignée, plan préparé) ; elle disparaît quand tout est fait. Remplace l'illustration de la graine.
+- **Compte sans parcelle** : un état vide simple (icône, phrase, bouton « Dessiner ma première parcelle »).
+- **Animateur** : carte au même style, avec un statut « Rattaché » ou « En attente ».
+- Ordinateur : la colonne de droite s'aligne sur les indicateurs. Service worker v34.
+
 ## v8.15 — 21 novembre 2026 : espace planteur vivant
 - **Paysage en fond** : collines, pousses qui se balancent au vent, nuages qui passent ; le soleil suit l'heure réelle (bas le matin, haut à midi, orangé le soir, lune la nuit). Très pâle, derrière le contenu.
 - **Bandeau d'accueil** (même vert et même colline que la connexion) : « Bonjour », la date, et la météo réelle de la première parcelle (Open-Meteo, à sa position), avec une icône animée (rayons qui tournent, gouttes qui tombent). Sur ordinateur : prévisions des 3 prochains jours. Sans parcelle, pas de météo plutôt qu'une météo inventée.
