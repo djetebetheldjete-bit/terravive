@@ -1,0 +1,25 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+
+# Plateformes générées par `flutter create .`
+android/
+ios/
+web/
+linux/
+macos/
+windows/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Firebase (secrets)
+google-services.json
+GoogleService-Info.plist
+lib/firebase_options.dart
